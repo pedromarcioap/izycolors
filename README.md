@@ -42,7 +42,7 @@ cd izycolors```
 
 Install dependencies:
 Bash
-```npm install
+```npm install```
 # or
 ```bun install```
 
