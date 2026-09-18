@@ -50,8 +50,11 @@ Configure environment variables:
 Create a .env file in the root folder based on .env.example[cite: 1]:
 
 Code snippet
+
 VITE_SUPABASE_URL=your-supabase-url
+
 VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+
 Run the development server:
 
 Bash
@@ -60,18 +63,27 @@ npm run dev
 bun dev
 Open http://localhost:5173 in your browser.
 
-'''📂 Project Structure
-Plaintext
-src/
-├── components/     # UI views, modals, and navigation controls[cite: 1]
-├── data/           # Default configurations and starter presets[cite: 1]
-├── services/       # Supabase client and authentication services[cite: 1]
-├── utils/          # Mathematical color conversion and contrast algorithms[cite: 1]
-└── types.ts        # Global TypeScript interfaces and definitions[cite: 1]
-🤝 Contributing
-Contributions, mathematical color improvements, and bug fixes are welcome!'''
+📂 Project Structure
 
-Fork the Project
+Plaintext
+
+src/
+
+├── components/     # UI views, modals, and navigation controls[cite: 1]
+
+├── data/           # Default configurations and starter presets[cite: 1]
+
+├── services/       # Supabase client and authentication services[cite: 1]
+
+├── utils/          # Mathematical color conversion and contrast algorithms[cite: 1]
+
+└── types.ts        # Global TypeScript interfaces and definitions[cite: 1]
+
+🤝 Contributing
+
+Contributions, mathematical color improvements, and bug fixes are welcome!
+
+## Fork the Project
 
 Create your Feature Branch (git checkout -b feature/AmazingFeature)
 
@@ -81,5 +93,5 @@ Push to the Branch (git push origin feature/AmazingFeature)
 
 Open a Pull Request
 
-📄 License
+# 📄 License
 Distributed under the MIT License.
