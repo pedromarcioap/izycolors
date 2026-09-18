@@ -38,13 +38,14 @@ A comprehensive chromatic workstation built for designers, illustrators, and fro
 1. Clone the repository:
 ```bash
 git clone [https://github.com/pedromarcioap/izycolors.git](https://github.com/pedromarcioap/izycolors.git)
-cd izycolors
-Install dependencies:
+cd izycolors```
 
+Install dependencies:
 Bash
-npm install
+```npm install
 # or
-bun install
+```bun install```
+
 Configure environment variables:
 Create a .env file in the root folder based on .env.example[cite: 1]:
 
@@ -54,9 +55,9 @@ VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
 Run the development server:
 
 Bash
-npm run dev
+```npm run dev```
 # or
-bun dev
+```bun dev```
 Open http://localhost:5173 in your browser.
 
 📂 Project Structure
