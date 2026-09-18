@@ -60,7 +60,7 @@ npm run dev
 bun dev
 Open http://localhost:5173 in your browser.
 
-📂 Project Structure
+'''📂 Project Structure
 Plaintext
 src/
 ├── components/     # UI views, modals, and navigation controls[cite: 1]
@@ -69,7 +69,7 @@ src/
 ├── utils/          # Mathematical color conversion and contrast algorithms[cite: 1]
 └── types.ts        # Global TypeScript interfaces and definitions[cite: 1]
 🤝 Contributing
-Contributions, mathematical color improvements, and bug fixes are welcome!
+Contributions, mathematical color improvements, and bug fixes are welcome!'''
 
 Fork the Project
 
