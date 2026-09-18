@@ -14,9 +14,12 @@ import {
   User, 
   FileText, 
   Command,
-  Maximize2
+  Maximize2,
+  ShieldCheck,
+  LayoutDashboard,
+  LogIn
 } from 'lucide-react';
-import { ColorGamut, NavigationTab, UserProfile } from '../types';
+import { ColorGamut, NavigationTab, UserProfile, AuthUser } from '../types';
 
 interface NavbarProps {
   currentTab: NavigationTab;
@@ -24,6 +27,8 @@ interface NavbarProps {
   gamut: ColorGamut;
   onGamutChange: (gamut: ColorGamut) => void;
   userProfile: UserProfile;
+  authUser?: AuthUser;
+  onOpenAuthModal?: () => void;
   onOpenCommandPalette: () => void;
   onOpenExportModal: () => void;
   favoritesCount: number;
@@ -37,6 +42,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   gamut,
   onGamutChange,
   userProfile,
+  authUser,
+  onOpenAuthModal,
   onOpenCommandPalette,
   onOpenExportModal,
   favoritesCount,
@@ -172,37 +179,69 @@ export const Navbar: React.FC<NavbarProps> = ({
             )}
           </div>
 
-          {/* Export Tokens Button */}
+          {/* Export Button */}
           <button
             onClick={onOpenExportModal}
-            className="h-8 px-3 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded text-xs font-medium flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-colors"
+            className="h-8 px-3 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded text-xs font-medium flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-colors cursor-pointer"
+            title="Exportar Amostras e Tokens de Cores"
           >
             <Download className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Exportar Tokens</span>
+            <span className="hidden sm:inline">Exportar Amostras & Tokens</span>
           </button>
 
-          {/* User Profile Avatar */}
-          <button
-            onClick={() => onTabChange('profile')}
-            className={`flex items-center gap-2 p-0.5 rounded-full transition-all ${
-              currentTab === 'profile' 
-                ? 'ring-2 ring-[#6366F1] ring-offset-2 ring-offset-[#0B0F17]' 
-                : 'hover:opacity-90'
-            }`}
-            title="Ver Perfil de Helena Vance"
-          >
-            <div className="relative">
-              <img 
-                src={userProfile.avatar} 
-                alt={userProfile.name}
-                className="w-8 h-8 rounded-full object-cover border border-white/20"
-              />
-              <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-[#0B0F17] rounded-full" />
+          {/* User Profile & Role Account Pill */}
+          {authUser ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onTabChange(authUser.role === 'admin' ? 'admin' : 'user_dashboard')}
+                className={`flex items-center gap-2 px-2 py-1 rounded-lg border transition-all ${
+                  currentTab === 'admin' || currentTab === 'user_dashboard'
+                    ? 'bg-white/[0.08] border-white/30'
+                    : 'bg-[#181C24] border-white/[0.08] hover:border-white/20'
+                }`}
+                title={`Logado como ${authUser.name} (${authUser.role === 'admin' ? 'Administrador' : 'Usuário Comum'})`}
+              >
+                <div className="relative">
+                  <img 
+                    src={authUser.avatar} 
+                    alt={authUser.name}
+                    className="w-6 h-6 rounded-full object-cover border border-white/20"
+                  />
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#0B0F17] ${
+                    authUser.role === 'admin' ? 'bg-purple-400' : 'bg-[#06B6D4]'
+                  }`} />
+                </div>
+                <span className="text-xs font-semibold text-white/90 hidden md:inline">
+                  {authUser.name.split(' ')[0]}
+                </span>
+                <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.2 rounded border ${
+                  authUser.role === 'admin'
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                    : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+                }`}>
+                  {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
+                </span>
+              </button>
+
+              {onOpenAuthModal && (
+                <button
+                  onClick={onOpenAuthModal}
+                  className="px-2 py-1 text-[11px] font-mono text-[#94A3B8] hover:text-white bg-[#181C24] hover:bg-[#202534] border border-white/[0.08] rounded-md transition-colors cursor-pointer"
+                  title="Trocar perfil ou entrar"
+                >
+                  Trocar
+                </button>
+              )}
             </div>
-            <span className="text-xs font-medium text-white/90 hidden md:inline font-mono">
-              {userProfile.handle}
-            </span>
-          </button>
+          ) : (
+            <button
+              onClick={onOpenAuthModal}
+              className="h-8 px-3 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Entrar</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -303,28 +342,48 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Auditoria WCAG</span>
           </button>
 
-          <button
-            onClick={() => onTabChange('cms')}
-            className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-all ${
-              currentTab === 'cms'
-                ? 'bg-[#6366F1] text-white shadow-sm'
-                : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-            }`}
-          >
-            <FileText className="w-3.5 h-3.5" />
-            <span>CMS Editorial</span>
-          </button>
+          {authUser?.role === 'admin' && (
+            <button
+              onClick={() => onTabChange('admin')}
+              className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                currentTab === 'admin'
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+              <span>Painel Admin</span>
+            </button>
+          )}
+
+          {authUser?.role === 'admin' && (
+            <button
+              onClick={() => onTabChange('cms')}
+              className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+                currentTab === 'cms'
+                  ? 'bg-[#6366F1] text-white shadow-sm'
+                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>CMS Editorial</span>
+            </button>
+          )}
 
           <button
             onClick={() => onTabChange('profile')}
-            className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-all ${
-              currentTab === 'profile'
-                ? 'bg-[#6366F1] text-white shadow-sm'
+            className={`px-3 py-1.5 rounded-md font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
+              currentTab === 'profile' || currentTab === 'user_dashboard'
+                ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
                 : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
             }`}
           >
-            <User className="w-3.5 h-3.5" />
-            <span>Perfil</span>
+            {authUser?.avatar ? (
+              <img src={authUser.avatar} alt="" className="w-4 h-4 rounded-full object-cover" />
+            ) : (
+              <User className="w-3.5 h-3.5" />
+            )}
+            <span>{authUser?.name ? authUser.name.split(' ')[0] : 'Meu Perfil'}</span>
           </button>
         </nav>
 

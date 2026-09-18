@@ -10,22 +10,29 @@ import { AccessibilityView } from './components/AccessibilityView';
 import { ProjectsVaultView } from './components/ProjectsVaultView';
 import { CmsAdminView } from './components/CmsAdminView';
 import { ProfileView } from './components/ProfileView';
+import { AdminAreaView } from './components/AdminAreaView';
+import { AuthModal } from './components/AuthModal';
 import { CommandPalette } from './components/CommandPalette';
 import { ExportModal } from './components/ExportModal';
 import { SubmitPaletteModal } from './components/SubmitPaletteModal';
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
+import { SavePaletteModal } from './components/SavePaletteModal';
 
 import { 
   NavigationTab, 
   ColorGamut, 
   Palette, 
   ProjectWorkspace, 
+  ProjectPalette,
   CollectionBoard, 
   FavoriteColor, 
+  VaultPalette,
   CmsArticle, 
   CommunitySubmission, 
   UserProfile,
-  CuratedDemoImage
+  CuratedDemoImage,
+  AuthUser,
+  AuditLogItem
 } from './types';
 
 import { 
@@ -34,6 +41,7 @@ import {
   INITIAL_PROJECTS, 
   INITIAL_COLLECTIONS, 
   INITIAL_FAVORITE_COLORS, 
+  INITIAL_VAULT_PALETTES,
   INITIAL_CMS_ARTICLES, 
   INITIAL_SUBMISSIONS, 
   INITIAL_TAXONOMY_TAGS 
@@ -48,13 +56,29 @@ import {
   isSupabaseConfigured
 } from './services/supabase';
 
-import { Menu, Sparkles, Sliders, Database, GitFork, Download, Check } from 'lucide-react';
+import { 
+  getStoredUsers, 
+  saveStoredUsers, 
+  getCurrentAuthUser, 
+  setCurrentAuthUser, 
+  getStoredAuditLogs, 
+  switchDemoRole,
+  checkCurrentSession
+} from './services/authService';
+
+import { Menu, Sparkles, Sliders, Database, GitFork, Download, Check, ShieldCheck, ShieldAlert, LayoutDashboard, LogIn, User } from 'lucide-react';
 
 export function App() {
   // Navigation & Gamut State
   const [currentTab, setCurrentTab] = useState<NavigationTab>('generator');
   const [gamut, setGamut] = useState<ColorGamut>('Display P3');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
+
+  // Authentication & Role Governance State
+  const [authUser, setAuthUser] = useState<AuthUser>(() => getCurrentAuthUser());
+  const [usersList, setUsersList] = useState<AuthUser[]>(() => getStoredUsers());
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => getStoredAuditLogs());
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Supabase & Persistence State
   const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(isSupabaseConfigured());
@@ -82,6 +106,11 @@ export function App() {
     return saved ? JSON.parse(saved) : INITIAL_FAVORITE_COLORS;
   });
 
+  const [vaultPalettes, setVaultPalettes] = useState<VaultPalette[]>(() => {
+    const saved = localStorage.getItem('chromatica_vault_palettes');
+    return saved ? JSON.parse(saved) : INITIAL_VAULT_PALETTES;
+  });
+
   const [articles, setArticles] = useState<CmsArticle[]>(() => {
     const saved = localStorage.getItem('chromatica_articles');
     return saved ? JSON.parse(saved) : INITIAL_CMS_ARTICLES;
@@ -93,7 +122,16 @@ export function App() {
   });
 
   const [taxonomyTags, setTaxonomyTags] = useState(INITIAL_TAXONOMY_TAGS);
-  const [userProfile, setUserProfile] = useState<UserProfile>(INITIAL_USER_PROFILE);
+  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
+    const current = getCurrentAuthUser();
+    return {
+      ...INITIAL_USER_PROFILE,
+      name: current.name,
+      handle: current.handle,
+      avatar: current.avatar,
+      bio: current.bio || INITIAL_USER_PROFILE.bio
+    };
+  });
 
   // Generator Seed State
   const [generatorSeed, setGeneratorSeed] = useState<string[]>(['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85']);
@@ -104,6 +142,9 @@ export function App() {
   const [exportPaletteTitle, setExportPaletteTitle] = useState<string>('Izy Colors System Palette');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
+  const [isSavePaletteModalOpen, setIsSavePaletteModalOpen] = useState(false);
+  const [savePaletteModalColors, setSavePaletteModalColors] = useState<string[]>(['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85']);
+  const [savePaletteModalTitle, setSavePaletteModalTitle] = useState<string>('Nova Paleta Harmônica');
   const [notificationToast, setNotificationToast] = useState<string | null>(null);
 
   const showToast = useCallback((msg: string) => {
@@ -111,12 +152,33 @@ export function App() {
     setTimeout(() => setNotificationToast(null), 3500);
   }, []);
 
-  // Load curated images on mount
+  // Load curated images and sync active auth session on mount
   useEffect(() => {
     loadCuratedImages().then(images => {
       setCuratedImages(images);
     });
+
+    // Check if there is an active Supabase or local session
+    checkCurrentSession().then(user => {
+      if (user) {
+        setAuthUser(user);
+        setUserProfile(prev => ({
+          ...prev,
+          name: user.name,
+          handle: user.handle,
+          avatar: user.avatar,
+          bio: user.bio || prev.bio
+        }));
+      }
+    });
   }, []);
+
+  // Strict RBAC Guard: If non-admin user is on admin or cms, redirect to profile
+  useEffect(() => {
+    if (authUser.role !== 'admin' && (currentTab === 'admin' || currentTab === 'cms')) {
+      setCurrentTab('profile');
+    }
+  }, [authUser.role, currentTab]);
 
   // Check Supabase connection
   const checkSupabaseStatus = useCallback(() => {
@@ -139,6 +201,10 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('chromatica_fav_colors', JSON.stringify(favoriteColors));
   }, [favoriteColors]);
+
+  useEffect(() => {
+    localStorage.setItem('chromatica_vault_palettes', JSON.stringify(vaultPalettes));
+  }, [vaultPalettes]);
 
   useEffect(() => {
     localStorage.setItem('chromatica_articles', JSON.stringify(articles));
@@ -180,18 +246,77 @@ export function App() {
     showToast(`Amostra ${hex} salva com sucesso no Cofre de Cores!`);
   };
 
-  // Save current palette to a collection
+  // Open Save Palette Modal for saving entire palette to Vault, Project, or Collection
+  const handleOpenSavePaletteModal = (colors: string[], title?: string) => {
+    setSavePaletteModalColors(colors && colors.length > 0 ? colors : generatorSeed);
+    setSavePaletteModalTitle(title || 'Nova Paleta Harmônica');
+    setIsSavePaletteModalOpen(true);
+  };
+
+  // Save full palette to private Vault
+  const handleSavePaletteToVault = (vaultPalette: VaultPalette) => {
+    setVaultPalettes(prev => [vaultPalette, ...prev]);
+    showToast(`Paleta completa "${vaultPalette.title}" salva com sucesso no Cofre Privado!`);
+  };
+
+  // Save full palette to a specific project workspace
+  const handleSavePaletteToProject = (projectId: string, projectPalette: ProjectPalette) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          palettes: [projectPalette, ...(p.palettes || [])],
+          updatedAt: 'Agora'
+        };
+      }
+      return p;
+    }));
+    showToast(`Paleta "${projectPalette.name}" adicionada ao projeto com sucesso!`);
+  };
+
+  // Create new project with palette included
+  const handleCreateProjectWithPalette = (newProject: ProjectWorkspace) => {
+    setProjects(prev => [newProject, ...prev]);
+    showToast(`Projeto "${newProject.name}" criado com sua nova paleta!`);
+  };
+
+  // Save palette into a specific Collection board
+  const handleSaveToCollectionBoard = (collectionId: string, colors: string[]) => {
+    setCollections(prev => prev.map(c => {
+      if (c.id === collectionId) {
+        return {
+          ...c,
+          coverColors: colors
+        };
+      }
+      return c;
+    }));
+    showToast('Paleta vinculada ao quadro de coleção com sucesso!');
+  };
+
+  // Delete full palette from Vault
+  const handleDeleteVaultPalette = (id: string) => {
+    setVaultPalettes(prev => prev.filter(p => p.id !== id));
+    showToast('Paleta removida do Cofre.');
+  };
+
+  // Delete palette from Project
+  const handleDeleteProjectPalette = (projectId: string, paletteId: string) => {
+    setProjects(prev => prev.map(p => {
+      if (p.id === projectId) {
+        return {
+          ...p,
+          palettes: (p.palettes || []).filter(pal => pal.id !== paletteId)
+        };
+      }
+      return p;
+    }));
+    showToast('Paleta removida do projeto.');
+  };
+
+  // Save current palette to a collection (shortcut or modal)
   const handleSaveToCollection = (colors: string[]) => {
-    setCollections(prev => {
-      if (prev.length === 0) return prev;
-      const updated = [...prev];
-      updated[0] = {
-        ...updated[0],
-        coverColors: colors
-      };
-      return updated;
-    });
-    showToast(`Paleta salva com sucesso na coleção "${collections[0]?.title || 'Recentes'}"!`);
+    handleOpenSavePaletteModal(colors);
   };
 
   // Likes on community palettes
@@ -320,6 +445,8 @@ export function App() {
         gamut={gamut}
         onGamutChange={setGamut}
         userProfile={userProfile}
+        authUser={authUser}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenExportModal={() => handleOpenExport()}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
@@ -357,6 +484,8 @@ export function App() {
                 {currentTab === 'extractor' && 'Extrator de Imagens & Curador'}
                 {currentTab === 'lab' && 'Color Space Lab (P3 / Rec.2020)'}
                 {currentTab === 'accessibility' && 'Auditoria Acessibilidade WCAG / APCA'}
+                {currentTab === 'admin' && 'Painel Administrativo & Governança'}
+                {currentTab === 'user_dashboard' && 'Área do Usuário & Criador'}
                 {currentTab === 'cms' && 'CMS Editorial & Curadoria'}
                 {currentTab === 'profile' && 'Perfil de Criador'}
               </span>
@@ -367,6 +496,29 @@ export function App() {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* User Account / Auth Modal Trigger */}
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="h-8 px-2 sm:px-2.5 rounded-lg bg-[#181C24] hover:bg-[#202534] border border-white/[0.08] hover:border-white/20 text-xs flex items-center gap-2 transition-colors cursor-pointer"
+              title={`Conta: ${authUser.name} (${authUser.role === 'admin' ? 'Administrador' : 'Usuário Comum'}) - Clique para gerenciar`}
+            >
+              <img 
+                src={authUser.avatar} 
+                alt={authUser.name} 
+                className="w-5 h-5 rounded-full object-cover border border-white/20"
+              />
+              <span className="hidden sm:inline text-white font-medium text-xs">
+                {authUser.name.split(' ')[0]}
+              </span>
+              <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border ${
+                authUser.role === 'admin'
+                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                  : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+              }`}>
+                {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
+              </span>
+            </button>
+
             <button
               onClick={() => setIsSupabaseModalOpen(true)}
               className={`h-8 px-2.5 rounded-lg text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${
@@ -385,10 +537,10 @@ export function App() {
             <button
               onClick={() => handleOpenExport()}
               className="h-8 px-3 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-              title="Exportar para Adobe Illustrator (.jsx / .ase) e Código"
+              title="Exportar para Adobe Illustrator (.jsx / .ase), CSS, Tailwind, JSON e SVG"
             >
               <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Exportar Amostras</span>
+              <span className="hidden sm:inline">Exportar Amostras & Tokens</span>
             </button>
           </div>
         </header>
@@ -462,38 +614,149 @@ export function App() {
               projects={projects}
               collections={collections}
               favoriteColors={favoriteColors}
+              vaultPalettes={vaultPalettes}
               onOpenInGenerator={handleOpenInGenerator}
               onOpenExport={handleOpenExport}
               onCreateProject={handleCreateProject}
+              onDeleteProject={(id) => {
+                setProjects(prev => prev.filter(p => p.id !== id));
+                showToast('Projeto removido.');
+              }}
               onCreateCollection={handleCreateCollection}
+              onSavePaletteToProject={handleSavePaletteToProject}
+              onDeletePaletteFromProject={handleDeleteProjectPalette}
+              onSavePaletteToVault={handleSavePaletteToVault}
+              onDeleteVaultPalette={handleDeleteVaultPalette}
               onDeleteFavoriteColor={handleDeleteFavoriteColor}
               onDeleteCollection={handleDeleteCollection}
             />
           )}
 
           {currentTab === 'cms' && (
-            <CmsAdminView
-              articles={articles}
-              submissions={submissions}
-              tags={taxonomyTags}
-              onCreateArticle={handleCreateArticle}
-              onApproveSubmission={handleApproveSubmission}
-              onRejectSubmission={handleRejectSubmission}
-              onAddTag={handleAddTag}
-              onOpenInGenerator={handleOpenInGenerator}
-            />
+            authUser.role === 'admin' ? (
+              <CmsAdminView
+                articles={articles}
+                submissions={submissions}
+                tags={taxonomyTags}
+                onCreateArticle={handleCreateArticle}
+                onApproveSubmission={handleApproveSubmission}
+                onRejectSubmission={handleRejectSubmission}
+                onAddTag={handleAddTag}
+                onOpenInGenerator={handleOpenInGenerator}
+              />
+            ) : (
+              <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
+                <ShieldAlert className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white font-['Geist']">Acesso Restrito</h3>
+                <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">
+                  O painel CMS Editorial e curadoria de conteúdo é restrito exclusivamente a administradores credenciados.
+                </p>
+                <button
+                  onClick={() => setCurrentTab('profile')}
+                  className="px-4 py-2 bg-[#6366F1] text-white font-semibold text-xs rounded-lg hover:bg-[#6366F1]/90 transition-colors cursor-pointer"
+                >
+                  Ir para Meu Perfil & Painel
+                </button>
+              </div>
+            )
           )}
 
-          {currentTab === 'profile' && (
+          {currentTab === 'admin' && (
+            authUser.role === 'admin' ? (
+              <AdminAreaView
+                currentUser={authUser}
+                onUserChange={(user) => {
+                  setAuthUser(user);
+                  setUserProfile(prev => ({
+                    ...prev,
+                    name: user.name,
+                    handle: user.handle,
+                    avatar: user.avatar,
+                    bio: user.bio || prev.bio
+                  }));
+                  showToast(`Perfil alternado para ${user.name} (${user.role === 'admin' ? 'Admin' : 'Usuário'})`);
+                }}
+                usersList={usersList}
+                onUpdateUsersList={setUsersList}
+                submissions={submissions}
+                onApproveSubmission={handleApproveSubmission}
+                onRejectSubmission={handleRejectSubmission}
+                articles={articles}
+                onCreateArticle={handleCreateArticle}
+                onDeleteArticle={(id) => setArticles(prev => prev.filter(a => a.id !== id))}
+                auditLogs={auditLogs}
+                onOpenInGenerator={handleOpenInGenerator}
+                onNavigateToUserPortal={() => setCurrentTab('profile')}
+                isSupabaseConnected={isSupabaseConnected}
+                onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+              />
+            ) : (
+              <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
+                <ShieldAlert className="w-12 h-12 text-purple-400 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white font-['Geist']">Painel Restrito a Administradores</h3>
+                <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">
+                  Esta área contém governança de usuários, logs de auditoria e configurações de persistência na nuvem. Privilégios de administrador são obrigatórios.
+                </p>
+                <button
+                  onClick={() => setCurrentTab('profile')}
+                  className="px-4 py-2 bg-[#6366F1] text-white font-semibold text-xs rounded-lg hover:bg-[#6366F1]/90 transition-colors cursor-pointer"
+                >
+                  Ir para Meu Perfil & Painel
+                </button>
+              </div>
+            )
+          )}
+
+          {(currentTab === 'profile' || currentTab === 'user_dashboard') && (
             <ProfileView
+              authUser={authUser}
               userProfile={userProfile}
               palettes={palettes}
               projects={projects}
               collections={collections}
+              favoriteColors={favoriteColors}
+              vaultPalettes={vaultPalettes}
+              submissions={submissions}
               onOpenInGenerator={handleOpenInGenerator}
               onSaveToCollection={handleSaveToCollection}
               onOpenExport={handleOpenExport}
-              onUpdateProfile={(updated) => setUserProfile(prev => ({ ...prev, ...updated }))}
+              onUpdateProfile={(updated) => {
+                setUserProfile(prev => ({ ...prev, ...updated }));
+                if (updated.name || updated.handle || updated.bio) {
+                  setAuthUser(prev => {
+                    const nextUser: AuthUser = {
+                      ...prev,
+                      name: updated.name || prev.name,
+                      handle: updated.handle || prev.handle,
+                      bio: updated.bio !== undefined ? updated.bio : prev.bio
+                    };
+                    setCurrentAuthUser(nextUser);
+                    setUsersList(curr => curr.map(u => u.id === nextUser.id ? nextUser : u));
+                    return nextUser;
+                  });
+                }
+                showToast('Perfil atualizado com sucesso.');
+              }}
+              onDeleteFavoriteColor={(hex) => {
+                setFavoriteColors(prev => prev.filter(f => f.hex !== hex));
+                showToast('Amostra removida dos favoritos.');
+              }}
+              onDeleteVaultPalette={handleDeleteVaultPalette}
+              onOpenAuthModal={() => setIsAuthModalOpen(true)}
+              onLogout={() => {
+                const guestUser = switchDemoRole('user');
+                setAuthUser(guestUser);
+                setUserProfile(prev => ({
+                  ...prev,
+                  name: guestUser.name,
+                  handle: guestUser.handle,
+                  avatar: guestUser.avatar,
+                  bio: guestUser.bio || ''
+                }));
+                showToast('Sessão desconectada.');
+              }}
+              onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
+              isSupabaseConnected={isSupabaseConnected}
             />
           )}
         </main>
@@ -508,6 +771,20 @@ export function App() {
         />
       </div>
 
+      {/* Save Palette to Projects, Vault or Collections Modal */}
+      <SavePaletteModal
+        isOpen={isSavePaletteModalOpen}
+        colors={savePaletteModalColors}
+        initialTitle={savePaletteModalTitle}
+        projects={projects}
+        collections={collections}
+        onClose={() => setIsSavePaletteModalOpen(false)}
+        onSaveToVault={handleSavePaletteToVault}
+        onSaveToProject={handleSavePaletteToProject}
+        onCreateProjectWithPalette={handleCreateProjectWithPalette}
+        onSaveToCollection={handleSaveToCollectionBoard}
+      />
+
       {/* Command Palette (⌘K) Modal */}
       <CommandPalette
         isOpen={isCommandPaletteOpen}
@@ -519,6 +796,7 @@ export function App() {
         }}
         onGamutChange={setGamut}
         onOpenExport={() => handleOpenExport()}
+        authUser={authUser}
       />
 
       {/* Export Tokens Modal with Adobe Illustrator & Swatches support */}
@@ -542,6 +820,34 @@ export function App() {
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
         onConnectionChange={checkSupabaseStatus}
+      />
+
+      {/* Role-Based Authentication & Account Management Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        currentUser={authUser}
+        onUserChange={(user) => {
+          setAuthUser(user);
+          setUserProfile(prev => ({
+            ...prev,
+            name: user.name,
+            handle: user.handle,
+            avatar: user.avatar,
+            bio: user.bio || prev.bio
+          }));
+          showToast(`Sessão ativa como ${user.name} (${user.role === 'admin' ? 'Administrador' : 'Usuário Comum'})`);
+        }}
+        onLogout={() => {
+          const guestUser = switchDemoRole('user');
+          setAuthUser(guestUser);
+          if (currentTab === 'admin' || currentTab === 'cms') {
+            setCurrentTab('user_dashboard');
+          }
+          showToast('Sessão desconectada. Modo visitante ativo.');
+        }}
+        onNavigateToAdmin={() => setCurrentTab('admin')}
+        onNavigateToUserPortal={() => setCurrentTab('user_dashboard')}
       />
     </div>
   );

@@ -2,5 +2,7 @@
   "name": "Izy Colors",
   "description": "Plataforma avançada de exploração cromática, gerador procedural com barra de espaço, harmonias matemáticas, extrator de imagem, auditoria WCAG e CMS editorial.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

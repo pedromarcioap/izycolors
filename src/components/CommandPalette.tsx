@@ -11,9 +11,11 @@ import {
   User, 
   Download, 
   X,
-  Palette as PaletteIcon
+  Palette as PaletteIcon,
+  ShieldCheck,
+  LayoutDashboard
 } from 'lucide-react';
-import { NavigationTab, ColorGamut } from '../types';
+import { NavigationTab, ColorGamut, AuthUser } from '../types';
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -22,6 +24,7 @@ interface CommandPaletteProps {
   onQuickGenerate: () => void;
   onGamutChange: (gamut: ColorGamut) => void;
   onOpenExport: () => void;
+  authUser?: AuthUser;
 }
 
 interface CommandItem {
@@ -43,7 +46,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   onNavigate,
   onQuickGenerate,
   onGamutChange,
-  onOpenExport
+  onOpenExport,
+  authUser
 }) => {
   const [query, setQuery] = useState('');
 
@@ -68,7 +72,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       category: 'Ações Imediatas',
       items: [
         { id: 'gen', label: 'Gerar Nova Paleta Aleatória', icon: Sparkles, hint: 'Espaço', action: () => { onQuickGenerate(); onNavigate('generator'); onClose(); } },
-        { id: 'exp', label: 'Exportar Tokens (CSS, Tailwind, JSON, SVG)', icon: Download, hint: 'Ctrl+E', action: () => { onOpenExport(); onClose(); } },
+        { id: 'exp', label: 'Exportar Amostras & Tokens (Illustrator, ASE, CSS, JSON)', icon: Download, hint: 'Ctrl+E', action: () => { onOpenExport(); onClose(); } },
       ]
     },
     {
@@ -81,8 +85,11 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         { id: 'tab-lab', label: 'Color Space Lab & Gradientes Perceptuais', icon: SlidersHorizontal, action: () => { onNavigate('lab'); onClose(); } },
         { id: 'tab-acc', label: 'Auditoria de Acessibilidade & Daltonismo', icon: Check, action: () => { onNavigate('accessibility'); onClose(); } },
         { id: 'tab-proj', label: 'Projetos, Coleções & Cofre de Cores', icon: Layers, action: () => { onNavigate('projects'); onClose(); } },
-        { id: 'tab-cms', label: 'Painel CMS Editorial & Curadoria', icon: FileText, action: () => { onNavigate('cms'); onClose(); } },
-        { id: 'tab-prof', label: 'Perfil de Helena Vance & Tokens', icon: User, action: () => { onNavigate('profile'); onClose(); } },
+        ...(authUser?.role === 'admin' ? [
+          { id: 'tab-admin', label: 'Painel Administrativo & Governança de Usuários', icon: ShieldCheck, hint: 'Admin', action: () => { onNavigate('admin'); onClose(); } },
+          { id: 'tab-cms', label: 'Painel CMS Editorial & Curadoria', icon: FileText, hint: 'CMS', action: () => { onNavigate('cms'); onClose(); } },
+        ] : []),
+        { id: 'tab-prof', label: 'Meu Perfil & Painel do Criador', icon: User, hint: 'Espaço', action: () => { onNavigate('profile'); onClose(); } },
       ]
     },
     {

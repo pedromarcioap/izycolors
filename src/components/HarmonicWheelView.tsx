@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { 
   Sparkles, 
   Sliders, 
@@ -185,6 +185,31 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
       }
     }
   };
+
+  // Global window pointer listeners to guarantee drag tracking even if cursor leaves wheel boundaries
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleGlobalPointerMove = (e: PointerEvent) => {
+      updateFromPointer(e.clientX, e.clientY, activeNodeRef.current);
+    };
+
+    const handleGlobalPointerUp = () => {
+      setIsDragging(false);
+      setActiveDragNode(null);
+      activeNodeRef.current = null;
+    };
+
+    window.addEventListener('pointermove', handleGlobalPointerMove);
+    window.addEventListener('pointerup', handleGlobalPointerUp);
+    window.addEventListener('pointercancel', handleGlobalPointerUp);
+
+    return () => {
+      window.removeEventListener('pointermove', handleGlobalPointerMove);
+      window.removeEventListener('pointerup', handleGlobalPointerUp);
+      window.removeEventListener('pointercancel', handleGlobalPointerUp);
+    };
+  }, [isDragging, updateFromPointer]);
 
   // Quick rotation step handlers
   const rotateWheel = (deltaDegrees: number) => {

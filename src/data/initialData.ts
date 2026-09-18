@@ -1,4 +1,4 @@
-import { Palette, UserProfile, ProjectWorkspace, CollectionBoard, FavoriteColor, CmsArticle, CommunitySubmission } from '../types';
+import { Palette, UserProfile, ProjectWorkspace, ProjectPalette, CollectionBoard, VaultPalette, FavoriteColor, CmsArticle, CommunitySubmission } from '../types';
 
 export const INITIAL_PALETTES: Palette[] = [
   {
@@ -309,6 +309,26 @@ export const INITIAL_PROJECTS: ProjectWorkspace[] = [
     primaryColors: ['#08BBD9', '#3B82F6', '#9354F5'],
     secondaryColors: ['#10B981', '#F59E0B', '#EF4444'],
     neutralGrays: ['#0B0F17', '#181C24', '#262A33', '#94A3B8', '#F8FAFC'],
+    palettes: [
+      {
+        id: 'pal-proj-1',
+        name: 'Aurora Mobile Dark Core',
+        description: 'Paleta principal para tema escuro e cards de investimento.',
+        colors: ['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#10B981'],
+        role: 'Primária',
+        createdAt: '12 Mar 2026',
+        wcagLevel: 'WCAG AAA'
+      },
+      {
+        id: 'pal-proj-2',
+        name: 'Aurora Analytics Highlights',
+        description: 'Tons de alto contraste para telemetria e gráficos financeiros.',
+        colors: ['#00F5D4', '#7B2CBF', '#F72585', '#4CC9F0', '#FEE440'],
+        role: 'Acentos',
+        createdAt: '14 Mar 2026',
+        wcagLevel: 'WCAG 2.1 AAA'
+      }
+    ],
     semanticTokens: {
       primary: '#08BBD9',
       secondary: '#3B82F6',
@@ -328,6 +348,17 @@ export const INITIAL_PROJECTS: ProjectWorkspace[] = [
     primaryColors: ['#1A1C20', '#6C757D', '#E63946'],
     secondaryColors: ['#F39C12', '#2F4432'],
     neutralGrays: ['#111827', '#1F2937', '#4B5563', '#E5E7EB', '#FFFFFF'],
+    palettes: [
+      {
+        id: 'pal-proj-3',
+        name: 'Zürich Cover & Grid High Impact',
+        description: 'Paleta para capas de edições impressas e títulos em display serif.',
+        colors: ['#1A1C20', '#6C757D', '#E63946', '#F39C12', '#FFFFFF'],
+        role: 'Primária',
+        createdAt: '10 Mar 2026',
+        wcagLevel: 'WCAG AAA'
+      }
+    ],
     semanticTokens: {
       primary: '#E63946',
       secondary: '#1A1C20',
@@ -338,6 +369,42 @@ export const INITIAL_PROJECTS: ProjectWorkspace[] = [
       background: '#FFFFFF'
     },
     updatedAt: 'Ontem às 18:20'
+  }
+];
+
+export const INITIAL_VAULT_PALETTES: VaultPalette[] = [
+  {
+    id: 'vault-pal-1',
+    title: 'Obsidian & Neon Luminescence',
+    description: 'Paleta confidencial calibrada em Oklch para dashboard corporativo de inteligência artificial.',
+    colors: ['#0B0F17', '#181C24', '#08BBD9', '#6366F1', '#EC4899'],
+    tags: ['Confidencial', 'Oklch', 'Dark Mode', 'IA Core'],
+    createdAt: 'Ontem',
+    notes: 'Aplicar #08BBD9 como acento em botões de ação rápida e #6366F1 como foco de navegação.',
+    gamut: 'Display P3',
+    wcagLevel: 'WCAG AAA (12.4:1)'
+  },
+  {
+    id: 'vault-pal-2',
+    title: 'Quantum Bio-Sensing Spectrum',
+    description: 'Paleta experimental de alta saturação perceptual para visualização de dados biométricos.',
+    colors: ['#031B28', '#06D6A0', '#00BBF9', '#9354F5', '#FF2A85'],
+    tags: ['Biofílica', 'Rec.2020', 'Biometria', 'Vault Exclusive'],
+    createdAt: 'há 3 dias',
+    notes: 'Certificada para renderização OLED com contraste mínimo 7:1.',
+    gamut: 'Rec.2020',
+    wcagLevel: 'WCAG 2.1 AAA Ready'
+  },
+  {
+    id: 'vault-pal-3',
+    title: 'Swiss Brutalism Editorial Vault',
+    description: 'Harmonia tonal para publicações arquitetônicas e monogramas em serigrafia.',
+    colors: ['#111827', '#374151', '#9CA3AF', '#E63946', '#FAFBF7'],
+    tags: ['Editorial', 'Suíço', 'Monocromático', 'Cofre'],
+    createdAt: 'há 5 dias',
+    notes: 'Tons de cinza neutros com acento suíço carmesim.',
+    gamut: 'sRGB',
+    wcagLevel: 'WCAG AAA'
   }
 ];
 

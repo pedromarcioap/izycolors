@@ -2,6 +2,8 @@ export type ColorGamut = 'sRGB' | 'Display P3' | 'Rec.2020';
 
 export type ColorBlindnessType = 'protanopia' | 'deuteranopia' | 'tritanopia' | 'achromatopsia';
 
+export type UserRole = 'admin' | 'user';
+
 export type NavigationTab = 
   | 'generator'
   | 'explorer'
@@ -11,7 +13,35 @@ export type NavigationTab =
   | 'accessibility'
   | 'projects'
   | 'cms'
-  | 'profile';
+  | 'profile'
+  | 'admin'
+  | 'user_dashboard';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  avatar: string;
+  handle: string;
+  bio?: string;
+  status: 'active' | 'suspended';
+  createdAt: string;
+  lastLoginAt: string;
+  palettesCount: number;
+  favoritesCount: number;
+  submissionsCount: number;
+}
+
+export interface AuditLogItem {
+  id: string;
+  timestamp: string;
+  actor: string;
+  actorRole: UserRole;
+  action: string;
+  details: string;
+  type: 'auth' | 'palette' | 'cms' | 'user' | 'system';
+}
 
 export interface ColorItem {
   id: string;
@@ -71,6 +101,16 @@ export interface ColorDetails {
   isLight: boolean;
 }
 
+export interface ProjectPalette {
+  id: string;
+  name: string;
+  description?: string;
+  colors: string[];
+  role: string; // 'Primária' | 'Secundária' | 'UI / Superfícies' | 'Acentos' | 'Semântica' | 'Dark Mode' | 'Geral'
+  createdAt: string;
+  wcagLevel?: string;
+}
+
 export interface ProjectWorkspace {
   id: string;
   name: string;
@@ -79,6 +119,7 @@ export interface ProjectWorkspace {
   primaryColors: string[];
   secondaryColors: string[];
   neutralGrays: string[];
+  palettes?: ProjectPalette[];
   semanticTokens: {
     primary: string;
     secondary: string;
@@ -100,6 +141,18 @@ export interface CollectionBoard {
   paletteIds: string[];
   coverColors: string[];
   createdAt: string;
+}
+
+export interface VaultPalette {
+  id: string;
+  title: string;
+  description?: string;
+  colors: string[];
+  tags: string[];
+  createdAt: string;
+  notes?: string;
+  gamut?: string;
+  wcagLevel?: string;
 }
 
 export interface FavoriteColor {

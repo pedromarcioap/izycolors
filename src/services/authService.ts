@@ -1,0 +1,531 @@
+import { AuthUser, AuditLogItem, UserRole } from '../types';
+import { getSupabaseClient } from './supabase';
+
+const STORAGE_KEY_USERS = 'izy_auth_users_v1';
+const STORAGE_KEY_CURRENT = 'izy_auth_current_user_v1';
+const STORAGE_KEY_AUDIT = 'izy_audit_logs_v1';
+
+// Seed initial users for both Admin and Regular User accounts
+export const INITIAL_USERS: AuthUser[] = [
+  {
+    id: 'usr-admin-1',
+    name: 'Helena Vance',
+    email: 'admin@izycolors.com',
+    role: 'admin',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    handle: '@helenavance',
+    bio: 'Lead Color Architect & Design Systems Engineer. Especialista em espaços de cor perceptuais e acessibilidade WCAG AAA.',
+    status: 'active',
+    createdAt: '2026-01-15',
+    lastLoginAt: 'Hoje, 09:42',
+    palettesCount: 48,
+    favoritesCount: 112,
+    submissionsCount: 15
+  },
+  {
+    id: 'usr-regular-1',
+    name: 'Pedro Márcio',
+    email: 'pedromarcioap@gmail.com',
+    role: 'user',
+    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=300&auto=format&fit=crop&q=80',
+    handle: '@pedromarcio',
+    bio: 'Designer de Interfaces & Ilustrador Digital. Explorando paletas com alto alcance dinâmico para produtos mobile e web.',
+    status: 'active',
+    createdAt: '2026-02-10',
+    lastLoginAt: 'Hoje, 10:15',
+    palettesCount: 14,
+    favoritesCount: 38,
+    submissionsCount: 4
+  },
+  {
+    id: 'usr-regular-2',
+    name: 'Matheus Costa',
+    email: 'matheus@designcraft.io',
+    role: 'user',
+    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=300&auto=format&fit=crop&q=80',
+    handle: '@matheus_c',
+    bio: 'Senior Brand Designer. Curador de paletas editoriais e sistemas de cores para e-commerce de luxo.',
+    status: 'active',
+    createdAt: '2026-02-18',
+    lastLoginAt: 'Ontem',
+    palettesCount: 22,
+    favoritesCount: 65,
+    submissionsCount: 7
+  },
+  {
+    id: 'usr-regular-3',
+    name: 'Elena Rostova',
+    email: 'elena.rostova@palette.art',
+    role: 'user',
+    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
+    handle: '@elena_art',
+    bio: 'Artista digital focada em animação 2D e iluminação cinematográfica.',
+    status: 'active',
+    createdAt: '2026-02-22',
+    lastLoginAt: 'Há 2 dias',
+    palettesCount: 9,
+    favoritesCount: 41,
+    submissionsCount: 2
+  },
+  {
+    id: 'usr-regular-4',
+    name: 'Kenzo Sato',
+    email: 'kenzo.sato@tokyo-lab.dev',
+    role: 'user',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    handle: '@kenzo_sato',
+    bio: 'Desenvolvedor Frontend & Pesquisador de Gamuts Wide-Color (P3 e Rec.2020).',
+    status: 'suspended',
+    createdAt: '2026-01-20',
+    lastLoginAt: 'Há 1 semana',
+    palettesCount: 5,
+    favoritesCount: 18,
+    submissionsCount: 1
+  }
+];
+
+export const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
+  {
+    id: 'log-1',
+    timestamp: 'Hoje, 10:15',
+    actor: 'Pedro Márcio',
+    actorRole: 'user',
+    action: 'Login no Sistema',
+    details: 'Sessão iniciada via credencial de usuário comum',
+    type: 'auth'
+  },
+  {
+    id: 'log-2',
+    timestamp: 'Hoje, 09:42',
+    actor: 'Helena Vance',
+    actorRole: 'admin',
+    action: 'Aprovação de Submissão',
+    details: 'Paleta "Cyber Neon 2026" aprovada e destacada como Staff Pick',
+    type: 'palette'
+  },
+  {
+    id: 'log-3',
+    timestamp: 'Hoje, 08:30',
+    actor: 'Helena Vance',
+    actorRole: 'admin',
+    action: 'Publicação Editorial',
+    details: 'Artigo "Guia Definitivo do Espaço OKLCH" publicado no CMS',
+    type: 'cms'
+  },
+  {
+    id: 'log-4',
+    timestamp: 'Ontem, 16:20',
+    actor: 'Helena Vance',
+    actorRole: 'admin',
+    action: 'Suspensão de Conta',
+    details: 'Usuário @kenzo_sato colocado em estado de revisão',
+    type: 'user'
+  }
+];
+
+// Load all users from localStorage or return seed
+export function getStoredUsers(): AuthUser[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_USERS);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao ler usuários armazenados:', err);
+  }
+  return INITIAL_USERS;
+}
+
+// Save users list to localStorage
+export function saveStoredUsers(users: AuthUser[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_USERS, JSON.stringify(users));
+  } catch (err) {
+    console.error('Erro ao persistir usuários:', err);
+  }
+}
+
+// Get currently active user (defaults to Admin for full experience preview)
+export function getCurrentAuthUser(): AuthUser {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_CURRENT);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && parsed.id) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao carregar usuário atual:', err);
+  }
+  // Default to admin
+  return INITIAL_USERS[0];
+}
+
+// Set currently active user
+export function setCurrentAuthUser(user: AuthUser): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_CURRENT, JSON.stringify(user));
+  } catch (err) {
+    console.error('Erro ao salvar usuário atual:', err);
+  }
+}
+
+// Load audit logs
+export function getStoredAuditLogs(): AuditLogItem[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_AUDIT);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao ler logs de auditoria:', err);
+  }
+  return INITIAL_AUDIT_LOGS;
+}
+
+// Add an audit log event
+export function logAuditEvent(actor: string, actorRole: UserRole, action: string, details: string, type: AuditLogItem['type']): AuditLogItem[] {
+  const currentLogs = getStoredAuditLogs();
+  const newLog: AuditLogItem = {
+    id: `log-${Date.now()}`,
+    timestamp: 'Agora mesmo',
+    actor,
+    actorRole,
+    action,
+    details,
+    type
+  };
+  const updated = [newLog, ...currentLogs].slice(0, 50); // keep last 50
+  try {
+    localStorage.setItem(STORAGE_KEY_AUDIT, JSON.stringify(updated));
+  } catch (err) {}
+  return updated;
+}
+
+// Authenticate via email/password (local match or Supabase Auth)
+export async function authenticateUser(email: string, password?: string): Promise<{ success: boolean; user?: AuthUser; error?: string; viaSupabase?: boolean }> {
+  const users = getStoredUsers();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // 1. Try Supabase Auth if client is available
+  const supabase = getSupabaseClient();
+  if (supabase && password) {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password
+      });
+
+      if (!error && data.user) {
+        const metaRole = (data.user.user_metadata?.role as UserRole) || (normalizedEmail.includes('admin') ? 'admin' : 'user');
+        const existing = users.find(u => u.email.toLowerCase() === normalizedEmail);
+        
+        const authUser: AuthUser = existing ? {
+          ...existing,
+          role: (data.user.user_metadata?.role as UserRole) || existing.role,
+          lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        } : {
+          id: data.user.id,
+          name: data.user.user_metadata?.name || normalizedEmail.split('@')[0],
+          email: normalizedEmail,
+          role: metaRole,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(normalizedEmail)}`,
+          handle: data.user.user_metadata?.handle || `@${normalizedEmail.split('@')[0]}`,
+          bio: data.user.user_metadata?.bio || 'Membro do Izy Colors Studio',
+          status: 'active',
+          createdAt: new Date().toISOString().split('T')[0],
+          lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          palettesCount: 0,
+          favoritesCount: 0,
+          submissionsCount: 0
+        };
+
+        // Sync with local users registry
+        if (!existing) {
+          saveStoredUsers([authUser, ...users]);
+        } else {
+          saveStoredUsers(users.map(u => u.id === authUser.id ? authUser : u));
+        }
+
+        setCurrentAuthUser(authUser);
+        logAuditEvent(authUser.name, authUser.role, 'Login Supabase Cloud', `Autenticado com sucesso via Supabase Auth (${authUser.role.toUpperCase()})`, 'auth');
+        return { success: true, user: authUser, viaSupabase: true };
+      } else if (error) {
+        // If Supabase failed with explicit error, check if this email is a seeded local demo account
+        const isSeededDemo = INITIAL_USERS.some(u => u.email.toLowerCase() === normalizedEmail);
+        if (!isSeededDemo) {
+          return { success: false, error: error.message || 'Credenciais inválidas no Supabase.' };
+        }
+      }
+    } catch (err: any) {
+      console.warn('Supabase auth fallback para autenticação local:', err);
+    }
+  }
+
+  // 2. Local fallback matching for registered & seeded demo users
+  const found = users.find(u => u.email.toLowerCase() === normalizedEmail);
+  if (found) {
+    if (found.status === 'suspended') {
+      return { success: false, error: 'Esta conta está temporariamente suspensa pelo administrador.' };
+    }
+    const updatedUser = { 
+      ...found, 
+      lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+    };
+    setCurrentAuthUser(updatedUser);
+    logAuditEvent(updatedUser.name, updatedUser.role, 'Login Local', `Sessão aberta como ${updatedUser.role === 'admin' ? 'Administrador' : 'Usuário'}`, 'auth');
+    return { success: true, user: updatedUser, viaSupabase: false };
+  }
+
+  return { 
+    success: false, 
+    error: 'Conta não encontrada. Cadastre-se na aba "Criar Nova Conta" para começar.' 
+  };
+}
+
+// Register a new user (via Supabase Auth if connected, or local storage)
+export async function registerUser(params: {
+  name: string;
+  email: string;
+  password?: string;
+  role?: UserRole;
+  handle?: string;
+  bio?: string;
+}): Promise<{ success: boolean; user?: AuthUser; error?: string; message?: string; viaSupabase?: boolean }> {
+  const users = getStoredUsers();
+  const normalizedEmail = params.email.trim().toLowerCase();
+  const desiredRole: UserRole = params.role || (normalizedEmail.includes('admin') ? 'admin' : 'user');
+  const cleanHandle = params.handle?.trim() 
+    ? (params.handle.startsWith('@') ? params.handle : `@${params.handle}`)
+    : `@${normalizedEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '')}`;
+
+  // Check if user already exists locally
+  const alreadyExists = users.some(u => u.email.toLowerCase() === normalizedEmail);
+  if (alreadyExists) {
+    return { success: false, error: 'Já existe uma conta registrada com este endereço de e-mail.' };
+  }
+
+  // Try Supabase Auth SignUp
+  const supabase = getSupabaseClient();
+  let supabaseUserId: string | null = null;
+  let usedSupabase = false;
+
+  if (supabase && params.password) {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: normalizedEmail,
+        password: params.password,
+        options: {
+          data: {
+            name: params.name.trim(),
+            handle: cleanHandle,
+            role: desiredRole,
+            bio: params.bio?.trim() || 'Criador Izy Colors'
+          }
+        }
+      });
+
+      if (error) {
+        return { success: false, error: error.message || 'Falha ao registrar usuário no Supabase.' };
+      }
+
+      if (data.user) {
+        supabaseUserId = data.user.id;
+        usedSupabase = true;
+      }
+    } catch (err: any) {
+      console.warn('Erro ao conectar ao Supabase Auth, prosseguindo com criação local:', err);
+    }
+  }
+
+  const newUser: AuthUser = {
+    id: supabaseUserId || `usr-${Date.now()}`,
+    name: params.name.trim(),
+    email: normalizedEmail,
+    role: desiredRole,
+    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(params.name.trim())}`,
+    handle: cleanHandle,
+    bio: params.bio?.trim() || 'Novo usuário Izy Colors Studio',
+    status: 'active',
+    createdAt: new Date().toISOString().split('T')[0],
+    lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    palettesCount: 0,
+    favoritesCount: 0,
+    submissionsCount: 0
+  };
+
+  const updatedList = [newUser, ...users];
+  saveStoredUsers(updatedList);
+  setCurrentAuthUser(newUser);
+
+  logAuditEvent(
+    newUser.name, 
+    newUser.role, 
+    usedSupabase ? 'Registro Supabase Cloud' : 'Registro de Conta', 
+    `Nova conta criada com cargo [${newUser.role.toUpperCase()}]${usedSupabase ? ' integrado ao Supabase Auth' : ' (local)'}`, 
+    'auth'
+  );
+
+  return { 
+    success: true, 
+    user: newUser, 
+    viaSupabase: usedSupabase,
+    message: usedSupabase 
+      ? 'Conta criada e sincronizada com o Supabase Auth com sucesso!' 
+      : 'Conta criada localmente com sucesso!' 
+  };
+}
+
+// Log out active user and sign out from Supabase
+export async function logoutAuthUser(): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      await supabase.auth.signOut();
+    } catch (e) {
+      console.warn('Erro ao deslogar do Supabase:', e);
+    }
+  }
+  // Reset to default regular user or guest representation
+  const defaultUser = INITIAL_USERS[1]; // Pedro Márcio (user)
+  setCurrentAuthUser(defaultUser);
+  logAuditEvent(defaultUser.name, defaultUser.role, 'Log Out', 'Sessão encerrada com sucesso', 'auth');
+}
+
+// Check if a Supabase cloud session is active
+export async function checkCurrentSession(): Promise<AuthUser | null> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (!error && data.session?.user) {
+      const u = data.session.user;
+      const email = u.email || '';
+      const users = getStoredUsers();
+      const existing = users.find(usr => usr.email.toLowerCase() === email.toLowerCase());
+      
+      const sessionUser: AuthUser = existing || {
+        id: u.id,
+        name: u.user_metadata?.name || email.split('@')[0],
+        email: email,
+        role: (u.user_metadata?.role as UserRole) || 'user',
+        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
+        handle: u.user_metadata?.handle || `@${email.split('@')[0]}`,
+        bio: u.user_metadata?.bio || 'Criador Izy Colors',
+        status: 'active',
+        createdAt: new Date().toISOString().split('T')[0],
+        lastLoginAt: 'Hoje',
+        palettesCount: 0,
+        favoritesCount: 0,
+        submissionsCount: 0
+      };
+      setCurrentAuthUser(sessionUser);
+      return sessionUser;
+    }
+  } catch (err) {
+    console.warn('Erro ao verificar sessão Supabase:', err);
+  }
+  return null;
+}
+
+// Quick switch between demo roles (Admin and Regular User)
+export function switchDemoRole(targetRole: UserRole): AuthUser {
+  const users = getStoredUsers();
+  const target = users.find(u => u.role === targetRole && u.status === 'active') || INITIAL_USERS.find(u => u.role === targetRole)!;
+  setCurrentAuthUser(target);
+  logAuditEvent(target.name, target.role, 'Alternância de Perfil Demo', `Ambiente alterado para perfil ${target.role.toUpperCase()}`, 'auth');
+  return target;
+}
+
+// Update role of a user in Admin area
+export function updateUserRole(userId: string, newRole: UserRole, adminActor: string): AuthUser[] {
+  const users = getStoredUsers();
+  const updated = users.map(u => {
+    if (u.id === userId) {
+      return { ...u, role: newRole };
+    }
+    return u;
+  });
+  saveStoredUsers(updated);
+  
+  const target = users.find(u => u.id === userId);
+  logAuditEvent(
+    adminActor, 
+    'admin', 
+    'Alteração de Cargo', 
+    `Cargo do usuário ${target ? target.name : userId} alterado para [${newRole.toUpperCase()}]`, 
+    'user'
+  );
+  return updated;
+}
+
+// Toggle user active / suspended status
+export function toggleUserStatus(userId: string, adminActor: string): AuthUser[] {
+  const users = getStoredUsers();
+  let changedStatus: string = 'active';
+  let targetName = '';
+
+  const updated: AuthUser[] = users.map(u => {
+    if (u.id === userId) {
+      const nextStatus: 'active' | 'suspended' = u.status === 'active' ? 'suspended' : 'active';
+      changedStatus = nextStatus;
+      targetName = u.name;
+      return { ...u, status: nextStatus };
+    }
+    return u;
+  });
+  saveStoredUsers(updated);
+
+  logAuditEvent(
+    adminActor, 
+    'admin', 
+    changedStatus === 'suspended' ? 'Conta Suspensa' : 'Conta Reativada', 
+    `Usuário ${targetName} teve seu status alterado para [${changedStatus}]`, 
+    'user'
+  );
+  return updated;
+}
+
+// Add a new user directly from Admin Area
+export function createNewUserFromAdmin(
+  userData: { name: string; email: string; handle: string; role: UserRole; bio?: string },
+  adminActor: string
+): { users: AuthUser[]; newUser: AuthUser } {
+  const users = getStoredUsers();
+  const newUser: AuthUser = {
+    id: `usr-${Date.now()}`,
+    name: userData.name,
+    email: userData.email.toLowerCase(),
+    role: userData.role,
+    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData.name)}`,
+    handle: userData.handle.startsWith('@') ? userData.handle : `@${userData.handle}`,
+    bio: userData.bio || 'Membro do Izy Colors Studio',
+    status: 'active',
+    createdAt: new Date().toISOString().split('T')[0],
+    lastLoginAt: 'Nunca',
+    palettesCount: 0,
+    favoritesCount: 0,
+    submissionsCount: 0
+  };
+
+  const updated = [newUser, ...users];
+  saveStoredUsers(updated);
+
+  logAuditEvent(
+    adminActor, 
+    'admin', 
+    'Novo Usuário Criado', 
+    `Administrador criou o usuário ${newUser.name} com cargo [${newUser.role.toUpperCase()}]`, 
+    'user'
+  );
+
+  return { users: updated, newUser };
+}

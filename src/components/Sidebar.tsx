@@ -17,9 +17,12 @@ import {
   Search,
   ChevronRight,
   GitFork,
-  ExternalLink
+  ExternalLink,
+  ShieldCheck,
+  LayoutDashboard,
+  LogIn
 } from 'lucide-react';
-import { ColorGamut, NavigationTab, UserProfile } from '../types';
+import { ColorGamut, NavigationTab, UserProfile, AuthUser } from '../types';
 
 interface SidebarProps {
   currentTab: NavigationTab;
@@ -27,6 +30,8 @@ interface SidebarProps {
   gamut: ColorGamut;
   onGamutChange: (gamut: ColorGamut) => void;
   userProfile: UserProfile;
+  authUser: AuthUser;
+  onOpenAuthModal: () => void;
   onOpenCommandPalette: () => void;
   onOpenExportModal: () => void;
   onOpenSupabaseModal: () => void;
@@ -44,6 +49,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   gamut,
   onGamutChange,
   userProfile,
+  authUser,
+  onOpenAuthModal,
   onOpenCommandPalette,
   onOpenExportModal,
   onOpenSupabaseModal,
@@ -114,19 +121,32 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'AAA',
       description: 'Simulador de daltonismo'
     },
-    {
-      id: 'cms' as NavigationTab,
-      label: 'CMS Editorial',
-      shortLabel: 'CMS',
-      icon: FileText,
-      description: 'Artigos e curadoria'
-    },
+    // Admin and CMS panels are strictly visible to administrators only
+    ...(authUser.role === 'admin' ? [
+      {
+        id: 'admin' as NavigationTab,
+        label: 'Painel Admin',
+        shortLabel: 'Admin',
+        icon: ShieldCheck,
+        badge: 'Admin',
+        description: 'Gestão de usuários e curadoria'
+      },
+      {
+        id: 'cms' as NavigationTab,
+        label: 'CMS Editorial',
+        shortLabel: 'CMS',
+        icon: FileText,
+        badge: 'Editorial',
+        description: 'Artigos e curadoria'
+      }
+    ] : []),
     {
       id: 'profile' as NavigationTab,
-      label: 'Perfil & Atividade',
+      label: 'Meu Perfil & Espaço',
       shortLabel: 'Perfil',
       icon: User,
-      description: userProfile.handle
+      badge: authUser.role === 'admin' ? 'Admin' : 'Pro',
+      description: authUser.handle || authUser.name
     }
   ];
 
@@ -292,7 +312,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         >
           <div className="flex items-center gap-2">
             <Download className="w-4 h-4 text-white shrink-0" />
-            {isExpanded && <span>Exportar Amostras</span>}
+            {isExpanded && <span>Exportar Amostras & Tokens</span>}
           </div>
           {isExpanded && (
             <span className="text-[10px] font-mono bg-white/20 px-1.5 py-0.5 rounded text-white">
@@ -341,26 +361,53 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </button>
 
-        {/* User Profile Mini Bar */}
+        {/* User Account / Role Badge & Auth Switcher */}
         <div 
-          onClick={() => onTabChange('profile')}
-          className={`rounded-lg bg-[#141822] border border-white/[0.06] flex items-center transition-colors cursor-pointer hover:border-white/20 ${
-            isExpanded ? 'p-2 gap-2.5' : 'p-1.5 justify-center'
+          className={`rounded-lg bg-[#141822] border border-white/[0.08] flex items-center transition-all ${
+            isExpanded ? 'p-2.5 gap-2.5' : 'p-1.5 justify-center'
           }`}
-          title="Helena Vance - Ver Perfil"
         >
-          <div className="relative shrink-0">
+          <div 
+            onClick={() => onTabChange(authUser.role === 'admin' ? 'admin' : 'user_dashboard')}
+            className="relative shrink-0 cursor-pointer"
+            title={`${authUser.name} (${authUser.role === 'admin' ? 'Administrador' : 'Usuário'})`}
+          >
             <img 
-              src={userProfile.avatar} 
-              alt={userProfile.name}
-              className="w-7 h-7 rounded-full object-cover border border-white/20"
+              src={authUser.avatar} 
+              alt={authUser.name}
+              className="w-8 h-8 rounded-full object-cover border border-white/20 hover:border-white/50 transition-colors"
             />
-            <span className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-emerald-500 border border-[#0B0F17] rounded-full" />
+            <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0B0F17] ${
+              authUser.role === 'admin' ? 'bg-purple-400' : 'bg-[#06B6D4]'
+            }`} />
           </div>
+
           {isExpanded && (
             <div className="flex-1 min-w-0 text-left">
-              <span className="text-xs font-semibold text-white block truncate">{userProfile.name}</span>
-              <span className="text-[10px] font-mono text-[#64748B] block truncate">{userProfile.handle}</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-white block truncate">
+                  {authUser.name}
+                </span>
+                <button
+                  onClick={onOpenAuthModal}
+                  className="text-[10px] font-mono text-[#06B6D4] hover:text-white px-1 py-0.5 rounded hover:bg-white/[0.06] transition-colors cursor-pointer"
+                  title="Trocar conta ou autenticar"
+                >
+                  Trocar
+                </button>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`text-[9px] font-mono font-bold uppercase px-1 rounded border ${
+                  authUser.role === 'admin'
+                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                    : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+                }`}>
+                  {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
+                </span>
+                <span className="text-[10px] font-mono text-[#64748B] truncate">
+                  {authUser.handle}
+                </span>
+              </div>
             </div>
           )}
         </div>
