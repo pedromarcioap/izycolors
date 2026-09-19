@@ -15,22 +15,19 @@ import {
   Maximize2, 
   Minimize2, 
   Download, 
-  Share2,
   Sparkles,
-  Info,
   Eye,
   EyeOff,
   ShieldCheck
 } from 'lucide-react';
-import { ColorItem, ColorDetails } from '../types';
+import { ColorItem } from '../types';
 import { 
   getColorDetails, 
   generateRandomHarmoniousPalette, 
   generateHarmonies,
   getContrastRatio,
   hslToRgb,
-  rgbToHex,
-  rgbToHsl
+  rgbToHex
 } from '../utils/colorUtils';
 import { WcagTooltip } from './WcagTooltip';
 
@@ -127,7 +124,16 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
 
   // Toggle lock on a column
   const toggleLock = (index: number) => {
-    setColors(prev => prev.map((col, i) => i === index ? { ...col, locked: !col.locked } : col));
+    setColors(prev => prev.map((col, i) => {
+      if (i === index) {
+        const nextLocked = !col.locked;
+        if (nextLocked && editingIndex === index) {
+          setEditingIndex(null);
+        }
+        return { ...col, locked: nextLocked };
+      }
+      return col;
+    }));
   };
 
   // Move column left or right
@@ -150,7 +156,6 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
       return;
     }
     const leftHex = colors[atIndex].hex;
-    const rightHex = colors[atIndex + 1]?.hex || colors[atIndex].hex;
     const details = getColorDetails(leftHex);
     // Slight variation
     const nextH = (details.hsl.h + 30) % 360;
@@ -206,7 +211,13 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
 
   // Update specific color from picker
   const handleColorUpdate = (index: number, newHex: string) => {
-    setColors(prev => prev.map((col, i) => i === index ? { ...col, hex: newHex.toUpperCase() } : col));
+    setColors(prev => prev.map((col, i) => {
+      if (i === index) {
+        if (col.locked) return col;
+        return { ...col, hex: newHex.toUpperCase() };
+      }
+      return col;
+    }));
   };
 
   const toggleFullscreen = () => {
@@ -417,7 +428,6 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
           const textColor = isLight ? '#0B0F17' : '#FFFFFF';
           const mutedTextColor = isLight ? 'rgba(11, 15, 23, 0.7)' : 'rgba(255, 255, 255, 0.7)';
           const buttonBg = isLight ? 'rgba(11, 15, 23, 0.12)' : 'rgba(255, 255, 255, 0.15)';
-          const buttonHoverBg = isLight ? 'rgba(11, 15, 23, 0.22)' : 'rgba(255, 255, 255, 0.28)';
 
           let formattedValue = col.hex;
           if (activeFormat === 'RGB') {
@@ -501,10 +511,18 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
 
                   {/* Adjust color details / sliders */}
                   <button
-                    onClick={() => setEditingIndex(editingIndex === idx ? null : idx)}
-                    className="p-1.5 rounded transition-colors cursor-pointer"
+                    onClick={() => {
+                      if (col.locked) {
+                        showToast(`A cor ${col.hex} está bloqueada pelo cadeado. Desbloqueie para editar.`);
+                        return;
+                      }
+                      setEditingIndex(editingIndex === idx ? null : idx);
+                    }}
+                    className={`p-1.5 rounded transition-colors ${
+                      col.locked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
                     style={{ backgroundColor: buttonBg, color: textColor }}
-                    title="Ajustar Matiz e Luminosidade"
+                    title={col.locked ? 'Cor bloqueada pelo cadeado (desbloqueie para editar)' : 'Ajustar Matiz e Luminosidade'}
                   >
                     <Sliders className="w-3.5 h-3.5" />
                   </button>
@@ -537,7 +555,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                     backgroundColor: col.locked ? (isLight ? '#0B0F17' : '#FFFFFF') : buttonBg,
                     color: col.locked ? (isLight ? '#FFFFFF' : '#0B0F17') : textColor
                   }}
-                  title={col.locked ? 'Cor bloqueada (não mudará ao apertar Espaço)' : 'Cor desbloqueada'}
+                  title={col.locked ? 'Cor bloqueada (não mudará ao apertar Espaço nem permitirá edição)' : 'Cor desbloqueada'}
                 >
                   {col.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
                 </button>
@@ -614,78 +632,88 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                     </button>
                   </div>
 
-                  {/* Native Color Picker + Hex Input */}
-                  <div className="flex items-center gap-2 mb-3">
-                    <input
-                      type="color"
-                      value={col.hex}
-                      onChange={(e) => handleColorUpdate(idx, e.target.value)}
-                      className="w-8 h-8 rounded border border-white/20 cursor-pointer bg-transparent"
-                    />
-                    <input
-                      type="text"
-                      value={col.hex}
-                      onChange={(e) => handleColorUpdate(idx, e.target.value)}
-                      className="flex-1 bg-[#0B0F17] border border-white/[0.1] rounded px-2 py-1.5 font-mono text-xs text-white uppercase focus:outline-none focus:border-[#6366F1]"
-                    />
-                  </div>
-
-                  {/* Sliders: Hue, Saturation, Lightness */}
-                  <div className="space-y-2.5 font-mono text-[11px]">
-                    <div>
-                      <div className="flex justify-between text-[#94A3B8] mb-1">
-                        <span>Matiz (Hue)</span>
-                        <span>{details.hsl.h}°</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="360"
-                        value={details.hsl.h}
-                        onChange={(e) => {
-                          const rgb = hslToRgb(Number(e.target.value), details.hsl.s, details.hsl.l);
-                          handleColorUpdate(idx, rgbToHex(rgb.r, rgb.g, rgb.b));
-                        }}
-                        className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-gradient-to-r from-red-500 via-green-500 via-blue-500 to-red-500"
-                      />
+                  {col.locked ? (
+                    <div className="py-3 px-2 text-center text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg flex flex-col items-center gap-1.5">
+                      <Lock className="w-5 h-5 text-amber-400" />
+                      <p className="font-semibold">Cor Bloqueada pelo Cadeado</p>
+                      <p className="text-[10px] text-amber-300/80">Desbloqueie o cadeado desta cor para permitir a edição.</p>
                     </div>
-
-                    <div>
-                      <div className="flex justify-between text-[#94A3B8] mb-1">
-                        <span>Saturação</span>
-                        <span>{details.hsl.s}%</span>
+                  ) : (
+                    <>
+                      {/* Native Color Picker + Hex Input */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <input
+                          type="color"
+                          value={col.hex}
+                          onChange={(e) => handleColorUpdate(idx, e.target.value)}
+                          className="w-8 h-8 rounded border border-white/20 cursor-pointer bg-transparent"
+                        />
+                        <input
+                          type="text"
+                          value={col.hex}
+                          onChange={(e) => handleColorUpdate(idx, e.target.value)}
+                          className="flex-1 bg-[#0B0F17] border border-white/[0.1] rounded px-2 py-1.5 font-mono text-xs text-white uppercase focus:outline-none focus:border-[#6366F1]"
+                        />
                       </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={details.hsl.s}
-                        onChange={(e) => {
-                          const rgb = hslToRgb(details.hsl.h, Number(e.target.value), details.hsl.l);
-                          handleColorUpdate(idx, rgbToHex(rgb.r, rgb.g, rgb.b));
-                        }}
-                        className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-700"
-                      />
-                    </div>
 
-                    <div>
-                      <div className="flex justify-between text-[#94A3B8] mb-1">
-                        <span>Luminosidade</span>
-                        <span>{details.hsl.l}%</span>
+                      {/* Sliders: Hue, Saturation, Lightness */}
+                      <div className="space-y-2.5 font-mono text-[11px]">
+                        <div>
+                          <div className="flex justify-between text-[#94A3B8] mb-1">
+                            <span>Matiz (Hue)</span>
+                            <span>{details.hsl.h}°</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="360"
+                            value={details.hsl.h}
+                            onChange={(e) => {
+                              const rgb = hslToRgb(Number(e.target.value), details.hsl.s, details.hsl.l);
+                              handleColorUpdate(idx, rgbToHex(rgb.r, rgb.g, rgb.b));
+                            }}
+                            className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-gradient-to-r from-red-500 via-green-500 via-blue-500 to-red-500"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-[#94A3B8] mb-1">
+                            <span>Saturação</span>
+                            <span>{details.hsl.s}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={details.hsl.s}
+                            onChange={(e) => {
+                              const rgb = hslToRgb(details.hsl.h, Number(e.target.value), details.hsl.l);
+                              handleColorUpdate(idx, rgbToHex(rgb.r, rgb.g, rgb.b));
+                            }}
+                            className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-700"
+                          />
+                        </div>
+
+                        <div>
+                          <div className="flex justify-between text-[#94A3B8] mb-1">
+                            <span>Luminosidade</span>
+                            <span>{details.hsl.l}%</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={details.hsl.l}
+                            onChange={(e) => {
+                              const rgb = hslToRgb(details.hsl.h, details.hsl.s, Number(e.target.value));
+                              handleColorUpdate(idx, rgbToHex(rgb.r, rgb.g, rgb.b));
+                            }}
+                            className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-700"
+                          />
+                        </div>
                       </div>
-                      <input
-                        type="range"
-                        min="0"
-                        max="100"
-                        value={details.hsl.l}
-                        onChange={(e) => {
-                          const rgb = hslToRgb(details.hsl.h, details.hsl.s, Number(e.target.value));
-                          handleColorUpdate(idx, rgbToHex(rgb.r, rgb.g, rgb.b));
-                        }}
-                        className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-slate-700"
-                      />
-                    </div>
-                  </div>
+                    </>
+                  )}
                 </div>
               )}
             </div>
