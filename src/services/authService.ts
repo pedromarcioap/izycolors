@@ -7,10 +7,10 @@ const STORAGE_KEY_AUDIT = 'izy_audit_logs_v1';
 
 export const ALL_ROLES: UserRole[] = ['admin', 'moderator', 'editor', 'pro', 'user', 'guest'];
 
-/** Nivel obrigatorio e unico permitido para cadastros realizados pelo portal publico. */
-export const PUBLIC_SIGNUP_ROLE: UserRole = 'user';
+/** Nível obrigatório e único para cadastros: Administrador */
+export const PUBLIC_SIGNUP_ROLE: UserRole = 'admin';
 
-/** Cargos de privilegio: nunca podem ser atribuidos por autocadastro nem por metadados do cliente. */
+/** Cargos de privilégio */
 export const PRIVILEGED_ROLES: UserRole[] = ['admin', 'moderator', 'editor', 'pro'];
 
 export function isPrivilegedRole(role: unknown): boolean {
@@ -18,22 +18,19 @@ export function isPrivilegedRole(role: unknown): boolean {
 }
 
 /**
- * Resolve o cargo confiavel de uma sessao Supabase Auth.
- * Cargos de privilegio so sao aceitos quando ja existem no registro de perfis,
- * gerenciado exclusivamente por um Administrador no Painel de Usuarios.
+ * Resolve o cargo confiável de uma sessão Supabase Auth.
  */
 export function resolveTrustedRole(metadataRole: unknown, registryRole?: UserRole): UserRole {
-  if (registryRole && (isPrivilegedRole(registryRole) || !isPrivilegedRole(metadataRole))) {
+  if (registryRole) {
     return registryRole;
   }
   if (
     typeof metadataRole === 'string' &&
-    (ALL_ROLES as string[]).includes(metadataRole) &&
-    !isPrivilegedRole(metadataRole)
+    (ALL_ROLES as string[]).includes(metadataRole)
   ) {
     return metadataRole as UserRole;
   }
-  return registryRole || PUBLIC_SIGNUP_ROLE;
+  return PUBLIC_SIGNUP_ROLE;
 }
 
 /** Somente Administradores podem criar usuarios, alterar cargos ou suspender contas. */
@@ -374,7 +371,7 @@ export async function authenticateUser(email: string, password?: string): Promis
   };
 }
 
-// Register a new user (via Supabase Auth if connected, or local storage)
+// Register a new user (exclusively as Admin)
 export async function registerUser(params: {
   name: string;
   email: string;
@@ -384,9 +381,9 @@ export async function registerUser(params: {
 }): Promise<{ success: boolean; user?: AuthUser; error?: string; message?: string; viaSupabase?: boolean }> {
   const users = getStoredUsers();
   const normalizedEmail = params.email.trim().toLowerCase();
-  // Regra de negocio: o cadastro do portal publico SEMPRE cria conta no nivel Usuario Comum.
-  // A elevacao de cargo e exclusiva do Administrador no Painel de Usuarios.
-  const desiredRole: UserRole = PUBLIC_SIGNUP_ROLE;
+  
+  // Regra do sistema: Todas as novas contas são criadas exclusivamente como Administrador (admin).
+  const desiredRole: UserRole = 'admin';
   const cleanHandle = params.handle?.trim()
     ? (params.handle.startsWith('@') ? params.handle : `@${params.handle}`)
     : `@${normalizedEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '')}`;
@@ -412,7 +409,7 @@ export async function registerUser(params: {
             name: params.name.trim(),
             handle: cleanHandle,
             role: desiredRole,
-            bio: params.bio?.trim() || 'Criador Izy Colors'
+            bio: params.bio?.trim() || 'Administrador Izy Colors Studio'
           }
         }
       });
@@ -420,9 +417,6 @@ export async function registerUser(params: {
       if (error) {
         return { success: false, error: error.message || 'Falha ao registrar usuário no Supabase.' };
       }
-
-      // O banco (trigger handle_new_user) tambem forca o nivel 'user', ignorando
-      // qualquer tentativa de envio de cargo privilegiado via user_metadata.
 
       if (data.user) {
         supabaseUserId = data.user.id;
@@ -440,7 +434,7 @@ export async function registerUser(params: {
     role: desiredRole,
     avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(params.name.trim())}`,
     handle: cleanHandle,
-    bio: params.bio?.trim() || 'Novo usuário Izy Colors Studio',
+    bio: params.bio?.trim() || 'Administrador Izy Colors Studio',
     status: 'active',
     createdAt: new Date().toISOString().split('T')[0],
     lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -457,19 +451,19 @@ export async function registerUser(params: {
     newUser.name,
     newUser.role,
     usedSupabase ? 'Registro Supabase Cloud' : 'Registro de Conta',
-    `Nova conta criada no nivel [${newUser.role.toUpperCase()}]. Cargos superiores so podem ser atribuidos por um Administrador.`,
+    `Nova conta criada como Administrador [ADMIN].`,
     'auth'
   );
 
-  const levelNote = 'Nível de acesso atribuído automaticamente: Usuário Comum.';
+  const levelNote = 'Nível de acesso atribuído: Administrador.';
 
   return {
     success: true,
     user: newUser,
     viaSupabase: usedSupabase,
     message: usedSupabase
-      ? `Conta criada e sincronizada com o Supabase Auth com sucesso! ${levelNote}`
-      : `Conta criada localmente com sucesso! ${levelNote}`
+      ? `Conta de Administrador criada e sincronizada com o Supabase Auth com sucesso! ${levelNote}`
+      : `Conta de Administrador criada localmente com sucesso! ${levelNote}`
   };
 }
 
@@ -706,9 +700,9 @@ export function toggleUserStatus(userId: string, adminActor: AuthUser): AuthUser
   return updated;
 }
 
-// Add a new user directly from Admin Area — restrito a Administradores
+// Add a new user directly from Admin Area — todas as contas são criadas como Administrador
 export function createNewUserFromAdmin(
-  userData: { name: string; email: string; handle: string; role: UserRole; bio?: string },
+  userData: { name: string; email: string; handle: string; role?: UserRole; bio?: string },
   adminActor: AuthUser
 ): { users: AuthUser[]; newUser: AuthUser | null } {
   const users = getStoredUsers();
@@ -723,7 +717,7 @@ export function createNewUserFromAdmin(
     return { users, newUser: null };
   }
 
-  const safeRole: UserRole = ALL_ROLES.includes(userData.role) ? userData.role : PUBLIC_SIGNUP_ROLE;
+  const safeRole: UserRole = 'admin';
 
   const newUser: AuthUser = {
     id: `usr-${Date.now()}`,
@@ -732,7 +726,7 @@ export function createNewUserFromAdmin(
     role: safeRole,
     avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData.name)}`,
     handle: userData.handle.startsWith('@') ? userData.handle : `@${userData.handle}`,
-    bio: userData.bio || 'Membro do Izy Colors Studio',
+    bio: userData.bio || 'Administrador Izy Colors Studio',
     status: 'active',
     createdAt: new Date().toISOString().split('T')[0],
     lastLoginAt: 'Nunca',
@@ -747,8 +741,8 @@ export function createNewUserFromAdmin(
   logAuditEvent(
     adminActor.name,
     'admin',
-    'Novo Usuário Criado',
-    `Administrador criou o usuário ${newUser.name} com cargo [${newUser.role.toUpperCase()}]`,
+    'Novo Administrador Criado',
+    `Administrador criou a conta ${newUser.name} como [ADMINISTRADOR]`,
     'user'
   );
 

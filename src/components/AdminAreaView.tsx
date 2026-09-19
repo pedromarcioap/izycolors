@@ -24,7 +24,6 @@ import {
   toggleUserStatus,
   createNewUserFromAdmin,
   canManageUserRoles,
-  PUBLIC_SIGNUP_ROLE,
   switchDemoRole
 } from '../services/authService';
 
@@ -192,9 +191,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
       name: newUserName.trim(),
       email: newUserEmail.trim(),
       handle: newUserHandle.trim() || `@${newUserEmail.split('@')[0]}`,
-      // Toda criação de usuário pelo portal nasce como Usuário Comum.
-      // A promoção de cargo é feita exclusivamente pelo Administrador na listagem de usuários.
-      role: PUBLIC_SIGNUP_ROLE,
+      role: 'admin',
       bio: newUserBio.trim()
     }, currentUser);
 
@@ -964,20 +961,22 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Cargo</label>
+                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Cargo / Nível</label>
                 <div
                   aria-disabled="true"
-                  title="Novos usuários são sempre criados como Usuário Comum. O cargo pode ser promovido depois na listagem de usuários."
-                  className="w-full bg-[#10141D]/60 border border-white/[0.08] rounded-lg px-3 py-2 text-xs flex items-center justify-between cursor-not-allowed select-none"
+                  title="Todas as novas contas no sistema são criadas exclusivamente como Administrador."
+                  className="w-full bg-[#10141D] border border-purple-500/30 rounded-lg px-3 py-2 text-xs flex items-center justify-between select-none"
                 >
-                  <span className="text-white font-semibold">Usuário Comum</span>
-                  <span className="flex items-center gap-1 text-[10px] font-mono text-[#64748B]">
-                    <Lock className="w-3 h-3" />
-                    Definido no cadastro
+                  <span className="text-purple-300 font-bold flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                    Administrador
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] font-mono text-purple-400/90 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
+                    Padrão do Sistema
                   </span>
                 </div>
                 <p className="text-[10px] text-[#64748B] mt-1.5 leading-relaxed">
-                  Após criar a conta, use a coluna <strong className="text-[#94A3B8]">Cargo / Papel</strong> na listagem para promover o usuário.
+                  Contas criadas no sistema possuem permissão total de administração e governança.
                 </p>
               </div>
 

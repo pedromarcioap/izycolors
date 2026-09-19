@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import {
   X, LogIn, UserPlus, Sparkles, ShieldCheck, User, Mail, Lock, AtSign,
-  Cloud, AlertCircle, CheckCircle2, LogOut, Check, ArrowRight, KeyRound,
-  Crown, Edit3, Eye, EyeOff, Award
+  Cloud, AlertCircle, CheckCircle2, LogOut, KeyRound,
+  Crown, Eye, EyeOff
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types';
 import {
@@ -353,7 +353,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="text-center pt-1 border-t border-white/[0.06] mt-4">
                 <p className="text-[11px] text-[#64748B]">
-                  Contas demo: <code className="text-purple-300 font-mono">admin@izycolors.com</code>, <code className="text-rose-300 font-mono">moderador@izycolors.com</code>, <code className="text-amber-300 font-mono">editor@izycolors.com</code>, <code className="text-emerald-300 font-mono">pro@izycolors.com</code>
+                  Contas de administração: <code className="text-purple-300 font-mono">admin@izycolors.com</code>, <code className="text-amber-300 font-mono">editor@izycolors.com</code>, <code className="text-emerald-300 font-mono">pro@izycolors.com</code>
                 </p>
               </div>
             </form>
@@ -362,6 +362,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Register New Account Tab */}
           {tab === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
+              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+                <p className="text-[11px] text-purple-200 leading-relaxed">
+                  Todas as novas contas criadas recebem privilégios completos de <strong>Administrador</strong> no sistema.
+                </p>
+              </div>
+
               <div>
                 <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                   Nome Completo *
@@ -438,7 +445,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="w-full h-10 bg-[#EC4899] hover:bg-[#D93D87] text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-pink-600/30 cursor-pointer disabled:opacity-50"
                 >
                   <UserPlus className="w-4 h-4" />
-                  <span>{loading ? 'Criando usuário no Supabase...' : 'Criar Conta e Acessar'}</span>
+                  <span>{loading ? 'Criando conta de administrador...' : 'Criar Conta de Administrador'}</span>
                 </button>
               </div>
             </form>
@@ -459,7 +466,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div>
                 <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
-                  E-mail Cadastrado
+                  E-mail Cadastrado *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -474,21 +481,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTab('login')}
-                  className="flex-1 h-10 bg-white/[0.05] hover:bg-white/[0.1] text-white rounded-lg text-xs font-medium transition-colors"
-                >
-                  Voltar ao Login
-                </button>
+              <div className="pt-2">
                 <button
                   type="submit"
                   disabled={loading}
-                  className="flex-1 h-10 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                  className="w-full h-10 bg-[#6366F1] hover:bg-[#4F46E5] text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-600/30 cursor-pointer disabled:opacity-50"
                 >
                   <Mail className="w-4 h-4" />
-                  <span>{loading ? 'Enviando...' : 'Enviar Instruções'}</span>
+                  <span>{loading ? 'Enviando e-mail...' : 'Enviar Link de Redefinição'}</span>
                 </button>
               </div>
             </form>
@@ -498,7 +498,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {tab === 'quick' && (
             <div className="space-y-3">
               <p className="text-xs text-[#94A3B8] leading-relaxed">
-                Alterne instantaneamente entre os níveis de usuário para testar o sistema de RBAC e a visualização dinâmica de permissões:
+                Alterne instantaneamente entre as contas de administração para testar a governança e permissões:
               </p>
 
               {/* Admin Card */}
@@ -514,50 +514,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Administrador</span>
+                    <span className="text-xs font-semibold text-white">Administrador Master</span>
                     <span className="text-[10px] font-mono text-purple-300">@helenavance</span>
                   </div>
-                  <p className="text-[11px] text-[#94A3B8]">Acesso irrestrito a governança, CMS e logs de auditoria.</p>
-                </div>
-              </div>
-
-              {/* Moderator Card */}
-              <div
-                onClick={() => handleQuickSwitch('moderator')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'moderator'
-                    ? 'bg-rose-950/30 border-rose-500/60 ring-1 ring-rose-500/40 shadow-lg'
-                    : 'bg-[#181C26] border-white/[0.08] hover:border-rose-500/40 hover:bg-[#1E2330]'
-                  }`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
-                  <Award className="w-4 h-4 text-rose-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Moderador</span>
-                    <span className="text-[10px] font-mono text-rose-300">@anabeatriz_mod</span>
-                  </div>
-                  <p className="text-[11px] text-[#94A3B8]">Moderação de submissões, curadoria de Staff Picks e revisão de paletas.</p>
-                </div>
-              </div>
-
-              {/* Editor Card */}
-              <div
-                onClick={() => handleQuickSwitch('editor')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'editor'
-                    ? 'bg-amber-950/30 border-amber-500/60 ring-1 ring-amber-500/40 shadow-lg'
-                    : 'bg-[#181C26] border-white/[0.08] hover:border-amber-500/40 hover:bg-[#1E2330]'
-                  }`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
-                  <Edit3 className="w-4 h-4 text-amber-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Editor / Curador</span>
-                    <span className="text-[10px] font-mono text-amber-300">@bruno_editor</span>
-                  </div>
-                  <p className="text-[11px] text-[#94A3B8]">Gestão de artigos do CMS e curadoria editorial.</p>
+                  <p className="text-[11px] text-[#94A3B8]">Acesso irrestrito a governança, Supabase, CMS e audit logs.</p>
                 </div>
               </div>
 
@@ -574,30 +534,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Usuário Pro</span>
+                    <span className="text-xs font-semibold text-white">Administrador Pro</span>
                     <span className="text-[10px] font-mono text-emerald-300">@camila_pro</span>
                   </div>
                   <p className="text-[11px] text-[#94A3B8]">Gamuts profissionais P3/Rec.2020 e exportação .ASE/.JSX.</p>
-                </div>
-              </div>
-
-              {/* Regular User Card */}
-              <div
-                onClick={() => handleQuickSwitch('user')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'user'
-                    ? 'bg-cyan-950/30 border-[#06B6D4]/60 ring-1 ring-[#06B6D4]/40 shadow-lg'
-                    : 'bg-[#181C26] border-white/[0.08] hover:border-[#06B6D4]/40 hover:bg-[#1E2330]'
-                  }`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-[#06B6D4]/20 border border-[#06B6D4]/40 flex items-center justify-center shrink-0">
-                  <User className="w-4 h-4 text-[#06B6D4]" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Usuário Comum</span>
-                    <span className="text-[10px] font-mono text-[#06B6D4]">@pedromarcio</span>
-                  </div>
-                  <p className="text-[11px] text-[#94A3B8]">Gerador, salvar no cofre, favoritar e submeter paletas.</p>
                 </div>
               </div>
             </div>
