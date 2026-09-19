@@ -1,25 +1,25 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  ShieldCheck, 
-  Users, 
-  FileText, 
-  CheckCircle2, 
-  Clock, 
-  AlertTriangle, 
-  Plus, 
-  Search, 
-  Sliders, 
-  Check, 
-  X, 
-  ArrowUpRight, 
-  RefreshCw, 
-  Lock, 
-  Unlock, 
-  UserCheck, 
-  UserX, 
-  Sparkles, 
-  Award, 
-  Activity, 
+import {
+  ShieldCheck,
+  Users,
+  FileText,
+  CheckCircle2,
+  Clock,
+  AlertTriangle,
+  Plus,
+  Search,
+  Sliders,
+  Check,
+  X,
+  ArrowUpRight,
+  RefreshCw,
+  Lock,
+  Unlock,
+  UserCheck,
+  UserX,
+  Sparkles,
+  Award,
+  Activity,
   Database,
   Eye,
   SlidersHorizontal,
@@ -28,11 +28,13 @@ import {
   BarChart2
 } from 'lucide-react';
 import { AuthUser, CommunitySubmission, CmsArticle, AuditLogItem, UserRole } from '../types';
-import { 
-  updateUserRole, 
-  toggleUserStatus, 
-  createNewUserFromAdmin, 
-  switchDemoRole 
+import {
+  updateUserRole,
+  toggleUserStatus,
+  createNewUserFromAdmin,
+  canManageUserRoles,
+  PUBLIC_SIGNUP_ROLE,
+  switchDemoRole
 } from '../services/authService';
 
 interface AdminAreaViewProps {
@@ -80,7 +82,6 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   const [newUserName, setNewUserName] = useState('');
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserHandle, setNewUserHandle] = useState('');
-  const [newUserRole, setNewUserRole] = useState<UserRole>('user');
   const [newUserBio, setNewUserBio] = useState('');
 
   // Article creation modal inside admin
@@ -101,11 +102,11 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   // Filtered users list (Hooks must run unconditionally before any early returns)
   const filteredUsers = useMemo(() => {
     return usersList.filter(u => {
-      const matchSearch = 
+      const matchSearch =
         u.name.toLowerCase().includes(userSearch.toLowerCase()) ||
         u.email.toLowerCase().includes(userSearch.toLowerCase()) ||
         u.handle.toLowerCase().includes(userSearch.toLowerCase());
-      
+
       const matchRole = roleFilter === 'all' || u.role === roleFilter;
       const matchStatus = statusFilter === 'all' || u.status === statusFilter;
 
@@ -171,14 +172,23 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   const proCount = usersList.filter(u => u.role === 'pro').length;
   const regularCount = usersList.filter(u => u.role === 'user' || u.role === 'guest').length;
 
+  // Somente Administradores podem alterar cargos, status e criar usuários.
   const handleRoleChange = (userId: string, nextRole: UserRole) => {
-    const updated = updateUserRole(userId, nextRole, currentUser.name);
+    if (!canManageUserRoles(currentUser)) {
+      showFeedback('Operação negada: apenas Administradores podem alterar cargos de usuários.');
+      return;
+    }
+    const updated = updateUserRole(userId, nextRole, currentUser);
     onUpdateUsersList(updated);
     showFeedback(`Cargo atualizado para [${nextRole.toUpperCase()}].`);
   };
 
   const handleToggleStatus = (userId: string) => {
-    const updated = toggleUserStatus(userId, currentUser.name);
+    if (!canManageUserRoles(currentUser)) {
+      showFeedback('Operação negada: apenas Administradores podem alterar o status de contas.');
+      return;
+    }
+    const updated = toggleUserStatus(userId, currentUser);
     onUpdateUsersList(updated);
     showFeedback('Status do usuário atualizado.');
   };
@@ -191,9 +201,16 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
       name: newUserName.trim(),
       email: newUserEmail.trim(),
       handle: newUserHandle.trim() || `@${newUserEmail.split('@')[0]}`,
-      role: newUserRole,
+      // Toda criação de usuário pelo portal nasce como Usuário Comum.
+      // A promoção de cargo é feita exclusivamente pelo Administrador na listagem de usuários.
+      role: PUBLIC_SIGNUP_ROLE,
       bio: newUserBio.trim()
-    }, currentUser.name);
+    }, currentUser);
+
+    if (!newUser) {
+      showFeedback('Operação negada: apenas Administradores podem criar usuários.');
+      return;
+    }
 
     onUpdateUsersList(users);
     setShowAddUserModal(false);
@@ -268,11 +285,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
           <div className="flex items-center gap-2.5 shrink-0">
             <button
               onClick={onOpenSupabaseModal}
-              className={`h-9 px-3.5 rounded-lg border text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer ${
-                isSupabaseConnected 
-                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400' 
-                  : 'bg-[#181C26] border-white/[0.08] text-[#94A3B8] hover:text-white'
-              }`}
+              className={`h-9 px-3.5 rounded-lg border text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer ${isSupabaseConnected
+                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                : 'bg-[#181C26] border-white/[0.08] text-[#94A3B8] hover:text-white'
+                }`}
               title="Configurar Supabase Relational Database"
             >
               <Database className="w-3.5 h-3.5" />
@@ -332,11 +348,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
       <div className="flex items-center gap-1 border-b border-white/[0.08] mb-6 overflow-x-auto scrollbar-none pb-2 text-xs font-medium">
         <button
           onClick={() => setActiveTab('overview')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${
-            activeTab === 'overview'
-              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${activeTab === 'overview'
+            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <BarChart2 className="w-3.5 h-3.5" />
           <span>Visão Geral & Métricas</span>
@@ -344,11 +359,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
         <button
           onClick={() => setActiveTab('users')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${
-            activeTab === 'users'
-              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${activeTab === 'users'
+            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <Users className="w-3.5 h-3.5" />
           <span>Gestão de Usuários</span>
@@ -359,11 +373,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
         <button
           onClick={() => setActiveTab('moderation')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${
-            activeTab === 'moderation'
-              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${activeTab === 'moderation'
+            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <Award className="w-3.5 h-3.5" />
           <span>Moderação & Curadoria</span>
@@ -376,11 +389,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
         <button
           onClick={() => setActiveTab('cms')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${
-            activeTab === 'cms'
-              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${activeTab === 'cms'
+            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <FileText className="w-3.5 h-3.5" />
           <span>CMS Editorial</span>
@@ -388,11 +400,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
         <button
           onClick={() => setActiveTab('logs')}
-          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${
-            activeTab === 'logs'
-              ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${activeTab === 'logs'
+            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <Activity className="w-3.5 h-3.5" />
           <span>Logs de Auditoria</span>
@@ -611,10 +622,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                       {/* Name + Avatar */}
                       <td className="p-3.5">
                         <div className="flex items-center gap-2.5">
-                          <img 
-                            src={user.avatar} 
-                            alt={user.name} 
-                            className="w-8 h-8 rounded-full object-cover border border-white/20 shrink-0" 
+                          <img
+                            src={user.avatar}
+                            alt={user.name}
+                            className="w-8 h-8 rounded-full object-cover border border-white/20 shrink-0"
                           />
                           <div>
                             <span className="font-semibold text-white block">{user.name}</span>
@@ -630,14 +641,13 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
                       {/* Role Pill */}
                       <td className="p-3.5">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
-                          user.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${user.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
                           user.role === 'moderator' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' :
-                          user.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
-                          user.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
-                          user.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :
-                          'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
-                        }`}>
+                            user.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+                              user.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
+                                user.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :
+                                  'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+                          }`}>
                           {user.role === 'admin' && <ShieldCheck className="w-3 h-3 text-purple-400" />}
                           {user.role === 'moderator' && <Award className="w-3 h-3 text-rose-400" />}
                           {user.role === 'editor' && <FileText className="w-3 h-3 text-amber-400" />}
@@ -649,11 +659,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
                       {/* Status */}
                       <td className="p-3.5">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono ${
-                          user.status === 'active'
-                            ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
-                            : 'bg-red-950/40 text-red-400 border border-red-500/30'
-                        }`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono ${user.status === 'active'
+                          ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-red-950/40 text-red-400 border border-red-500/30'
+                          }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'active' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                           {user.status === 'active' ? 'Ativo' : 'Suspenso'}
                         </span>
@@ -692,11 +701,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                           <button
                             onClick={() => handleToggleStatus(user.id)}
                             disabled={isCurrentSession}
-                            className={`p-1 rounded text-xs transition-colors border cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                              user.status === 'active'
-                                ? 'bg-red-950/20 hover:bg-red-950/40 border-red-500/30 text-red-400'
-                                : 'bg-emerald-950/20 hover:bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                            }`}
+                            className={`p-1 rounded text-xs transition-colors border cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${user.status === 'active'
+                              ? 'bg-red-950/20 hover:bg-red-950/40 border-red-500/30 text-red-400'
+                              : 'bg-emerald-950/20 hover:bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                              }`}
                             title={user.status === 'active' ? 'Suspender Usuário' : 'Reativar Usuário'}
                           >
                             {user.status === 'active' ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
@@ -729,20 +737,19 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
           <div className="space-y-4">
             {submissions.map((sub) => (
-              <div 
-                key={sub.id} 
+              <div
+                key={sub.id}
                 className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
               >
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-white">{sub.title}</span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                      sub.status === 'Aprovado' 
-                        ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30'
-                        : sub.status === 'Rejeitado'
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${sub.status === 'Aprovado'
+                      ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30'
+                      : sub.status === 'Rejeitado'
                         ? 'bg-red-950/50 text-red-400 border-red-500/30'
                         : 'bg-amber-950/50 text-amber-400 border-amber-500/30'
-                    }`}>
+                      }`}>
                       {sub.status}
                     </span>
                   </div>
@@ -750,8 +757,8 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                   {/* Swatches strip */}
                   <div className="flex items-center gap-1.5">
                     {sub.colors.map((hex, i) => (
-                      <div 
-                        key={i} 
+                      <div
+                        key={i}
                         className="w-10 h-8 rounded border border-white/10 shadow flex items-center justify-center text-[9px] font-mono text-white/90"
                         style={{ backgroundColor: hex }}
                       >
@@ -886,19 +893,18 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
           <div className="space-y-2">
             {auditLogs.map((log) => (
-              <div 
-                key={log.id} 
+              <div
+                key={log.id}
                 className="p-3 bg-[#181C26] border border-white/[0.04] rounded-lg flex items-center justify-between text-xs"
               >
                 <div className="flex items-center gap-3">
                   <span className="text-[10px] font-mono text-[#64748B] w-24 shrink-0">{log.timestamp}</span>
                   <div className="flex items-center gap-2">
                     <span className="font-semibold text-white">{log.actor}</span>
-                    <span className={`text-[9px] font-mono uppercase px-1.5 py-0.2 rounded border ${
-                      log.actorRole === 'admin' 
-                        ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
-                        : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
-                    }`}>
+                    <span className={`text-[9px] font-mono uppercase px-1.5 py-0.2 rounded border ${log.actorRole === 'admin'
+                      ? 'bg-purple-500/20 text-purple-300 border-purple-500/30'
+                      : 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30'
+                      }`}>
                       {log.actorRole}
                     </span>
                     <span className="text-white/40">•</span>
@@ -922,7 +928,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
           <div className="bg-[#141822] border border-white/[0.12] rounded-2xl w-full max-w-md shadow-2xl p-6">
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
               <h3 className="text-base font-bold text-white">Cadastrar Novo Usuário</h3>
-              <button 
+              <button
                 onClick={() => setShowAddUserModal(false)}
                 className="text-[#94A3B8] hover:text-white"
               >
@@ -968,18 +974,20 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
               <div>
                 <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Cargo</label>
-                <select
-                  value={newUserRole}
-                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
-                  className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                <div
+                  aria-disabled="true"
+                  title="Novos usuários são sempre criados como Usuário Comum. O cargo pode ser promovido depois na listagem de usuários."
+                  className="w-full bg-[#10141D]/60 border border-white/[0.08] rounded-lg px-3 py-2 text-xs flex items-center justify-between cursor-not-allowed select-none"
                 >
-                  <option value="user">Usuário Comum (Criador)</option>
-                  <option value="pro">Assinante Pro (Recursos Avançados)</option>
-                  <option value="editor">Editor de Conteúdo (CMS & Curadoria)</option>
-                  <option value="moderator">Moderador (Curadoria & Revisão)</option>
-                  <option value="admin">Administrador Master</option>
-                  <option value="guest">Visitante (Convidado)</option>
-                </select>
+                  <span className="text-white font-semibold">Usuário Comum</span>
+                  <span className="flex items-center gap-1 text-[10px] font-mono text-[#64748B]">
+                    <Lock className="w-3 h-3" />
+                    Definido no cadastro
+                  </span>
+                </div>
+                <p className="text-[10px] text-[#64748B] mt-1.5 leading-relaxed">
+                  Após criar a conta, use a coluna <strong className="text-[#94A3B8]">Cargo / Papel</strong> na listagem para promover o usuário.
+                </p>
               </div>
 
               <div className="pt-3 flex items-center justify-end gap-2">
@@ -1008,7 +1016,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
           <div className="bg-[#141822] border border-white/[0.12] rounded-2xl w-full max-w-lg shadow-2xl p-6">
             <div className="flex items-center justify-between pb-4 border-b border-white/[0.08]">
               <h3 className="text-base font-bold text-white">Publicar Novo Artigo Editorial</h3>
-              <button 
+              <button
                 onClick={() => setShowArticleModal(false)}
                 className="text-[#94A3B8] hover:text-white"
               >

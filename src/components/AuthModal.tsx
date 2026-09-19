@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { 
-  X, LogIn, UserPlus, Sparkles, ShieldCheck, User, Mail, Lock, AtSign, 
-  Cloud, AlertCircle, CheckCircle2, LogOut, Check, ArrowRight, KeyRound, 
-  Crown, Edit3, Eye, EyeOff, Award 
+import {
+  X, LogIn, UserPlus, Sparkles, ShieldCheck, User, Mail, Lock, AtSign,
+  Cloud, AlertCircle, CheckCircle2, LogOut, Check, ArrowRight, KeyRound,
+  Crown, Edit3, Eye, EyeOff, Award
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types';
-import { 
-  authenticateUser, 
-  registerUser, 
-  logoutAuthUser, 
+import {
+  authenticateUser,
+  PUBLIC_SIGNUP_ROLE,
+  registerUser,
+  logoutAuthUser,
   switchDemoRole,
-  resetPasswordForEmail 
+  resetPasswordForEmail
 } from '../services/authService';
 import { getSupabaseCredentials } from '../services/supabase';
 
@@ -89,11 +90,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setSuccessMsg(null);
     setLoading(true);
 
+    // O cadastro publico nunca envia cargo: o nivel e forcado como Usuario Comum
+    // no authService e no trigger do Supabase (handle_new_user).
     const res = await registerUser({
       name: name.trim(),
       email: email.trim(),
       password: password.trim() || undefined,
-      role: 'user',
       handle: handle.trim() || undefined
     });
     setLoading(false);
@@ -160,7 +162,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div 
+      <div
         className="bg-[#141822] border border-white/[0.12] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative"
         onClick={(e) => e.stopPropagation()}
       >
@@ -171,11 +173,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               <span className="text-[10px] font-mono tracking-widest text-[#06B6D4] uppercase bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-2 py-0.5 rounded font-semibold">
                 Sessão & Controle de Acesso
               </span>
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
-                supabaseCreds.isConfigured
+              <span className={`text-[10px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${supabaseCreds.isConfigured
                   ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                   : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-              }`}>
+                }`}>
                 <Cloud className="w-3 h-3" />
                 {supabaseCreds.isConfigured ? 'Supabase Auth Online' : 'Modo Local'}
               </span>
@@ -195,9 +196,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Current Active Account Banner */}
         <div className="px-6 py-3.5 bg-[#181E2C] border-b border-white/[0.06] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img 
-              src={currentUser.avatar} 
-              alt={currentUser.name} 
+            <img
+              src={currentUser.avatar}
+              alt={currentUser.name}
               className="w-9 h-9 rounded-full object-cover border border-white/20"
             />
             <div>
@@ -240,11 +241,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         <div className="flex border-b border-white/[0.06] bg-[#10141D]">
           <button
             onClick={() => { setTab('login'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${
-              tab === 'login'
+            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${tab === 'login'
                 ? 'border-[#6366F1] text-white bg-white/[0.02]'
                 : 'border-transparent text-[#94A3B8] hover:text-white'
-            }`}
+              }`}
           >
             <LogIn className="w-3.5 h-3.5 text-[#6366F1]" />
             <span>Entrar</span>
@@ -252,11 +252,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <button
             onClick={() => { setTab('register'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${
-              tab === 'register'
+            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${tab === 'register'
                 ? 'border-[#EC4899] text-white bg-white/[0.02]'
                 : 'border-transparent text-[#94A3B8] hover:text-white'
-            }`}
+              }`}
           >
             <UserPlus className="w-3.5 h-3.5 text-[#EC4899]" />
             <span>Criar Conta</span>
@@ -264,11 +263,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           <button
             onClick={() => { setTab('quick'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${
-              tab === 'quick'
+            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${tab === 'quick'
                 ? 'border-[#06B6D4] text-white bg-white/[0.02]'
                 : 'border-transparent text-[#94A3B8] hover:text-white'
-            }`}
+              }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" />
             <span>Acesso Demo</span>
@@ -434,12 +432,35 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
+              <div>
+                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                  Nível de Acesso (Cargo)
+                </label>
+                <div
+                  aria-disabled="true"
+                  title="O nível de acesso é definido automaticamente no cadastro e só pode ser alterado por um Administrador no Painel de Usuários."
+                  className="w-full bg-[#10141D]/60 border border-white/[0.08] rounded-lg pl-9 pr-3 py-2 text-xs flex items-center justify-between relative cursor-not-allowed select-none"
+                >
+                  <User className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <span className="text-white font-semibold flex items-center gap-1.5">
+                    Usuário Comum
+                    <span className="text-[10px] font-mono uppercase text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-1.5 py-0.5 rounded">
+                      {PUBLIC_SIGNUP_ROLE}
+                    </span>
+                  </span>
+                  <span className="flex items-center gap-1 text-[10px] font-mono text-[#64748B]">
+                    <Lock className="w-3 h-3" />
+                    Fixo
+                  </span>
+                </div>
+              </div>
+
               <div className="p-3 bg-[#10141D] border border-white/[0.08] rounded-xl flex items-start gap-2.5 text-xs">
                 <ShieldCheck className="w-4 h-4 text-[#06B6D4] shrink-0 mt-0.5" />
                 <div className="space-y-1">
-                  <span className="text-white font-semibold block">Perfil de Usuário Comum</span>
+                  <span className="text-white font-semibold block">Cadastro restrito ao nível Usuário Comum</span>
                   <p className="text-[#94A3B8] text-[11px] leading-relaxed">
-                    Novos cadastros criam automaticamente contas de <strong className="text-[#06B6D4]">Usuário Comum</strong>. A definição de permissões (Administrador, Moderador, Editor ou Pro) é efetuada exclusivamente por um Administrador no Painel de Usuários.
+                    Todo cadastro feito pelo portal é criado automaticamente como <strong className="text-[#06B6D4]">Usuário Comum</strong>. Cargos como Administrador, Moderador, Editor ou Pro são atribuídos exclusivamente por um Administrador na página de Usuários.
                   </p>
                 </div>
               </div>
@@ -515,13 +536,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </p>
 
               {/* Admin Card */}
-              <div 
+              <div
                 onClick={() => handleQuickSwitch('admin')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  currentUser.role === 'admin'
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'admin'
                     ? 'bg-purple-950/30 border-purple-500/60 ring-1 ring-purple-500/40 shadow-lg'
                     : 'bg-[#181C26] border-white/[0.08] hover:border-purple-500/40 hover:bg-[#1E2330]'
-                }`}
+                  }`}
               >
                 <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-4 h-4 text-purple-400" />
@@ -536,13 +556,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               {/* Moderator Card */}
-              <div 
+              <div
                 onClick={() => handleQuickSwitch('moderator')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  currentUser.role === 'moderator'
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'moderator'
                     ? 'bg-rose-950/30 border-rose-500/60 ring-1 ring-rose-500/40 shadow-lg'
                     : 'bg-[#181C26] border-white/[0.08] hover:border-rose-500/40 hover:bg-[#1E2330]'
-                }`}
+                  }`}
               >
                 <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
                   <Award className="w-4 h-4 text-rose-400" />
@@ -557,13 +576,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               {/* Editor Card */}
-              <div 
+              <div
                 onClick={() => handleQuickSwitch('editor')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  currentUser.role === 'editor'
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'editor'
                     ? 'bg-amber-950/30 border-amber-500/60 ring-1 ring-amber-500/40 shadow-lg'
                     : 'bg-[#181C26] border-white/[0.08] hover:border-amber-500/40 hover:bg-[#1E2330]'
-                }`}
+                  }`}
               >
                 <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
                   <Edit3 className="w-4 h-4 text-amber-400" />
@@ -578,13 +596,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               {/* Pro Card */}
-              <div 
+              <div
                 onClick={() => handleQuickSwitch('pro')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  currentUser.role === 'pro'
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'pro'
                     ? 'bg-emerald-950/30 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-lg'
                     : 'bg-[#181C26] border-white/[0.08] hover:border-emerald-500/40 hover:bg-[#1E2330]'
-                }`}
+                  }`}
               >
                 <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
                   <Crown className="w-4 h-4 text-emerald-400" />
@@ -599,13 +616,12 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               {/* Regular User Card */}
-              <div 
+              <div
                 onClick={() => handleQuickSwitch('user')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
-                  currentUser.role === 'user'
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'user'
                     ? 'bg-cyan-950/30 border-[#06B6D4]/60 ring-1 ring-[#06B6D4]/40 shadow-lg'
                     : 'bg-[#181C26] border-white/[0.08] hover:border-[#06B6D4]/40 hover:bg-[#1E2330]'
-                }`}
+                  }`}
               >
                 <div className="w-9 h-9 rounded-xl bg-[#06B6D4]/20 border border-[#06B6D4]/40 flex items-center justify-center shrink-0">
                   <User className="w-4 h-4 text-[#06B6D4]" />

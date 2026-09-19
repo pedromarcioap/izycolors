@@ -5,6 +5,59 @@ const STORAGE_KEY_USERS = 'izy_auth_users_v1';
 const STORAGE_KEY_CURRENT = 'izy_auth_current_user_v1';
 const STORAGE_KEY_AUDIT = 'izy_audit_logs_v1';
 
+export const ALL_ROLES: UserRole[] = ['admin', 'moderator', 'editor', 'pro', 'user', 'guest'];
+
+/** Nivel obrigatorio e unico permitido para cadastros realizados pelo portal publico. */
+export const PUBLIC_SIGNUP_ROLE: UserRole = 'user';
+
+/** Cargos de privilegio: nunca podem ser atribuidos por autocadastro nem por metadados do cliente. */
+export const PRIVILEGED_ROLES: UserRole[] = ['admin', 'moderator', 'editor', 'pro'];
+
+export function isPrivilegedRole(role: unknown): boolean {
+  return typeof role === 'string' && PRIVILEGED_ROLES.includes(role as UserRole);
+}
+
+/**
+ * Resolve o cargo confiavel de uma sessao Supabase Auth.
+ * Cargos de privilegio so sao aceitos quando ja existem no registro de perfis,
+ * gerenciado exclusivamente por um Administrador no Painel de Usuarios.
+ */
+export function resolveTrustedRole(metadataRole: unknown, registryRole?: UserRole): UserRole {
+  if (registryRole && (isPrivilegedRole(registryRole) || !isPrivilegedRole(metadataRole))) {
+    return registryRole;
+  }
+  if (
+    typeof metadataRole === 'string' &&
+    (ALL_ROLES as string[]).includes(metadataRole) &&
+    !isPrivilegedRole(metadataRole)
+  ) {
+    return metadataRole as UserRole;
+  }
+  return registryRole || PUBLIC_SIGNUP_ROLE;
+}
+
+/** Somente Administradores podem criar usuarios, alterar cargos ou suspender contas. */
+export function canManageUserRoles(actor?: AuthUser | null): boolean {
+  if (!actor || actor.role !== 'admin') return false;
+  const registry = getStoredUsers();
+  const stored =
+    registry.find(u => u.id === actor.id) ||
+    registry.find(u => u.email.toLowerCase() === actor.email.toLowerCase());
+  // Sessoes Supabase Admin ainda nao sincronizadas localmente sao aceitas.
+  return !stored || stored.role === 'admin';
+}
+
+/** Registra tentativa negada de operacao privilegiada para trilha de auditoria. */
+function logDeniedOperation(actor: AuthUser | undefined, action: string, details: string, type: AuditLogItem['type'] = 'system') {
+  logAuditEvent(
+    actor?.name || 'Sessao desconhecida',
+    actor?.role || 'guest',
+    action,
+    details,
+    type
+  );
+}
+
 // Seed initial users for both Admin and Regular User accounts
 export const INITIAL_USERS: AuthUser[] = [
   {
@@ -235,7 +288,7 @@ export function logAuditEvent(actor: string, actorRole: UserRole, action: string
   const updated = [newLog, ...currentLogs].slice(0, 50); // keep last 50
   try {
     localStorage.setItem(STORAGE_KEY_AUDIT, JSON.stringify(updated));
-  } catch (err) {}
+  } catch (err) { }
   return updated;
 }
 
@@ -254,18 +307,19 @@ export async function authenticateUser(email: string, password?: string): Promis
       });
 
       if (!error && data.user) {
-        const metaRole = (data.user.user_metadata?.role as UserRole) || (normalizedEmail.includes('admin') ? 'admin' : 'user');
         const existing = users.find(u => u.email.toLowerCase() === normalizedEmail);
-        
+        // Cargo privilegiado so e aceito quando ja registrado (atribuido por um Administrador).
+        const trustedRole = resolveTrustedRole(data.user.user_metadata?.role, existing?.role);
+
         const authUser: AuthUser = existing ? {
           ...existing,
-          role: (data.user.user_metadata?.role as UserRole) || existing.role,
+          role: trustedRole,
           lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         } : {
           id: data.user.id,
           name: data.user.user_metadata?.name || normalizedEmail.split('@')[0],
           email: normalizedEmail,
-          role: metaRole,
+          role: trustedRole,
           avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(normalizedEmail)}`,
           handle: data.user.user_metadata?.handle || `@${normalizedEmail.split('@')[0]}`,
           bio: data.user.user_metadata?.bio || 'Membro do Izy Colors Studio',
@@ -305,18 +359,18 @@ export async function authenticateUser(email: string, password?: string): Promis
     if (found.status === 'suspended') {
       return { success: false, error: 'Esta conta está temporariamente suspensa pelo administrador.' };
     }
-    const updatedUser = { 
-      ...found, 
-      lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+    const updatedUser = {
+      ...found,
+      lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
     setCurrentAuthUser(updatedUser);
     logAuditEvent(updatedUser.name, updatedUser.role, 'Login Local', `Sessão aberta como ${updatedUser.role === 'admin' ? 'Administrador' : 'Usuário'}`, 'auth');
     return { success: true, user: updatedUser, viaSupabase: false };
   }
 
-  return { 
-    success: false, 
-    error: 'Conta não encontrada. Cadastre-se na aba "Criar Nova Conta" para começar.' 
+  return {
+    success: false,
+    error: 'Conta não encontrada. Cadastre-se na aba "Criar Nova Conta" para começar.'
   };
 }
 
@@ -325,14 +379,15 @@ export async function registerUser(params: {
   name: string;
   email: string;
   password?: string;
-  role?: UserRole;
   handle?: string;
   bio?: string;
 }): Promise<{ success: boolean; user?: AuthUser; error?: string; message?: string; viaSupabase?: boolean }> {
   const users = getStoredUsers();
   const normalizedEmail = params.email.trim().toLowerCase();
-  const desiredRole: UserRole = 'user';
-  const cleanHandle = params.handle?.trim() 
+  // Regra de negocio: o cadastro do portal publico SEMPRE cria conta no nivel Usuario Comum.
+  // A elevacao de cargo e exclusiva do Administrador no Painel de Usuarios.
+  const desiredRole: UserRole = PUBLIC_SIGNUP_ROLE;
+  const cleanHandle = params.handle?.trim()
     ? (params.handle.startsWith('@') ? params.handle : `@${params.handle}`)
     : `@${normalizedEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '')}`;
 
@@ -366,6 +421,9 @@ export async function registerUser(params: {
         return { success: false, error: error.message || 'Falha ao registrar usuário no Supabase.' };
       }
 
+      // O banco (trigger handle_new_user) tambem forca o nivel 'user', ignorando
+      // qualquer tentativa de envio de cargo privilegiado via user_metadata.
+
       if (data.user) {
         supabaseUserId = data.user.id;
         usedSupabase = true;
@@ -396,20 +454,22 @@ export async function registerUser(params: {
   setCurrentAuthUser(newUser);
 
   logAuditEvent(
-    newUser.name, 
-    newUser.role, 
-    usedSupabase ? 'Registro Supabase Cloud' : 'Registro de Conta', 
-    `Nova conta criada com cargo [${newUser.role.toUpperCase()}]${usedSupabase ? ' integrado ao Supabase Auth' : ' (local)'}`, 
+    newUser.name,
+    newUser.role,
+    usedSupabase ? 'Registro Supabase Cloud' : 'Registro de Conta',
+    `Nova conta criada no nivel [${newUser.role.toUpperCase()}]. Cargos superiores so podem ser atribuidos por um Administrador.`,
     'auth'
   );
 
-  return { 
-    success: true, 
-    user: newUser, 
+  const levelNote = 'Nível de acesso atribuído automaticamente: Usuário Comum.';
+
+  return {
+    success: true,
+    user: newUser,
     viaSupabase: usedSupabase,
-    message: usedSupabase 
-      ? 'Conta criada e sincronizada com o Supabase Auth com sucesso!' 
-      : 'Conta criada localmente com sucesso!' 
+    message: usedSupabase
+      ? `Conta criada e sincronizada com o Supabase Auth com sucesso! ${levelNote}`
+      : `Conta criada localmente com sucesso! ${levelNote}`
   };
 }
 
@@ -441,12 +501,12 @@ export async function checkCurrentSession(): Promise<AuthUser | null> {
       const email = u.email || '';
       const users = getStoredUsers();
       const existing = users.find(usr => usr.email.toLowerCase() === email.toLowerCase());
-      
+
       const sessionUser: AuthUser = existing || {
         id: u.id,
         name: u.user_metadata?.name || email.split('@')[0],
         email: email,
-        role: (u.user_metadata?.role as UserRole) || 'user',
+        role: resolveTrustedRole(u.user_metadata?.role),
         avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
         handle: u.user_metadata?.handle || `@${email.split('@')[0]}`,
         bio: u.user_metadata?.bio || 'Criador Izy Colors',
@@ -483,7 +543,7 @@ export async function resetPasswordForEmail(email: string): Promise<{ success: b
       return { success: false, error: err.message || 'Erro ao enviar email de recuperação.' };
     }
   }
-  return { 
+  return {
     success: fontCheckSimulatedSuccess(normalizedEmail),
     message: `(Modo Local) Link de redefinição simulado com sucesso para ${normalizedEmail}.`
   };
@@ -496,7 +556,7 @@ function fontCheckSimulatedSuccess(_email: string): boolean {
 // Subscribe to Supabase Auth State Changes for automatic session restoration
 export function initAuthListener(onUserChange: (user: AuthUser) => void): () => void {
   const supabase = getSupabaseClient();
-  if (!supabase) return () => {};
+  if (!supabase) return () => { };
 
   const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
@@ -504,16 +564,16 @@ export function initAuthListener(onUserChange: (user: AuthUser) => void): () => 
         const email = session.user.email || '';
         const users = getStoredUsers();
         const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-        
+
         const authUser: AuthUser = existing ? {
           ...existing,
-          role: (session.user.user_metadata?.role as UserRole) || existing.role,
+          role: resolveTrustedRole(session.user.user_metadata?.role, existing.role),
           lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         } : {
           id: session.user.id,
           name: session.user.user_metadata?.name || email.split('@')[0],
           email,
-          role: (session.user.user_metadata?.role as UserRole) || 'user',
+          role: resolveTrustedRole(session.user.user_metadata?.role),
           avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
           handle: session.user.user_metadata?.handle || `@${email.split('@')[0]}`,
           bio: session.user.user_metadata?.bio || 'Criador Izy Colors',
@@ -569,9 +629,25 @@ export function switchDemoRole(targetRole: UserRole): AuthUser {
   return target;
 }
 
-// Update role of a user in Admin area
-export function updateUserRole(userId: string, newRole: UserRole, adminActor: string): AuthUser[] {
+// Update role of a user in Admin area — restrito a Administradores
+export function updateUserRole(userId: string, newRole: UserRole, adminActor: AuthUser): AuthUser[] {
   const users = getStoredUsers();
+
+  if (!canManageUserRoles(adminActor)) {
+    console.warn('[RBAC] Alteração de cargo negada: solicitante sem privilégio de Administrador.');
+    logDeniedOperation(
+      adminActor,
+      'Alteração de Cargo Negada',
+      `Tentativa não autorizada de alterar o cargo do usuário ${userId} para [${String(newRole).toUpperCase()}]`
+    );
+    return users;
+  }
+
+  if (!ALL_ROLES.includes(newRole)) {
+    return users;
+  }
+
+  const target = users.find(u => u.id === userId);
   const updated = users.map(u => {
     if (u.id === userId) {
       return { ...u, role: newRole };
@@ -579,22 +655,32 @@ export function updateUserRole(userId: string, newRole: UserRole, adminActor: st
     return u;
   });
   saveStoredUsers(updated);
-  
-  const target = users.find(u => u.id === userId);
+
   logAuditEvent(
-    adminActor, 
-    'admin', 
-    'Alteração de Cargo', 
-    `Cargo do usuário ${target ? target.name : userId} alterado para [${newRole.toUpperCase()}]`, 
+    adminActor.name,
+    'admin',
+    'Alteração de Cargo',
+    `Cargo do usuário ${target ? target.name : userId} alterado para [${newRole.toUpperCase()}]`,
     'user'
   );
   return updated;
 }
 
-// Toggle user active / suspended status
-export function toggleUserStatus(userId: string, adminActor: string): AuthUser[] {
+// Toggle user active / suspended status — restrito a Administradores
+export function toggleUserStatus(userId: string, adminActor: AuthUser): AuthUser[] {
   const users = getStoredUsers();
-  let changedStatus: string = 'active';
+
+  if (!canManageUserRoles(adminActor)) {
+    console.warn('[RBAC] Alteração de status negada: solicitante sem privilégio de Administrador.');
+    logDeniedOperation(
+      adminActor,
+      'Alteração de Status Negada',
+      `Tentativa não autorizada de alterar o status do usuário ${userId}`
+    );
+    return users;
+  }
+
+  let changedStatus: 'active' | 'suspended' | null = null;
   let targetName = '';
 
   const updated: AuthUser[] = users.map(u => {
@@ -608,27 +694,42 @@ export function toggleUserStatus(userId: string, adminActor: string): AuthUser[]
   });
   saveStoredUsers(updated);
 
+  const isSuspended = changedStatus === 'suspended';
+
   logAuditEvent(
-    adminActor, 
-    'admin', 
-    changedStatus === 'suspended' ? 'Conta Suspensa' : 'Conta Reativada', 
-    `Usuário ${targetName} teve seu status alterado para [${changedStatus}]`, 
+    adminActor.name,
+    'admin',
+    isSuspended ? 'Conta Suspensa' : 'Conta Reativada',
+    `Usuário ${targetName} teve seu status alterado para [${changedStatus}]`,
     'user'
   );
   return updated;
 }
 
-// Add a new user directly from Admin Area
+// Add a new user directly from Admin Area — restrito a Administradores
 export function createNewUserFromAdmin(
   userData: { name: string; email: string; handle: string; role: UserRole; bio?: string },
-  adminActor: string
-): { users: AuthUser[]; newUser: AuthUser } {
+  adminActor: AuthUser
+): { users: AuthUser[]; newUser: AuthUser | null } {
   const users = getStoredUsers();
+
+  if (!canManageUserRoles(adminActor)) {
+    console.warn('[RBAC] Criação de usuário negada: solicitante sem privilégio de Administrador.');
+    logDeniedOperation(
+      adminActor,
+      'Criação de Usuário Negada',
+      `Tentativa não autorizada de criar o usuário ${userData.email}`
+    );
+    return { users, newUser: null };
+  }
+
+  const safeRole: UserRole = ALL_ROLES.includes(userData.role) ? userData.role : PUBLIC_SIGNUP_ROLE;
+
   const newUser: AuthUser = {
     id: `usr-${Date.now()}`,
     name: userData.name,
     email: userData.email.toLowerCase(),
-    role: userData.role,
+    role: safeRole,
     avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData.name)}`,
     handle: userData.handle.startsWith('@') ? userData.handle : `@${userData.handle}`,
     bio: userData.bio || 'Membro do Izy Colors Studio',
@@ -644,10 +745,10 @@ export function createNewUserFromAdmin(
   saveStoredUsers(updated);
 
   logAuditEvent(
-    adminActor, 
-    'admin', 
-    'Novo Usuário Criado', 
-    `Administrador criou o usuário ${newUser.name} com cargo [${newUser.role.toUpperCase()}]`, 
+    adminActor.name,
+    'admin',
+    'Novo Usuário Criado',
+    `Administrador criou o usuário ${newUser.name} com cargo [${newUser.role.toUpperCase()}]`,
     'user'
   );
 
