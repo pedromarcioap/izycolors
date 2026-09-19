@@ -64,7 +64,9 @@ import {
   setCurrentAuthUser, 
   getStoredAuditLogs, 
   switchDemoRole,
-  checkCurrentSession
+  checkCurrentSession,
+  logoutAuthUser,
+  initAuthListener
 } from './services/authService';
 
 import { Menu, Sparkles, Sliders, Database, GitFork, Download, Check, ShieldCheck, ShieldAlert, LayoutDashboard, LogIn, User } from 'lucide-react';
@@ -184,11 +186,48 @@ export function App() {
         }));
       }
     });
+
+    // Subscribe to Supabase Auth state changes in real time
+    const unsubscribeAuth = initAuthListener((user) => {
+      setAuthUser(user);
+      setUserProfile(prev => ({
+        ...prev,
+        name: user.name,
+        handle: user.handle,
+        avatar: user.avatar,
+        bio: user.bio || prev.bio
+      }));
+    });
+
+    return () => {
+      unsubscribeAuth();
+    };
   }, []);
 
-  // Strict RBAC Guard: If non-admin user is on admin or cms, redirect to profile
+  // Handle Logout via Supabase Auth
+  const handleLogout = useCallback(async () => {
+    await logoutAuthUser();
+    const guestUser = switchDemoRole('guest');
+    setAuthUser(guestUser);
+    setUserProfile(prev => ({
+      ...prev,
+      name: guestUser.name,
+      handle: guestUser.handle,
+      avatar: guestUser.avatar,
+      bio: guestUser.bio
+    }));
+    if (currentTab === 'admin' || currentTab === 'cms') {
+      setCurrentTab('generator');
+    }
+    showToast('Sessão encerrada com sucesso via Supabase Auth.');
+  }, [currentTab, showToast]);
+
+  // Strict RBAC Guard: Protect admin and cms routes based on user role
   useEffect(() => {
-    if (authUser.role !== 'admin' && (currentTab === 'admin' || currentTab === 'cms')) {
+    if (currentTab === 'admin' && authUser.role !== 'admin') {
+      setCurrentTab('profile');
+    }
+    if (currentTab === 'cms' && authUser.role !== 'admin' && authUser.role !== 'editor') {
       setCurrentTab('profile');
     }
   }, [authUser.role, currentTab]);
@@ -472,6 +511,7 @@ export function App() {
         userProfile={userProfile}
         authUser={authUser}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenExportModal={() => handleOpenExport()}
         onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
@@ -899,14 +939,7 @@ export function App() {
           }));
           showToast(`Sessão ativa como ${user.name} (${user.role === 'admin' ? 'Administrador' : 'Usuário Comum'})`);
         }}
-        onLogout={() => {
-          const guestUser = switchDemoRole('user');
-          setAuthUser(guestUser);
-          if (currentTab === 'admin' || currentTab === 'cms') {
-            setCurrentTab('user_dashboard');
-          }
-          showToast('Sessão desconectada. Modo visitante ativo.');
-        }}
+        onLogout={handleLogout}
         onNavigateToAdmin={() => setCurrentTab('admin')}
         onNavigateToUserPortal={() => setCurrentTab('user_dashboard')}
       />

@@ -17,7 +17,8 @@ import {
   Maximize2,
   ShieldCheck,
   LayoutDashboard,
-  LogIn
+  LogIn,
+  LogOut
 } from 'lucide-react';
 import { ColorGamut, NavigationTab, UserProfile, AuthUser } from '../types';
 
@@ -29,6 +30,7 @@ interface NavbarProps {
   userProfile: UserProfile;
   authUser?: AuthUser;
   onOpenAuthModal?: () => void;
+  onLogout?: () => void;
   onOpenCommandPalette: () => void;
   onOpenExportModal: () => void;
   favoritesCount: number;
@@ -44,6 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   userProfile,
   authUser,
   onOpenAuthModal,
+  onLogout,
   onOpenCommandPalette,
   onOpenExportModal,
   favoritesCount,
@@ -230,6 +233,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   title="Trocar perfil ou entrar"
                 >
                   Trocar
+                </button>
+              )}
+
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="px-2 py-1 text-[11px] font-mono text-rose-400 hover:text-rose-300 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 rounded-md transition-colors cursor-pointer flex items-center gap-1"
+                  title="Sair da conta e encerrar sessão"
+                >
+                  <LogOut className="w-3 h-3" />
+                  <span>Sair</span>
                 </button>
               )}
             </div>

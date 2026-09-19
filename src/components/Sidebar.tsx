@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   LayoutDashboard,
   LogIn,
+  LogOut,
   BarChart3
 } from 'lucide-react';
 import { ColorGamut, NavigationTab, UserProfile, AuthUser } from '../types';
@@ -33,6 +34,7 @@ interface SidebarProps {
   userProfile: UserProfile;
   authUser: AuthUser;
   onOpenAuthModal: () => void;
+  onLogout?: () => void;
   onOpenCommandPalette: () => void;
   onOpenExportModal: () => void;
   onOpenSupabaseModal: () => void;
@@ -52,6 +54,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userProfile,
   authUser,
   onOpenAuthModal,
+  onLogout,
   onOpenCommandPalette,
   onOpenExportModal,
   onOpenSupabaseModal,
@@ -401,13 +404,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <span className="text-xs font-semibold text-white block truncate">
                   {authUser.name}
                 </span>
-                <button
-                  onClick={onOpenAuthModal}
-                  className="text-[10px] font-mono text-[#06B6D4] hover:text-white px-1 py-0.5 rounded hover:bg-white/[0.06] transition-colors cursor-pointer"
-                  title="Trocar conta ou autenticar"
-                >
-                  Trocar
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={onOpenAuthModal}
+                    className="text-[10px] font-mono text-[#06B6D4] hover:text-white px-1 py-0.5 rounded hover:bg-white/[0.06] transition-colors cursor-pointer"
+                    title="Trocar conta ou autenticar"
+                  >
+                    Trocar
+                  </button>
+                  {onLogout && (
+                    <button
+                      onClick={onLogout}
+                      className="text-[10px] font-mono text-rose-400 hover:text-rose-300 px-1 py-0.5 rounded hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-0.5"
+                      title="Sair da conta e encerrar sessão"
+                    >
+                      <LogOut className="w-2.5 h-2.5" />
+                      <span>Sair</span>
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className={`text-[9px] font-mono font-bold uppercase px-1 rounded border ${
