@@ -72,7 +72,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'moderation' | 'cms' | 'logs' | 'settings'>('overview');
   const [userSearch, setUserSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'user'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'editor' | 'pro' | 'user'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
 
   // New User Modal
@@ -166,10 +166,11 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   // Statistics
   const pendingSubmissionsCount = submissions.filter(s => s.status === 'Pendente').length;
   const adminCount = usersList.filter(u => u.role === 'admin').length;
-  const regularCount = usersList.filter(u => u.role === 'user').length;
+  const editorCount = usersList.filter(u => u.role === 'editor').length;
+  const proCount = usersList.filter(u => u.role === 'pro').length;
+  const regularCount = usersList.filter(u => u.role === 'user' || u.role === 'guest').length;
 
-  const handleToggleRole = (userId: string, currentRole: UserRole) => {
-    const nextRole: UserRole = currentRole === 'admin' ? 'user' : 'admin';
+  const handleRoleChange = (userId: string, nextRole: UserRole) => {
     const updated = updateUserRole(userId, nextRole, currentUser.name);
     onUpdateUsersList(updated);
     showFeedback(`Cargo atualizado para [${nextRole.toUpperCase()}].`);
@@ -512,7 +513,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
             <div className="flex flex-wrap items-center gap-2.5">
               {/* Role Filter */}
-              <div className="flex items-center p-0.5 bg-[#10141D] border border-white/[0.08] rounded-lg text-xs font-mono">
+              <div className="flex items-center p-0.5 bg-[#10141D] border border-white/[0.08] rounded-lg text-xs font-mono overflow-x-auto">
                 <button
                   onClick={() => setRoleFilter('all')}
                   className={`px-2.5 py-1 rounded ${roleFilter === 'all' ? 'bg-[#202534] text-white' : 'text-[#94A3B8] hover:text-white'}`}
@@ -524,6 +525,18 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                   className={`px-2.5 py-1 rounded ${roleFilter === 'admin' ? 'bg-purple-600/30 text-purple-300' : 'text-[#94A3B8] hover:text-white'}`}
                 >
                   Admins ({adminCount})
+                </button>
+                <button
+                  onClick={() => setRoleFilter('editor')}
+                  className={`px-2.5 py-1 rounded ${roleFilter === 'editor' ? 'bg-amber-600/30 text-amber-300' : 'text-[#94A3B8] hover:text-white'}`}
+                >
+                  Editores ({editorCount})
+                </button>
+                <button
+                  onClick={() => setRoleFilter('pro')}
+                  className={`px-2.5 py-1 rounded ${roleFilter === 'pro' ? 'bg-emerald-600/30 text-emerald-300' : 'text-[#94A3B8] hover:text-white'}`}
+                >
+                  Pro ({proCount})
                 </button>
                 <button
                   onClick={() => setRoleFilter('user')}
@@ -598,21 +611,17 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                       {/* Role Pill */}
                       <td className="p-3.5">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
-                          user.role === 'admin'
-                            ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                            : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+                          user.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+                          user.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+                          user.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
+                          user.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :
+                          'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
                         }`}>
-                          {user.role === 'admin' ? (
-                            <>
-                              <ShieldCheck className="w-3 h-3 text-purple-400" />
-                              Administrador
-                            </>
-                          ) : (
-                            <>
-                              <Users className="w-3 h-3 text-[#06B6D4]" />
-                              Usuário Comum
-                            </>
-                          )}
+                          {user.role === 'admin' && <ShieldCheck className="w-3 h-3 text-purple-400" />}
+                          {user.role === 'editor' && <FileText className="w-3 h-3 text-amber-400" />}
+                          {user.role === 'pro' && <Sparkles className="w-3 h-3 text-emerald-400" />}
+                          {(user.role === 'user' || user.role === 'guest') && <Users className="w-3 h-3 text-[#06B6D4]" />}
+                          {user.role.toUpperCase()}
                         </span>
                       </td>
 
@@ -641,23 +650,20 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                       {/* Actions */}
                       <td className="p-3.5 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Toggle Role Button */}
-                          <button
-                            onClick={() => handleToggleRole(user.id, user.role)}
+                          {/* Role Selector Select */}
+                          <select
+                            value={user.role}
+                            onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
                             disabled={isCurrentSession}
-                            className={`px-2 py-1 rounded text-[11px] font-mono transition-colors border cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${
-                              user.role === 'admin'
-                                ? 'bg-[#181C26] hover:bg-[#202534] border-white/10 text-cyan-300'
-                                : 'bg-purple-950/40 hover:bg-purple-900/50 border-purple-500/40 text-purple-300'
-                            }`}
-                            title={
-                              isCurrentSession 
-                                ? 'Você não pode rebaixar seu próprio cargo ativo' 
-                                : user.role === 'admin' ? 'Rebaixar para Usuário Comum' : 'Promover a Administrador'
-                            }
+                            className="px-2 py-1 bg-[#10141D] border border-white/10 rounded text-[11px] font-mono text-white focus:outline-none focus:border-purple-500 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                            title={isCurrentSession ? 'Você não pode alterar seu próprio cargo nesta sessão' : 'Alterar cargo do usuário'}
                           >
-                            {user.role === 'admin' ? 'Tornar Usuário' : 'Promover a Admin'}
-                          </button>
+                            <option value="admin">ADMIN</option>
+                            <option value="editor">EDITOR</option>
+                            <option value="pro">PRO</option>
+                            <option value="user">USER</option>
+                            <option value="guest">GUEST</option>
+                          </select>
 
                           {/* Toggle Status */}
                           <button
@@ -945,7 +951,10 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                   className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
                 >
                   <option value="user">Usuário Comum (Criador)</option>
+                  <option value="pro">Assinante Pro (Recursos Avançados)</option>
+                  <option value="editor">Editor de Conteúdo (CMS & Curadoria)</option>
                   <option value="admin">Administrador Master</option>
+                  <option value="guest">Visitante (Convidado)</option>
                 </select>
               </div>
 

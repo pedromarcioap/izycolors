@@ -658,7 +658,7 @@ export function App() {
           )}
 
           {currentTab === 'cms' && (
-            authUser.role === 'admin' ? (
+            (authUser.role === 'admin' || authUser.role === 'editor') ? (
               <CmsAdminView
                 articles={articles}
                 submissions={submissions}
@@ -674,7 +674,7 @@ export function App() {
                 <ShieldAlert className="w-12 h-12 text-amber-400 mx-auto mb-4" />
                 <h3 className="text-lg font-bold text-white font-['Geist']">Acesso Restrito</h3>
                 <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">
-                  O painel CMS Editorial e curadoria de conteúdo é restrito exclusivamente a administradores credenciados.
+                  O painel CMS Editorial e curadoria de conteúdo é restrito a editores e administradores credenciados.
                 </p>
                 <button
                   onClick={() => setCurrentTab('profile')}

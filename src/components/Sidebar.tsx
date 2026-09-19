@@ -122,7 +122,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'AAA',
       description: 'Simulador de daltonismo'
     },
-    // Admin and CMS panels are strictly visible to administrators only
+    // Role-restricted navigation items
     ...(authUser.role === 'admin' ? [
       {
         id: 'admin' as NavigationTab,
@@ -130,14 +130,16 @@ export const Sidebar: React.FC<SidebarProps> = ({
         shortLabel: 'Admin',
         icon: ShieldCheck,
         badge: 'Admin',
-        description: 'Gestão de usuários e curadoria'
-      },
+        description: 'Gestão de usuários e auditoria'
+      }
+    ] : []),
+    ...(authUser.role === 'admin' || authUser.role === 'editor' ? [
       {
         id: 'cms' as NavigationTab,
         label: 'CMS Editorial',
         shortLabel: 'CMS',
         icon: FileText,
-        badge: 'Editorial',
+        badge: authUser.role === 'admin' ? 'Editorial' : 'Curador',
         description: 'Artigos e curadoria'
       }
     ] : []),
@@ -146,7 +148,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Dashboard de Cores',
       shortLabel: 'Dashboard',
       icon: BarChart3,
-      badge: 'Recharts',
+      badge: 'Analytics',
       description: 'Frequência, gamuts & evolução'
     },
     {
@@ -154,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       label: 'Meu Perfil & Espaço',
       shortLabel: 'Perfil',
       icon: User,
-      badge: authUser.role === 'admin' ? 'Admin' : 'Pro',
+      badge: authUser.role.toUpperCase(),
       description: authUser.handle || authUser.name
     }
   ];
@@ -387,7 +389,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
               className="w-8 h-8 rounded-full object-cover border border-white/20 hover:border-white/50 transition-colors"
             />
             <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0B0F17] ${
-              authUser.role === 'admin' ? 'bg-purple-400' : 'bg-[#06B6D4]'
+              authUser.role === 'admin' ? 'bg-purple-400' :
+              authUser.role === 'editor' ? 'bg-amber-400' :
+              authUser.role === 'pro' ? 'bg-emerald-400' : 'bg-[#06B6D4]'
             }`} />
           </div>
 
@@ -407,11 +411,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className={`text-[9px] font-mono font-bold uppercase px-1 rounded border ${
-                  authUser.role === 'admin'
-                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                    : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+                  authUser.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+                  authUser.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+                  authUser.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
+                  authUser.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :
+                  'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
                 }`}>
-                  {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
+                  {authUser.role.toUpperCase()}
                 </span>
                 <span className="text-[10px] font-mono text-[#64748B] truncate">
                   {authUser.handle}

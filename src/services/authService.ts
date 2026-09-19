@@ -23,6 +23,36 @@ export const INITIAL_USERS: AuthUser[] = [
     submissionsCount: 15
   },
   {
+    id: 'usr-editor-1',
+    name: 'Bruno Siqueira',
+    email: 'editor@izycolors.com',
+    role: 'editor',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    handle: '@bruno_editor',
+    bio: 'Curador Editorial & Revisor de Conteúdo Cromático. Responsável pela seleção de Staff Picks e edital da comunidade.',
+    status: 'active',
+    createdAt: '2026-01-28',
+    lastLoginAt: 'Hoje, 08:30',
+    palettesCount: 31,
+    favoritesCount: 84,
+    submissionsCount: 22
+  },
+  {
+    id: 'usr-pro-1',
+    name: 'Camila Albuquerque',
+    email: 'pro@izycolors.com',
+    role: 'pro',
+    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
+    handle: '@camila_pro',
+    bio: 'Senior Design Systems Lead. Desenvolvendo tokens OKLCH e paletas de alta amostragem para apps de grande escala.',
+    status: 'active',
+    createdAt: '2026-02-01',
+    lastLoginAt: 'Hoje, 11:05',
+    palettesCount: 28,
+    favoritesCount: 95,
+    submissionsCount: 8
+  },
+  {
     id: 'usr-regular-1',
     name: 'Pedro Márcio',
     email: 'pedromarcioap@gmail.com',
@@ -54,25 +84,10 @@ export const INITIAL_USERS: AuthUser[] = [
   },
   {
     id: 'usr-regular-3',
-    name: 'Elena Rostova',
-    email: 'elena.rostova@palette.art',
-    role: 'user',
-    avatar: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=300&auto=format&fit=crop&q=80',
-    handle: '@elena_art',
-    bio: 'Artista digital focada em animação 2D e iluminação cinematográfica.',
-    status: 'active',
-    createdAt: '2026-02-22',
-    lastLoginAt: 'Há 2 dias',
-    palettesCount: 9,
-    favoritesCount: 41,
-    submissionsCount: 2
-  },
-  {
-    id: 'usr-regular-4',
     name: 'Kenzo Sato',
     email: 'kenzo.sato@tokyo-lab.dev',
     role: 'user',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
     handle: '@kenzo_sato',
     bio: 'Desenvolvedor Frontend & Pesquisador de Gamuts Wide-Color (P3 e Rec.2020).',
     status: 'suspended',
@@ -436,10 +451,104 @@ export async function checkCurrentSession(): Promise<AuthUser | null> {
   return null;
 }
 
-// Quick switch between demo roles (Admin and Regular User)
+// Request password reset email via Supabase Auth
+export async function resetPasswordForEmail(email: string): Promise<{ success: boolean; error?: string; message?: string }> {
+  const normalizedEmail = email.trim().toLowerCase();
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true, message: `Instruções de redefinição de senha enviadas para ${normalizedEmail}.` };
+    } catch (err: any) {
+      return { success: false, error: err.message || 'Erro ao enviar email de recuperação.' };
+    }
+  }
+  return { 
+    success: fontCheckSimulatedSuccess(normalizedEmail),
+    message: `(Modo Local) Link de redefinição simulado com sucesso para ${normalizedEmail}.`
+  };
+}
+
+function fontCheckSimulatedSuccess(_email: string): boolean {
+  return true;
+}
+
+// Subscribe to Supabase Auth State Changes for automatic session restoration
+export function initAuthListener(onUserChange: (user: AuthUser) => void): () => void {
+  const supabase = getSupabaseClient();
+  if (!supabase) return () => {};
+
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (session?.user) {
+        const email = session.user.email || '';
+        const users = getStoredUsers();
+        const existing = users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        
+        const authUser: AuthUser = existing ? {
+          ...existing,
+          role: (session.user.user_metadata?.role as UserRole) || existing.role,
+          lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        } : {
+          id: session.user.id,
+          name: session.user.user_metadata?.name || email.split('@')[0],
+          email,
+          role: (session.user.user_metadata?.role as UserRole) || 'user',
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
+          handle: session.user.user_metadata?.handle || `@${email.split('@')[0]}`,
+          bio: session.user.user_metadata?.bio || 'Criador Izy Colors',
+          status: 'active',
+          createdAt: new Date().toISOString().split('T')[0],
+          lastLoginAt: 'Hoje',
+          palettesCount: 0,
+          favoritesCount: 0,
+          submissionsCount: 0
+        };
+        setCurrentAuthUser(authUser);
+        onUserChange(authUser);
+      }
+    } else if (event === 'SIGNED_OUT') {
+      const defaultUser = INITIAL_USERS.find(u => u.role === 'user') || INITIAL_USERS[0];
+      setCurrentAuthUser(defaultUser);
+      onUserChange(defaultUser);
+    }
+  });
+
+  return () => {
+    subscription.unsubscribe();
+  };
+}
+
+// Quick switch between demo roles (Admin, Editor, Pro, User, Guest)
 export function switchDemoRole(targetRole: UserRole): AuthUser {
+  if (targetRole === 'guest') {
+    const guestUser: AuthUser = {
+      id: 'usr-guest-mode',
+      name: 'Visitante (Trial)',
+      email: 'guest@izycolors.com',
+      role: 'guest',
+      avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Guest',
+      handle: '@visitante',
+      bio: 'Modo visitante experimental em pré-visualização.',
+      status: 'active',
+      createdAt: new Date().toISOString().split('T')[0],
+      lastLoginAt: 'Agora mesmo',
+      palettesCount: 0,
+      favoritesCount: 0,
+      submissionsCount: 0
+    };
+    setCurrentAuthUser(guestUser);
+    logAuditEvent(guestUser.name, guestUser.role, 'Alternância para Visitante', 'Sessão alterada para modo Visitante (Demonstração)', 'auth');
+    return guestUser;
+  }
+
   const users = getStoredUsers();
-  const target = users.find(u => u.role === targetRole && u.status === 'active') || INITIAL_USERS.find(u => u.role === targetRole)!;
+  const target = users.find(u => u.role === targetRole && u.status === 'active') || INITIAL_USERS.find(u => u.role === targetRole) || INITIAL_USERS[0];
   setCurrentAuthUser(target);
   logAuditEvent(target.name, target.role, 'Alternância de Perfil Demo', `Ambiente alterado para perfil ${target.role.toUpperCase()}`, 'auth');
   return target;

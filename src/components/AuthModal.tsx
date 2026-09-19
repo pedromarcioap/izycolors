@@ -1,23 +1,17 @@
 import React, { useState } from 'react';
 import { 
-  X, 
-  ShieldCheck, 
-  User, 
-  LogIn, 
-  UserPlus, 
-  Check, 
-  AlertCircle, 
-  Sparkles,
-  ArrowRight,
-  LogOut,
-  Mail,
-  Lock,
-  AtSign,
-  Cloud,
-  CheckCircle2
+  X, LogIn, UserPlus, Sparkles, ShieldCheck, User, Mail, Lock, AtSign, 
+  Cloud, AlertCircle, CheckCircle2, LogOut, Check, ArrowRight, KeyRound, 
+  Crown, Edit3, Eye, EyeOff 
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types';
-import { authenticateUser, registerUser, switchDemoRole, logoutAuthUser } from '../services/authService';
+import { 
+  authenticateUser, 
+  registerUser, 
+  logoutAuthUser, 
+  switchDemoRole,
+  resetPasswordForEmail 
+} from '../services/authService';
 import { getSupabaseCredentials } from '../services/supabase';
 
 interface AuthModalProps {
@@ -39,9 +33,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onNavigateToAdmin,
   onNavigateToUserPortal
 }) => {
-  const [tab, setTab] = useState<'login' | 'register' | 'quick'>('login');
+  const [tab, setTab] = useState<'login' | 'register' | 'reset' | 'quick'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
   const [selectedRole, setSelectedRole] = useState<UserRole>('user');
@@ -69,8 +64,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (res.success && res.user) {
       setSuccessMsg(
         res.viaSupabase
-          ? `Autenticado com sucesso via Supabase Cloud como ${res.user.role === 'admin' ? 'Administrador' : 'Usuário'}!`
-          : `Sessão iniciada como ${res.user.role === 'admin' ? 'Administrador' : 'Usuário'} (${res.user.name})`
+          ? `Autenticado com sucesso via Supabase Cloud como ${res.user.role.toUpperCase()}!`
+          : `Sessão iniciada como ${res.user.role.toUpperCase()} (${res.user.name})`
       );
       onUserChange(res.user);
       setTimeout(() => {
@@ -115,6 +110,26 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleResetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) {
+      setErrorMsg('Informe o e-mail da sua conta para recuperar a senha.');
+      return;
+    }
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setLoading(true);
+
+    const res = await resetPasswordForEmail(email);
+    setLoading(false);
+
+    if (res.success) {
+      setSuccessMsg(res.message || 'Instruções enviadas para seu e-mail!');
+    } else {
+      setErrorMsg(res.error || 'Erro ao enviar e-mail de redefinição.');
+    }
+  };
+
   const handleQuickSwitch = (role: UserRole) => {
     const user = switchDemoRole(role);
     onUserChange(user);
@@ -125,6 +140,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     await logoutAuthUser();
     onLogout();
     onClose();
+  };
+
+  const getRoleBadgeStyle = (role: UserRole) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+      case 'editor':
+        return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+      case 'pro':
+        return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
+      case 'guest':
+        return 'bg-slate-500/20 text-slate-300 border-slate-500/40';
+      default:
+        return 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40';
+    }
   };
 
   return (
@@ -138,7 +168,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] font-mono tracking-widest text-[#06B6D4] uppercase bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-2 py-0.5 rounded font-semibold">
-                Controle de Acesso & Sessão
+                Sessão & Controle de Acesso
               </span>
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${
                 supabaseCreds.isConfigured
@@ -146,7 +176,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
               }`}>
                 <Cloud className="w-3 h-3" />
-                {supabaseCreds.isConfigured ? 'Supabase Conectado' : 'Modo Local'}
+                {supabaseCreds.isConfigured ? 'Supabase Auth Online' : 'Modo Local'}
               </span>
             </div>
             <h2 className="text-xl font-bold text-white tracking-tight font-['Geist'] mt-1.5">
@@ -172,12 +202,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             <div>
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-semibold text-white">{currentUser.name}</span>
-                <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border ${
-                  currentUser.role === 'admin'
-                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                    : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
-                }`}>
-                  {currentUser.role === 'admin' ? 'Administrador' : 'Usuário Comum'}
+                <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border ${getRoleBadgeStyle(currentUser.role)}`}>
+                  {currentUser.role}
                 </span>
               </div>
               <span className="text-[11px] font-mono text-[#64748B] block">{currentUser.email}</span>
@@ -193,7 +219,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }}
                 className="px-2.5 py-1 text-[11px] font-mono text-purple-300 hover:text-white bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/30 rounded transition-colors cursor-pointer"
               >
-                Abrir Admin
+                Painel Admin
               </button>
             ) : (
               <button
@@ -203,7 +229,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 }}
                 className="px-2.5 py-1 text-[11px] font-mono text-[#06B6D4] hover:text-white bg-[#06B6D4]/10 hover:bg-[#06B6D4]/20 border border-[#06B6D4]/30 rounded transition-colors cursor-pointer"
               >
-                Abrir Painel
+                Meu Perfil
               </button>
             )}
           </div>
@@ -220,7 +246,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <LogIn className="w-3.5 h-3.5 text-[#6366F1]" />
-            <span>Entrar com E-mail</span>
+            <span>Entrar</span>
           </button>
 
           <button
@@ -232,7 +258,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <UserPlus className="w-3.5 h-3.5 text-[#EC4899]" />
-            <span>Criar Nova Conta</span>
+            <span>Criar Conta</span>
           </button>
 
           <button
@@ -244,7 +270,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             }`}
           >
             <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" />
-            <span>Acesso Rápido Demo</span>
+            <span>Acesso Demo</span>
           </button>
         </div>
 
@@ -264,7 +290,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </div>
           )}
 
-          {/* Login with Email Tab */}
+          {/* Login Tab */}
           {tab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
@@ -285,18 +311,34 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
-                  Senha
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-mono uppercase text-[#94A3B8]">
+                    Senha
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => { setTab('reset'); setErrorMsg(null); setSuccessMsg(null); }}
+                    className="text-[11px] text-[#6366F1] hover:text-[#8183F4] transition-colors"
+                  >
+                    Esqueceu a senha?
+                  </button>
+                </div>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
-                    type="password"
-                    placeholder={supabaseCreds.isConfigured ? "Sua senha do Supabase" : "Qualquer senha no modo local"}
+                    type={showPassword ? "text" : "password"}
+                    placeholder={supabaseCreds.isConfigured ? "Sua senha do Supabase Auth" : "Qualquer senha (modo local)"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#6366F1]"
+                    className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg pl-9 pr-9 py-2 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#6366F1]"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#64748B] hover:text-white transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
                 </div>
               </div>
 
@@ -307,13 +349,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="w-full h-10 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-indigo-600/30 cursor-pointer disabled:opacity-50"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>{loading ? 'Autenticando via Supabase...' : 'Entrar na Plataforma'}</span>
+                  <span>{loading ? 'Autenticando via Supabase...' : 'Entrar no Izy Colors'}</span>
                 </button>
               </div>
 
-              <div className="text-center pt-1">
+              <div className="text-center pt-1 border-t border-white/[0.06] mt-4">
                 <p className="text-[11px] text-[#64748B]">
-                  Contas demo: <code className="text-purple-300">admin@izycolors.com</code> ou <code className="text-cyan-300">pedromarcioap@gmail.com</code>
+                  Contas demo: <code className="text-purple-300 font-mono">admin@izycolors.com</code>, <code className="text-amber-300 font-mono">editor@izycolors.com</code>, <code className="text-emerald-300 font-mono">pro@izycolors.com</code>
                 </p>
               </div>
             </form>
@@ -393,15 +435,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div>
                 <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
-                  Cargo Inicial
+                  Nível de Acesso (Cargo)
                 </label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setSelectedRole('user')}
-                    className={`p-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
                       selectedRole === 'user'
-                        ? 'bg-[#06B6D4]/10 border-[#06B6D4] text-white'
+                        ? 'bg-[#06B6D4]/15 border-[#06B6D4] text-white'
                         : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
                     }`}
                   >
@@ -411,10 +453,36 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   <button
                     type="button"
+                    onClick={() => setSelectedRole('pro')}
+                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
+                      selectedRole === 'pro'
+                        ? 'bg-emerald-500/15 border-emerald-500 text-white'
+                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
+                    }`}
+                  >
+                    <Crown className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>Usuário Pro</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSelectedRole('editor')}
+                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
+                      selectedRole === 'editor'
+                        ? 'bg-amber-500/15 border-amber-500 text-white'
+                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
+                    }`}
+                  >
+                    <Edit3 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Editor / Curador</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setSelectedRole('admin')}
-                    className={`p-2.5 rounded-lg border text-xs font-medium flex items-center justify-center gap-2 cursor-pointer transition-colors ${
+                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
                       selectedRole === 'admin'
-                        ? 'bg-purple-500/10 border-purple-500 text-white'
+                        ? 'bg-purple-500/15 border-purple-500 text-white'
                         : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
                     }`}
                   >
@@ -422,11 +490,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <span>Administrador</span>
                   </button>
                 </div>
-                <p className="text-[10px] text-[#64748B] mt-1.5">
-                  {selectedRole === 'admin' 
-                    ? 'O cargo Administrador concede acesso aos painéis Admin e CMS Editorial.' 
-                    : 'O cargo Usuário Comum tem acesso à Área do Usuário, Cofre e Gerador.'}
-                </p>
               </div>
 
               <div className="pt-2">
@@ -442,78 +505,144 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
+          {/* Reset Password Tab */}
+          {tab === 'reset' && (
+            <form onSubmit={handleResetSubmit} className="space-y-4">
+              <div className="text-center pb-2">
+                <div className="w-10 h-10 rounded-full bg-[#6366F1]/20 border border-[#6366F1]/40 flex items-center justify-center mx-auto mb-2">
+                  <KeyRound className="w-5 h-5 text-[#6366F1]" />
+                </div>
+                <h3 className="text-sm font-semibold text-white">Recuperação de Senha</h3>
+                <p className="text-xs text-[#94A3B8] mt-1">
+                  Enviaremos um link de redefinição de senha seguro para seu e-mail via Supabase Auth.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                  E-mail Cadastrado
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="email"
+                    required
+                    placeholder="seu.email@exemplo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#6366F1]"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTab('login')}
+                  className="flex-1 h-10 bg-white/[0.05] hover:bg-white/[0.1] text-white rounded-lg text-xs font-medium transition-colors"
+                >
+                  Voltar ao Login
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 h-10 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  <Mail className="w-4 h-4" />
+                  <span>{loading ? 'Enviando...' : 'Enviar Instruções'}</span>
+                </button>
+              </div>
+            </form>
+          )}
+
           {/* Quick Demo Access Tab */}
           {tab === 'quick' && (
-            <div className="space-y-4">
+            <div className="space-y-3">
               <p className="text-xs text-[#94A3B8] leading-relaxed">
-                Alterne instantaneamente entre os perfis de demonstração para testar as permissões de Administrador e a experiência do Usuário Comum:
+                Alterne instantaneamente entre os níveis de usuário para testar o sistema de RBAC e a visualização dinâmica de permissões:
               </p>
 
               {/* Admin Card */}
               <div 
                 onClick={() => handleQuickSwitch('admin')}
-                className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-4 ${
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
                   currentUser.role === 'admin'
                     ? 'bg-purple-950/30 border-purple-500/60 ring-1 ring-purple-500/40 shadow-lg'
                     : 'bg-[#181C26] border-white/[0.08] hover:border-purple-500/40 hover:bg-[#1E2330]'
                 }`}
               >
-                <div className="w-10 h-10 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-5 h-5 text-purple-400" />
+                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4 h-4 text-purple-400" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-white">Perfil Administrador</span>
-                    {currentUser.role === 'admin' ? (
-                      <span className="text-[10px] font-mono text-purple-300 bg-purple-500/20 px-2 py-0.5 rounded border border-purple-500/40 flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Ativo
-                      </span>
-                    ) : (
-                      <span className="text-[11px] font-mono text-purple-400 flex items-center gap-0.5">
-                        Entrar <ArrowRight className="w-3 h-3" />
-                      </span>
-                    )}
+                    <span className="text-xs font-semibold text-white">Administrador</span>
+                    <span className="text-[10px] font-mono text-purple-300">@helenavance</span>
                   </div>
-                  <p className="text-xs text-[#94A3B8] mt-1">
-                    Conta: <strong className="text-white">Helena Vance</strong> (admin@izycolors.com)
-                  </p>
-                  <p className="text-[11px] text-[#64748B] mt-1">
-                    Acesso total: Painel administrativo, gestão de usuários, curadoria de paletas e CMS editorial.
-                  </p>
+                  <p className="text-[11px] text-[#94A3B8]">Acesso irrestrito a governança, CMS e logs de auditoria.</p>
+                </div>
+              </div>
+
+              {/* Editor Card */}
+              <div 
+                onClick={() => handleQuickSwitch('editor')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
+                  currentUser.role === 'editor'
+                    ? 'bg-amber-950/30 border-amber-500/60 ring-1 ring-amber-500/40 shadow-lg'
+                    : 'bg-[#181C26] border-white/[0.08] hover:border-amber-500/40 hover:bg-[#1E2330]'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+                  <Edit3 className="w-4 h-4 text-amber-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white">Editor / Curador</span>
+                    <span className="text-[10px] font-mono text-amber-300">@bruno_editor</span>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8]">Gestão de artigos do CMS e curadoria de Staff Picks.</p>
+                </div>
+              </div>
+
+              {/* Pro Card */}
+              <div 
+                onClick={() => handleQuickSwitch('pro')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
+                  currentUser.role === 'pro'
+                    ? 'bg-emerald-950/30 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-lg'
+                    : 'bg-[#181C26] border-white/[0.08] hover:border-emerald-500/40 hover:bg-[#1E2330]'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+                  <Crown className="w-4 h-4 text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white">Usuário Pro</span>
+                    <span className="text-[10px] font-mono text-emerald-300">@camila_pro</span>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8]">Gamuts profissionais P3/Rec.2020 e exportação .ASE/.JSX.</p>
                 </div>
               </div>
 
               {/* Regular User Card */}
               <div 
                 onClick={() => handleQuickSwitch('user')}
-                className={`p-4 rounded-xl border transition-all cursor-pointer flex items-start gap-4 ${
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
                   currentUser.role === 'user'
                     ? 'bg-cyan-950/30 border-[#06B6D4]/60 ring-1 ring-[#06B6D4]/40 shadow-lg'
                     : 'bg-[#181C26] border-white/[0.08] hover:border-[#06B6D4]/40 hover:bg-[#1E2330]'
                 }`}
               >
-                <div className="w-10 h-10 rounded-xl bg-[#06B6D4]/20 border border-[#06B6D4]/40 flex items-center justify-center shrink-0">
-                  <User className="w-5 h-5 text-[#06B6D4]" />
+                <div className="w-9 h-9 rounded-xl bg-[#06B6D4]/20 border border-[#06B6D4]/40 flex items-center justify-center shrink-0">
+                  <User className="w-4 h-4 text-[#06B6D4]" />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-white">Perfil Usuário Comum</span>
-                    {currentUser.role === 'user' ? (
-                      <span className="text-[10px] font-mono text-[#06B6D4] bg-[#06B6D4]/20 px-2 py-0.5 rounded border border-[#06B6D4]/40 flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Ativo
-                      </span>
-                    ) : (
-                      <span className="text-[11px] font-mono text-[#06B6D4] flex items-center gap-0.5">
-                        Entrar <ArrowRight className="w-3 h-3" />
-                      </span>
-                    )}
+                    <span className="text-xs font-semibold text-white">Usuário Comum</span>
+                    <span className="text-[10px] font-mono text-[#06B6D4]">@pedromarcio</span>
                   </div>
-                  <p className="text-xs text-[#94A3B8] mt-1">
-                    Conta: <strong className="text-white">Pedro Márcio</strong> (pedromarcioap@gmail.com)
-                  </p>
-                  <p className="text-[11px] text-[#64748B] mt-1">
-                    Área do Usuário: Gerador, paletas salvas, tokens favoritos, histórico de submissões e perfil de criador.
-                  </p>
+                  <p className="text-[11px] text-[#94A3B8]">Gerador, salvar no cofre, favoritar e submeter paletas.</p>
                 </div>
               </div>
             </div>
@@ -522,7 +651,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
         {/* Footer Actions */}
         <div className="p-4 bg-[#0E131E] border-t border-white/[0.08] flex items-center justify-between text-xs font-mono">
-          <span className="text-[#64748B]">Izy Colors Auth & RBAC</span>
+          <span className="text-[#64748B]">Izy Colors Auth & RBAC System</span>
           <button
             onClick={handleLogoutClick}
             className="text-red-400 hover:text-red-300 flex items-center gap-1.5 transition-colors cursor-pointer"
