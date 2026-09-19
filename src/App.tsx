@@ -214,7 +214,7 @@ export function App() {
       name: guestUser.name,
       handle: guestUser.handle,
       avatar: guestUser.avatar,
-      bio: guestUser.bio
+      bio: guestUser.bio || ''
     }));
     if (currentTab === 'admin' || currentTab === 'cms') {
       setCurrentTab('generator');
@@ -843,18 +843,7 @@ export function App() {
               }}
               onDeleteVaultPalette={handleDeleteVaultPalette}
               onOpenAuthModal={() => setIsAuthModalOpen(true)}
-              onLogout={() => {
-                const guestUser = switchDemoRole('user');
-                setAuthUser(guestUser);
-                setUserProfile(prev => ({
-                  ...prev,
-                  name: guestUser.name,
-                  handle: guestUser.handle,
-                  avatar: guestUser.avatar,
-                  bio: guestUser.bio || ''
-                }));
-                showToast('Sessão desconectada.');
-              }}
+              onLogout={handleLogout}
               onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
               isSupabaseConnected={isSupabaseConnected}
             />
