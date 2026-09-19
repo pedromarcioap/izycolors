@@ -39,7 +39,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
-  const [selectedRole, setSelectedRole] = useState<UserRole>('user');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -94,7 +93,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       name: name.trim(),
       email: email.trim(),
       password: password.trim() || undefined,
-      role: selectedRole,
+      role: 'user',
       handle: handle.trim() || undefined
     });
     setLoading(false);
@@ -435,75 +434,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
-                  Nível de Acesso (Cargo)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('user')}
-                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
-                      selectedRole === 'user'
-                        ? 'bg-[#06B6D4]/15 border-[#06B6D4] text-white'
-                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
-                    }`}
-                  >
-                    <User className="w-3.5 h-3.5 text-[#06B6D4]" />
-                    <span>Usuário Comum</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('pro')}
-                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
-                      selectedRole === 'pro'
-                        ? 'bg-emerald-500/15 border-emerald-500 text-white'
-                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
-                    }`}
-                  >
-                    <Crown className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Usuário Pro</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('moderator')}
-                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
-                      selectedRole === 'moderator'
-                        ? 'bg-rose-500/15 border-rose-500 text-white'
-                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
-                    }`}
-                  >
-                    <Award className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Moderador</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('editor')}
-                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
-                      selectedRole === 'editor'
-                        ? 'bg-amber-500/15 border-amber-500 text-white'
-                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
-                    }`}
-                  >
-                    <Edit3 className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Editor / Curador</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSelectedRole('admin')}
-                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors col-span-2 ${
-                      selectedRole === 'admin'
-                        ? 'bg-purple-500/15 border-purple-500 text-white'
-                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
-                    }`}
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-                    <span>Administrador</span>
-                  </button>
+              <div className="p-3 bg-[#10141D] border border-white/[0.08] rounded-xl flex items-start gap-2.5 text-xs">
+                <ShieldCheck className="w-4 h-4 text-[#06B6D4] shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="text-white font-semibold block">Perfil de Usuário Comum</span>
+                  <p className="text-[#94A3B8] text-[11px] leading-relaxed">
+                    Novos cadastros criam automaticamente contas de <strong className="text-[#06B6D4]">Usuário Comum</strong>. A definição de permissões (Administrador, Moderador, Editor ou Pro) é efetuada exclusivamente por um Administrador no Painel de Usuários.
+                  </p>
                 </div>
               </div>
 

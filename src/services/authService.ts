@@ -331,7 +331,7 @@ export async function registerUser(params: {
 }): Promise<{ success: boolean; user?: AuthUser; error?: string; message?: string; viaSupabase?: boolean }> {
   const users = getStoredUsers();
   const normalizedEmail = params.email.trim().toLowerCase();
-  const desiredRole: UserRole = params.role || (normalizedEmail.includes('admin') ? 'admin' : 'user');
+  const desiredRole: UserRole = params.role || 'user';
   const cleanHandle = params.handle?.trim() 
     ? (params.handle.startsWith('@') ? params.handle : `@${params.handle}`)
     : `@${normalizedEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '')}`;
@@ -498,7 +498,7 @@ export function initAuthListener(onUserChange: (user: AuthUser) => void): () => 
   const supabase = getSupabaseClient();
   if (!supabase) return () => {};
 
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event: string, session: any) => {
     if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
       if (session?.user) {
         const email = session.user.email || '';
