@@ -10,6 +10,7 @@ import { AccessibilityView } from './components/AccessibilityView';
 import { ProjectsVaultView } from './components/ProjectsVaultView';
 import { CmsAdminView } from './components/CmsAdminView';
 import { ProfileView } from './components/ProfileView';
+import { UserAnalyticsDashboard } from './components/UserAnalyticsDashboard';
 import { AdminAreaView } from './components/AdminAreaView';
 import { AuthModal } from './components/AuthModal';
 import { CommandPalette } from './components/CommandPalette';
@@ -124,12 +125,24 @@ export function App() {
   const [taxonomyTags, setTaxonomyTags] = useState(INITIAL_TAXONOMY_TAGS);
   const [userProfile, setUserProfile] = useState<UserProfile>(() => {
     const current = getCurrentAuthUser();
+    let savedProfile: Partial<UserProfile> = {};
+    try {
+      const raw = localStorage.getItem('chromatica_user_profile');
+      if (raw) savedProfile = JSON.parse(raw);
+    } catch (err) {
+      console.error('Erro ao ler chromatica_user_profile:', err);
+    }
     return {
       ...INITIAL_USER_PROFILE,
-      name: current.name,
-      handle: current.handle,
-      avatar: current.avatar,
-      bio: current.bio || INITIAL_USER_PROFILE.bio
+      ...savedProfile,
+      name: current.name || savedProfile.name || INITIAL_USER_PROFILE.name,
+      handle: current.handle || savedProfile.handle || INITIAL_USER_PROFILE.handle,
+      avatar: current.avatar || savedProfile.avatar || INITIAL_USER_PROFILE.avatar,
+      bio: current.bio || savedProfile.bio || INITIAL_USER_PROFILE.bio,
+      exportPreferences: {
+        ...INITIAL_USER_PROFILE.exportPreferences,
+        ...(savedProfile.exportPreferences || {})
+      }
     };
   });
 
@@ -213,6 +226,18 @@ export function App() {
   useEffect(() => {
     localStorage.setItem('chromatica_submissions', JSON.stringify(submissions));
   }, [submissions]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('chromatica_user_profile', JSON.stringify(userProfile));
+    } catch (e) {
+      console.error('Erro ao persistir chromatica_user_profile:', e);
+    }
+  }, [userProfile]);
+
+  useEffect(() => {
+    saveStoredUsers(usersList);
+  }, [usersList]);
 
   // Open any palette into the Generator
   const handleOpenInGenerator = (colors: string[]) => {
@@ -707,7 +732,21 @@ export function App() {
             )
           )}
 
-          {(currentTab === 'profile' || currentTab === 'user_dashboard') && (
+          {currentTab === 'user_dashboard' && (
+            <UserAnalyticsDashboard
+              palettes={palettes}
+              vaultPalettes={vaultPalettes}
+              projects={projects}
+              collections={collections}
+              favoriteColors={favoriteColors}
+              submissions={submissions}
+              onOpenInGenerator={handleOpenInGenerator}
+              onOpenExport={handleOpenExport}
+              onNavigateToProfile={() => setCurrentTab('profile')}
+            />
+          )}
+
+          {currentTab === 'profile' && (
             <ProfileView
               authUser={authUser}
               userProfile={userProfile}
@@ -721,7 +760,24 @@ export function App() {
               onSaveToCollection={handleSaveToCollection}
               onOpenExport={handleOpenExport}
               onUpdateProfile={(updated) => {
-                setUserProfile(prev => ({ ...prev, ...updated }));
+                setUserProfile(prev => {
+                  const nextProfile = { 
+                    ...prev, 
+                    ...updated,
+                    exportPreferences: updated.exportPreferences 
+                      ? { ...prev.exportPreferences, ...updated.exportPreferences }
+                      : prev.exportPreferences
+                  };
+                  try {
+                    localStorage.setItem('chromatica_user_profile', JSON.stringify(nextProfile));
+                    if (updated.exportPreferences) {
+                      localStorage.setItem('chromatica_token_prefs', JSON.stringify(nextProfile.exportPreferences));
+                    }
+                  } catch (e) {
+                    console.error('Erro ao salvar chromatica_user_profile:', e);
+                  }
+                  return nextProfile;
+                });
                 if (updated.name || updated.handle || updated.bio) {
                   setAuthUser(prev => {
                     const nextUser: AuthUser = {
@@ -731,11 +787,15 @@ export function App() {
                       bio: updated.bio !== undefined ? updated.bio : prev.bio
                     };
                     setCurrentAuthUser(nextUser);
-                    setUsersList(curr => curr.map(u => u.id === nextUser.id ? nextUser : u));
+                    setUsersList(curr => {
+                      const updatedUsers = curr.map(u => u.id === nextUser.id ? nextUser : u);
+                      saveStoredUsers(updatedUsers);
+                      return updatedUsers;
+                    });
                     return nextUser;
                   });
                 }
-                showToast('Perfil atualizado com sucesso.');
+                showToast('Perfil e preferências salvos com sucesso.');
               }}
               onDeleteFavoriteColor={(hex) => {
                 setFavoriteColors(prev => prev.filter(f => f.hex !== hex));
@@ -783,6 +843,7 @@ export function App() {
         onSaveToProject={handleSavePaletteToProject}
         onCreateProjectWithPalette={handleCreateProjectWithPalette}
         onSaveToCollection={handleSaveToCollectionBoard}
+        onCreateCollection={handleCreateCollection}
       />
 
       {/* Command Palette (⌘K) Modal */}

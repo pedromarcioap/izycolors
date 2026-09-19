@@ -17,7 +17,9 @@ import {
   Download, 
   Share2,
   Sparkles,
-  Info
+  Info,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { ColorItem, ColorDetails } from '../types';
 import { 
@@ -58,6 +60,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isFocusMode, setIsFocusMode] = useState(false);
   const [harmonyMode, setHarmonyMode] = useState<string>('smart');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -92,7 +95,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
     });
   }, [colors.length, harmonyMode, historyIndex]);
 
-  // Spacebar global event handler
+  // Spacebar and Escape global event handler
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Don't trigger if typing in an input or textarea
@@ -104,10 +107,14 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
         e.preventDefault();
         generateNewPalette();
       }
+      if (e.code === 'Escape' && isFocusMode) {
+        e.preventDefault();
+        setIsFocusMode(false);
+      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [generateNewPalette]);
+  }, [generateNewPalette, isFocusMode]);
 
   // Toggle lock on a column
   const toggleLock = (index: number) => {
@@ -204,7 +211,14 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
   };
 
   return (
-    <div ref={containerRef} className="flex-1 flex flex-col bg-[#0B0F17] select-none min-h-[calc(100vh-88px)]">
+    <div 
+      ref={containerRef} 
+      className={
+        isFocusMode 
+          ? "fixed inset-0 z-50 bg-[#0B0F17] flex flex-col w-screen h-screen select-none overflow-hidden animate-in fade-in duration-200"
+          : "flex-1 flex flex-col bg-[#0B0F17] select-none min-h-[calc(100vh-88px)]"
+      }
+    >
       {/* Toast feedback */}
       {toastMessage && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-[#181C24] border border-[#6366F1]/50 text-white text-xs font-medium rounded-full shadow-2xl animate-in fade-in slide-in-from-top-4 flex items-center gap-2">
@@ -213,114 +227,178 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
         </div>
       )}
 
-      {/* Generator Control Header Toolbar */}
-      <div className="h-12 bg-[#111827] border-b border-white/[0.08] px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0">
-        <div className="flex items-center gap-2">
+      {/* Floating Focus Mode Control Bar */}
+      {isFocusMode ? (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2.5 bg-[#0E131E]/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/[0.15] shadow-2xl animate-in slide-in-from-top-4">
+          <div className="flex items-center gap-1.5 text-xs text-[#06B6D4] font-mono">
+            <Eye className="w-3.5 h-3.5" />
+            <span className="font-bold tracking-wider text-[11px] uppercase">Modo Foco</span>
+          </div>
+
+          <div className="w-px h-4 bg-white/10" />
+
           <button
             onClick={generateNewPalette}
-            className="h-8 px-3.5 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded text-xs font-semibold flex items-center gap-2 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer active:scale-95"
+            className="h-7 px-3 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
           >
-            <Sparkles className="w-3.5 h-3.5" />
+            <Sparkles className="w-3 h-3" />
             <span>Gerar</span>
-            <span className="hidden sm:inline text-[10px] bg-white/20 px-1 rounded font-mono">Espaço</span>
+            <span className="text-[9px] bg-white/20 px-1 rounded font-mono">Espaço</span>
           </button>
 
-          {/* Harmony Mode Selector */}
-          <div className="hidden sm:flex items-center bg-[#181C24] p-0.5 rounded border border-white/[0.08] text-xs">
-            <span className="text-[10px] font-mono text-[#64748B] px-2">Harmonia:</span>
-            {[
-              { id: 'smart', label: 'Coolors Smart' },
-              { id: 'analogous', label: 'Análoga' },
-              { id: 'monochromatic', label: 'Monocromática' },
-              { id: 'triad', label: 'Tríade' },
-              { id: 'complementary', label: 'Complementar' },
-              { id: 'tetradic', label: 'Tétrade' }
-            ].map(m => (
-              <button
-                key={m.id}
-                onClick={() => setHarmonyMode(m.id)}
-                className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
-                  harmonyMode === m.id
-                    ? 'bg-[#262A33] text-white'
-                    : 'text-[#94A3B8] hover:text-white'
-                }`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tools Right */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
-          {/* Format Switcher */}
-          <div className="flex items-center bg-[#181C24] p-0.5 rounded border border-white/[0.08] text-xs font-mono">
-            {(['HEX', 'RGB', 'HSL', 'OKLCH'] as const).map(fmt => (
-              <button
-                key={fmt}
-                onClick={() => setActiveFormat(fmt)}
-                className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
-                  activeFormat === fmt
-                    ? 'bg-[#6366F1] text-white font-semibold'
-                    : 'text-[#94A3B8] hover:text-white'
-                }`}
-              >
-                {fmt}
-              </button>
-            ))}
-          </div>
-
           {/* Undo / Redo */}
-          <div className="flex items-center bg-[#181C24] rounded border border-white/[0.08]">
+          <div className="flex items-center bg-[#181C24] rounded-full border border-white/10 px-1">
             <button
               onClick={handleUndo}
               disabled={historyIndex < 0}
-              className="p-1.5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              className="p-1 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
               title="Desfazer"
             >
-              <RotateCcw className="w-3.5 h-3.5" />
+              <RotateCcw className="w-3 h-3" />
             </button>
-            <div className="w-[1px] h-3 bg-white/[0.08]" />
+            <div className="w-[1px] h-3 bg-white/10" />
             <button
               onClick={handleRedo}
               disabled={historyIndex >= history.length - 1}
-              className="p-1.5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+              className="p-1 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
               title="Refazer"
             >
-              <RotateCw className="w-3.5 h-3.5" />
+              <RotateCw className="w-3 h-3" />
             </button>
           </div>
 
-          {/* Save to Collection */}
-          <button
-            onClick={() => onSaveToCollection(colors.map(c => c.hex))}
-            className="h-8 px-2.5 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded text-xs text-[#DFE2EE] flex items-center gap-1.5 transition-colors"
-            title="Salvar em Projetos / Coleções"
-          >
-            <Bookmark className="w-3.5 h-3.5 text-[#06B6D4]" />
-            <span className="hidden md:inline">Salvar Coleção</span>
-          </button>
+          <div className="w-px h-4 bg-white/10" />
 
-          {/* Export Tokens */}
           <button
-            onClick={() => onOpenExport(colors.map(c => c.hex))}
-            className="h-8 px-2.5 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded text-xs text-[#DFE2EE] flex items-center gap-1.5 transition-colors"
-            title="Exportar tokens em CSS, Tailwind, JSON e SVG"
+            onClick={() => setIsFocusMode(false)}
+            className="h-7 px-3 bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 rounded-full text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+            title="Sair do Modo Foco (Esc)"
           >
-            <Download className="w-3.5 h-3.5" />
-            <span className="hidden md:inline">Exportar</span>
-          </button>
-
-          {/* Fullscreen Toggle */}
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded text-[#94A3B8] hover:text-white transition-colors"
-            title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia'}
-          >
-            {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            <EyeOff className="w-3.5 h-3.5" />
+            <span>Sair do Foco</span>
+            <span className="text-[9px] font-mono bg-black/30 px-1 rounded">Esc</span>
           </button>
         </div>
-      </div>
+      ) : (
+        /* Generator Control Header Toolbar */
+        <div className="h-12 bg-[#111827] border-b border-white/[0.08] px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={generateNewPalette}
+              className="h-8 px-3.5 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded text-xs font-semibold flex items-center gap-2 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer active:scale-95"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Gerar</span>
+              <span className="hidden sm:inline text-[10px] bg-white/20 px-1 rounded font-mono">Espaço</span>
+            </button>
+
+            {/* Harmony Mode Selector */}
+            <div className="hidden sm:flex items-center bg-[#181C24] p-0.5 rounded border border-white/[0.08] text-xs">
+              <span className="text-[10px] font-mono text-[#64748B] px-2">Harmonia:</span>
+              {[
+                { id: 'smart', label: 'Coolors Smart' },
+                { id: 'analogous', label: 'Análoga' },
+                { id: 'monochromatic', label: 'Monocromática' },
+                { id: 'triad', label: 'Tríade' },
+                { id: 'complementary', label: 'Complementar' },
+                { id: 'tetradic', label: 'Tétrade' }
+              ].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => setHarmonyMode(m.id)}
+                  className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                    harmonyMode === m.id
+                      ? 'bg-[#262A33] text-white'
+                      : 'text-[#94A3B8] hover:text-white'
+                  }`}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Tools Right */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            {/* Format Switcher */}
+            <div className="flex items-center bg-[#181C24] p-0.5 rounded border border-white/[0.08] text-xs font-mono">
+              {(['HEX', 'RGB', 'HSL', 'OKLCH'] as const).map(fmt => (
+                <button
+                  key={fmt}
+                  onClick={() => setActiveFormat(fmt)}
+                  className={`px-2 py-0.5 rounded text-[10px] transition-colors ${
+                    activeFormat === fmt
+                      ? 'bg-[#6366F1] text-white font-semibold'
+                      : 'text-[#94A3B8] hover:text-white'
+                  }`}
+                >
+                  {fmt}
+                </button>
+              ))}
+            </div>
+
+            {/* Modo Foco Button */}
+            <button
+              onClick={() => setIsFocusMode(true)}
+              className="h-8 px-2.5 bg-[#06B6D4]/10 hover:bg-[#06B6D4]/20 border border-[#06B6D4]/30 rounded text-xs text-[#06B6D4] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+              title="Modo Foco: Ocultar navegação e barras laterais para visualizar em tela cheia"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span className="hidden md:inline font-medium">Modo Foco</span>
+            </button>
+
+            {/* Undo / Redo */}
+            <div className="flex items-center bg-[#181C24] rounded border border-white/[0.08]">
+              <button
+                onClick={handleUndo}
+                disabled={historyIndex < 0}
+                className="p-1.5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+                title="Desfazer"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+              <div className="w-[1px] h-3 bg-white/[0.08]" />
+              <button
+                onClick={handleRedo}
+                disabled={historyIndex >= history.length - 1}
+                className="p-1.5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
+                title="Refazer"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Save to Collection */}
+            <button
+              onClick={() => onSaveToCollection(colors.map(c => c.hex))}
+              className="h-8 px-2.5 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded text-xs text-[#DFE2EE] flex items-center gap-1.5 transition-colors"
+              title="Salvar em Projetos / Coleções"
+            >
+              <Bookmark className="w-3.5 h-3.5 text-[#06B6D4]" />
+              <span className="hidden md:inline">Salvar Coleção</span>
+            </button>
+
+            {/* Export Tokens */}
+            <button
+              onClick={() => onOpenExport(colors.map(c => c.hex))}
+              className="h-8 px-2.5 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded text-xs text-[#DFE2EE] flex items-center gap-1.5 transition-colors"
+              title="Exportar tokens em CSS, Tailwind, JSON e SVG"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span className="hidden md:inline">Exportar</span>
+            </button>
+
+            {/* Fullscreen Toggle */}
+            <button
+              onClick={toggleFullscreen}
+              className="p-2 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded text-[#94A3B8] hover:text-white transition-colors"
+              title={isFullscreen ? 'Sair da tela cheia' : 'Tela cheia do navegador'}
+            >
+              {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Color Swatch Columns Area (Full-Bleed Coolors Layout) */}
       <div className="flex-1 flex flex-col md:flex-row w-full h-full relative overflow-hidden">

@@ -27,7 +27,8 @@ import {
   LogOut,
   ShieldCheck,
   Send,
-  Eye
+  Eye,
+  BarChart3
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -40,16 +41,18 @@ import {
   AuthUser 
 } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
+import { UserAnalyticsDashboard } from './UserAnalyticsDashboard';
 
 interface ProfileViewProps {
   authUser: AuthUser;
   userProfile: UserProfile;
-  palettes: Palette[];
-  projects: ProjectWorkspace[];
-  collections: CollectionBoard[];
-  favoriteColors: FavoriteColor[];
+  palettes?: Palette[];
+  projects?: ProjectWorkspace[];
+  collections?: CollectionBoard[];
+  favoriteColors?: FavoriteColor[];
   vaultPalettes?: VaultPalette[];
-  submissions: CommunitySubmission[];
+  submissions?: CommunitySubmission[];
+  initialSubTab?: 'analytics' | 'palettes' | 'submissions' | 'swatches' | 'showcase' | 'collections' | 'vault' | 'settings';
   onOpenInGenerator: (colors: string[]) => void;
   onSaveToCollection: (colors: string[]) => void;
   onOpenExport: (colors: string[], title?: string) => void;
@@ -65,12 +68,13 @@ interface ProfileViewProps {
 export const ProfileView: React.FC<ProfileViewProps> = ({
   authUser,
   userProfile,
-  palettes,
-  projects,
-  collections,
-  favoriteColors,
+  palettes = [],
+  projects = [],
+  collections = [],
+  favoriteColors = [],
   vaultPalettes = [],
-  submissions,
+  submissions = [],
+  initialSubTab,
   onOpenInGenerator,
   onSaveToCollection,
   onOpenExport,
@@ -82,25 +86,82 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onOpenSubmissionModal,
   isSupabaseConnected
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState<'palettes' | 'submissions' | 'swatches' | 'showcase' | 'collections' | 'vault' | 'settings'>('palettes');
+  const [activeSubTab, setActiveSubTab] = useState<'analytics' | 'palettes' | 'submissions' | 'swatches' | 'showcase' | 'collections' | 'vault' | 'settings'>(initialSubTab || 'analytics');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
+
+  const safePalettes = palettes || [];
+  const safeProjects = projects || [];
+  const safeCollections = collections || [];
+  const safeFavoriteColors = favoriteColors || [];
+  const safeVaultPalettes = vaultPalettes || [];
+  const safeSubmissions = submissions || [];
+  
+  // Sync if initialSubTab prop changes
+  useEffect(() => {
+    if (initialSubTab) {
+      setActiveSubTab(initialSubTab);
+    }
+  }, [initialSubTab]);
   
   // Edit Profile Form State
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editName, setEditName] = useState(authUser.name || userProfile.name);
-  const [editHandle, setEditHandle] = useState(authUser.handle || userProfile.handle);
-  const [editTitle, setEditTitle] = useState(userProfile.title || 'Criador & Especialista em Cores');
-  const [editBio, setEditBio] = useState(authUser.bio || userProfile.bio || '');
-  const [editWebsite, setEditWebsite] = useState(userProfile.website || '');
+  const [editName, setEditName] = useState(authUser?.name || userProfile?.name || '');
+  const [editHandle, setEditHandle] = useState(authUser?.handle || userProfile?.handle || '');
+  const [editTitle, setEditTitle] = useState(userProfile?.title || 'Criador & Especialista em Cores');
+  const [editBio, setEditBio] = useState(authUser?.bio || userProfile?.bio || '');
+  const [editWebsite, setEditWebsite] = useState(userProfile?.website || '');
   const [savedFeedback, setSavedFeedback] = useState(false);
 
-  // Sync edit state whenever authUser changes
+  // Token Export Preferences State
+  const [tokenFormat, setTokenFormat] = useState<'OKLCH' | 'HEX' | 'RGB' | 'HSL'>(
+    userProfile?.exportPreferences?.defaultFormat || 'OKLCH'
+  );
+  const [tokenPrefix, setTokenPrefix] = useState<string>(
+    userProfile?.exportPreferences?.variablePrefix || 'sys-color'
+  );
+  const [tokenNaming, setTokenNaming] = useState<'kebab-case' | 'camelCase' | 'snake_case'>(
+    userProfile?.exportPreferences?.namingConvention || 'kebab-case'
+  );
+  const [tokenIncludeComments, setTokenIncludeComments] = useState<boolean>(
+    userProfile?.exportPreferences?.includeComments ?? true
+  );
+  const [tokenPrefsSaved, setTokenPrefsSaved] = useState<boolean>(false);
+
+  // Sync edit state whenever authUser or userProfile changes
   useEffect(() => {
-    setEditName(authUser.name || userProfile.name);
-    setEditHandle(authUser.handle || userProfile.handle);
-    setEditBio(authUser.bio || userProfile.bio || '');
+    setEditName(authUser?.name || userProfile?.name || '');
+    setEditHandle(authUser?.handle || userProfile?.handle || '');
+    setEditBio(authUser?.bio || userProfile?.bio || '');
+    setEditTitle(userProfile?.title || 'Criador & Especialista em Cores');
+    setEditWebsite(userProfile?.website || '');
+    if (userProfile?.exportPreferences) {
+      setTokenFormat(userProfile.exportPreferences.defaultFormat || 'OKLCH');
+      setTokenPrefix(userProfile.exportPreferences.variablePrefix || 'sys-color');
+      setTokenNaming(userProfile.exportPreferences.namingConvention || 'kebab-case');
+      setTokenIncludeComments(userProfile.exportPreferences.includeComments ?? true);
+    }
   }, [authUser, userProfile]);
+
+  const handleSaveTokenPreferences = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const updatedPreferences = {
+      defaultFormat: tokenFormat,
+      variablePrefix: tokenPrefix.trim() || 'sys-color',
+      namingConvention: tokenNaming,
+      includeComments: tokenIncludeComments
+    };
+    onUpdateProfile({
+      exportPreferences: updatedPreferences
+    });
+    try {
+      localStorage.setItem('chromatica_token_prefs', JSON.stringify(updatedPreferences));
+    } catch (err) {
+      console.error('Erro ao salvar chromatica_token_prefs:', err);
+    }
+    setTokenPrefsSaved(true);
+    setTimeout(() => setTokenPrefsSaved(false), 2500);
+  };
 
   const handleCopyTokens = (p: Palette) => {
     const css = exportCssTokens(p.colors, p.title.toLowerCase().replace(/\s+/g, '-'));
@@ -129,10 +190,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setTimeout(() => setSavedFeedback(false), 3000);
   };
 
-  // Submissions filtered for current user
-  const mySubmissions = submissions.filter(s => 
-    (s.authorHandle && s.authorHandle.toLowerCase() === authUser.handle.toLowerCase()) ||
-    (s.author && s.author.toLowerCase() === authUser.name.toLowerCase())
+  // Submissions filtered for current user safely
+  const mySubmissions = safeSubmissions.filter(s => 
+    (s.authorHandle && authUser?.handle && s.authorHandle.toLowerCase() === authUser.handle.toLowerCase()) ||
+    (s.author && authUser?.name && s.author.toLowerCase() === authUser.name.toLowerCase())
   );
 
   return (
@@ -253,7 +314,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="p-5 bg-[#181C24] border border-white/[0.08] rounded-xl shadow-lg">
           <span className="text-xs font-mono text-[#94A3B8]">Minhas Paletas</span>
           <div className="text-3xl font-bold font-mono text-white tracking-tight mt-1">
-            {palettes.length}
+            {safePalettes.length}
           </div>
           <span className="text-[11px] text-emerald-400 font-mono mt-1 block">
             Prontas para exportação
@@ -263,7 +324,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="p-5 bg-[#181C24] border border-white/[0.08] rounded-xl shadow-lg">
           <span className="text-xs font-mono text-[#94A3B8]">Cores Salvas</span>
           <div className="text-3xl font-bold font-mono text-[#EC4899] tracking-tight mt-1">
-            {favoriteColors.length}
+            {safeFavoriteColors.length}
           </div>
           <span className="text-[11px] text-[#94A3B8] font-mono mt-1 block">
             Amostras no cofre rápido
@@ -273,7 +334,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="p-5 bg-[#181C24] border border-white/[0.08] rounded-xl shadow-lg">
           <span className="text-xs font-mono text-[#94A3B8]">Submissões Editoriais</span>
           <div className="text-3xl font-bold font-mono text-[#06B6D4] tracking-tight mt-1">
-            {mySubmissions.length || submissions.length}
+            {mySubmissions.length || safeSubmissions.length}
           </div>
           <span className="text-[11px] text-[#94A3B8] font-mono mt-1 block">
             Para revisão da comunidade
@@ -283,7 +344,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         <div className="p-5 bg-[#181C24] border border-white/[0.08] rounded-xl shadow-lg">
           <span className="text-xs font-mono text-[#94A3B8]">Coleções & Projetos</span>
           <div className="text-3xl font-bold font-mono text-purple-400 tracking-tight mt-1">
-            {collections.length + projects.length}
+            {safeCollections.length + safeProjects.length}
           </div>
           <span className="text-[11px] text-[#06B6D4] font-mono mt-1 block">
             Workspaces organizados
@@ -294,6 +355,21 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* Subtabs Bar */}
       <div className="flex items-center gap-2 border-b border-white/[0.08] mb-8 overflow-x-auto scrollbar-none">
         <button
+          onClick={() => setActiveSubTab('analytics')}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
+            activeSubTab === 'analytics'
+              ? 'border-[#06B6D4] text-white font-semibold'
+              : 'border-transparent text-[#94A3B8] hover:text-white'
+          }`}
+        >
+          <BarChart3 className="w-4 h-4 text-[#06B6D4]" />
+          <span>Dashboard de Métricas & Recharts</span>
+          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#06B6D4]/10 text-[#06B6D4] border border-[#06B6D4]/20 hidden sm:inline-block">
+            Novo
+          </span>
+        </button>
+
+        <button
           onClick={() => setActiveSubTab('palettes')}
           className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
             activeSubTab === 'palettes'
@@ -302,7 +378,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           }`}
         >
           <PaletteIcon className="w-4 h-4 text-[#06B6D4]" />
-          <span>Minhas Paletas & Forks ({palettes.length})</span>
+          <span>Minhas Paletas & Forks ({safePalettes.length})</span>
         </button>
 
         <button
@@ -314,7 +390,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           }`}
         >
           <Send className="w-4 h-4 text-[#6366F1]" />
-          <span>Submissões & Curadoria ({mySubmissions.length || submissions.length})</span>
+          <span>Submissões & Curadoria ({mySubmissions.length || safeSubmissions.length})</span>
         </button>
 
         <button
@@ -326,7 +402,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           }`}
         >
           <Heart className="w-4 h-4 text-[#EC4899]" />
-          <span>Cores Favoritas ({favoriteColors.length})</span>
+          <span>Cores Favoritas ({safeFavoriteColors.length})</span>
         </button>
 
         <button
@@ -350,7 +426,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           }`}
         >
           <Bookmark className="w-4 h-4 text-[#06B6D4]" />
-          <span>Coleções & Boards ({collections.length})</span>
+          <span>Coleções & Boards ({safeCollections.length})</span>
         </button>
 
         <button
@@ -386,6 +462,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
       )}
 
+      {/* SUB-TAB 0: ANALYTICS & VISUALIZATIONS DASHBOARD (RECHARTS) */}
+      {activeSubTab === 'analytics' && (
+        <div className="-mt-4">
+          <UserAnalyticsDashboard
+            palettes={safePalettes}
+            vaultPalettes={safeVaultPalettes}
+            projects={safeProjects}
+            collections={safeCollections}
+            favoriteColors={safeFavoriteColors}
+            submissions={safeSubmissions}
+            onOpenInGenerator={onOpenInGenerator}
+            onOpenExport={onOpenExport}
+          />
+        </div>
+      )}
+
       {/* SUB-TAB 1: PALETTES GRID */}
       {activeSubTab === 'palettes' && (
         <div className="space-y-6">
@@ -405,8 +497,15 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {palettes.map((p) => (
+          {safePalettes.length === 0 ? (
+            <div className="py-12 text-center text-xs text-[#94A3B8] bg-[#10141D] rounded-xl border border-white/[0.04]">
+              <PaletteIcon className="w-8 h-8 text-[#06B6D4]/40 mx-auto mb-2" />
+              <p>Nenhuma paleta criada ou clonada ainda.</p>
+              <p className="text-[#64748B] mt-1">Crie paletas no Gerador ou clone paletas da Comunidade para vê-las aqui.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {safePalettes.map((p) => (
               <div
                 key={p.id}
                 className="bg-[#181C24] border border-white/[0.08] rounded-xl overflow-hidden shadow-xl hover:border-white/[0.18] transition-all flex flex-col justify-between group"
@@ -485,7 +584,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </div>
               </div>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -511,7 +611,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </div>
 
           <div className="space-y-3 pt-2">
-            {(mySubmissions.length > 0 ? mySubmissions : submissions).map((sub) => (
+            {(mySubmissions.length > 0 ? mySubmissions : safeSubmissions).map((sub) => (
               <div 
                 key={sub.id} 
                 className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -571,10 +671,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <h3 className="text-base font-semibold text-white font-['Geist']">Cores & Amostras Favoritas</h3>
               <p className="text-xs text-[#94A3B8] mt-0.5">Clique em qualquer amostra para copiar o código hexadecimal instantaneamente.</p>
             </div>
-            <span className="text-xs font-mono text-[#64748B]">{favoriteColors.length} amostras</span>
+            <span className="text-xs font-mono text-[#64748B]">{safeFavoriteColors.length} amostras</span>
           </div>
 
-          {favoriteColors.length === 0 ? (
+          {safeFavoriteColors.length === 0 ? (
             <div className="py-12 text-center text-xs text-[#94A3B8] bg-[#10141D] rounded-xl border border-white/[0.04]">
               <Heart className="w-8 h-8 text-[#EC4899]/40 mx-auto mb-2" />
               <p>Nenhuma cor individual favoritada ainda.</p>
@@ -582,7 +682,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {favoriteColors.map((fav, idx) => {
+              {safeFavoriteColors.map((fav, idx) => {
                 const hexVal = typeof fav === 'string' ? fav : fav.hex;
                 const nameVal = typeof fav === 'string' ? fav : fav.name;
                 return (
@@ -665,7 +765,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {/* SUB-TAB 5: COLLECTIONS & BOARDS */}
       {activeSubTab === 'collections' && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {collections.map((col) => (
+          {safeCollections.map((col) => (
             <div key={col.id} className="bg-[#181C24] border border-white/[0.08] rounded-xl p-6 shadow-xl">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-base font-bold text-white font-['Geist']">{col.title}</h3>
@@ -699,7 +799,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                     Cofre Privado de Paletas & Tokens
                   </h3>
                   <p className="text-xs text-[#94A3B8] mt-0.5">
-                    {vaultPalettes.length} paletas completas salvas com criptografia e calibradas para produção.
+                    {safeVaultPalettes.length} paletas completas salvas com criptografia e calibradas para produção.
                   </p>
                 </div>
               </div>
@@ -707,7 +807,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => {
-                    const allColors = vaultPalettes.flatMap(p => p.colors);
+                    const allColors = safeVaultPalettes.flatMap(p => p.colors || []);
                     onOpenInGenerator(allColors.length > 0 ? allColors.slice(0, 5) : ['#0B0F17', '#181C24', '#08BBD9', '#6366F1', '#EC4899']);
                   }}
                   className="h-8 px-3.5 bg-amber-400 hover:bg-amber-300 text-black rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-md shadow-amber-500/20 transition-colors cursor-pointer"
@@ -718,7 +818,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
             </div>
 
-            {vaultPalettes.length === 0 ? (
+            {safeVaultPalettes.length === 0 ? (
               <div className="py-12 text-center text-xs text-[#94A3B8] bg-[#10141D] rounded-xl border border-white/[0.04]">
                 <Lock className="w-8 h-8 text-amber-400/40 mx-auto mb-2" />
                 <p>Nenhuma paleta completa salva no cofre ainda.</p>
@@ -726,7 +826,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {vaultPalettes.map((pal) => (
+                {safeVaultPalettes.map((pal) => (
                   <div
                     key={pal.id}
                     className="p-5 bg-[#111827] border border-white/[0.08] rounded-xl flex flex-col justify-between gap-4 hover:border-amber-400/40 transition-all shadow-md group"
@@ -821,21 +921,44 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       {activeSubTab === 'settings' && (
         <div className="max-w-3xl space-y-6">
           <div className="bg-[#181C24] border border-white/[0.08] rounded-xl p-6 shadow-xl">
-            <h3 className="text-base font-bold text-white font-['Geist'] mb-1">
-              Preferências de Exportação de Tokens
-            </h3>
+            <div className="flex items-center justify-between gap-4 mb-1">
+              <h3 className="text-base font-bold text-white font-['Geist']">
+                Preferências de Exportação de Tokens
+              </h3>
+              {tokenPrefsSaved && (
+                <span className="px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono flex items-center gap-1 animate-in fade-in">
+                  <Check className="w-3.5 h-3.5" />
+                  <span>Salvo com sucesso</span>
+                </span>
+              )}
+            </div>
             <p className="text-xs text-[#94A3B8] mb-6">
               Configure as regras globais para geração de arquivos CSS, Tailwind v4 e scripts de automação.
             </p>
 
-            <div className="space-y-4 text-xs font-mono">
+            <form onSubmit={handleSaveTokenPreferences} className="space-y-4 text-xs font-mono">
               <div>
                 <label className="text-[#94A3B8] block mb-1">Formato Padrão de Representação:</label>
-                <select className="w-full bg-[#111827] border border-white/[0.1] rounded-lg p-2.5 text-white">
-                  <option>OKLCH (CSS Color 4) - Uniforme Perceptual</option>
-                  <option>HEX (#RRGGBB) - Clássico Web</option>
-                  <option>RGB (rgb(r, g, b))</option>
-                  <option>HSL (hsl(h, s, l))</option>
+                <select 
+                  value={tokenFormat}
+                  onChange={(e) => {
+                    const newFmt = e.target.value as 'OKLCH' | 'HEX' | 'RGB' | 'HSL';
+                    setTokenFormat(newFmt);
+                    onUpdateProfile({
+                      exportPreferences: {
+                        defaultFormat: newFmt,
+                        variablePrefix: tokenPrefix.trim() || 'sys-color',
+                        namingConvention: tokenNaming,
+                        includeComments: tokenIncludeComments
+                      }
+                    });
+                  }}
+                  className="w-full bg-[#111827] border border-white/[0.1] rounded-lg p-2.5 text-white focus:outline-none focus:border-[#06B6D4]"
+                >
+                  <option value="OKLCH">OKLCH (CSS Color 4) - Uniforme Perceptual</option>
+                  <option value="HEX">HEX (#RRGGBB) - Clássico Web</option>
+                  <option value="RGB">RGB (rgb(r, g, b))</option>
+                  <option value="HSL">HSL (hsl(h, s, l))</option>
                 </select>
               </div>
 
@@ -843,20 +966,105 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <label className="text-[#94A3B8] block mb-1">Prefixo de Variável CSS:</label>
                 <input
                   type="text"
-                  defaultValue="sys-color"
-                  className="w-full bg-[#111827] border border-white/[0.1] rounded-lg p-2.5 text-white"
+                  value={tokenPrefix}
+                  onChange={(e) => setTokenPrefix(e.target.value)}
+                  onBlur={() => {
+                    onUpdateProfile({
+                      exportPreferences: {
+                        defaultFormat: tokenFormat,
+                        variablePrefix: tokenPrefix.trim() || 'sys-color',
+                        namingConvention: tokenNaming,
+                        includeComments: tokenIncludeComments
+                      }
+                    });
+                  }}
+                  placeholder="sys-color"
+                  className="w-full bg-[#111827] border border-white/[0.1] rounded-lg p-2.5 text-white focus:outline-none focus:border-[#06B6D4]"
                 />
               </div>
 
               <div>
                 <label className="text-[#94A3B8] block mb-1">Convenção de Nomes:</label>
-                <select className="w-full bg-[#111827] border border-white/[0.1] rounded-lg p-2.5 text-white">
-                  <option>kebab-case (--sys-color-primary-500)</option>
-                  <option>camelCase (sysColorPrimary500)</option>
-                  <option>snake_case (sys_color_primary_500)</option>
+                <select 
+                  value={tokenNaming}
+                  onChange={(e) => {
+                    const newNaming = e.target.value as 'kebab-case' | 'camelCase' | 'snake_case';
+                    setTokenNaming(newNaming);
+                    onUpdateProfile({
+                      exportPreferences: {
+                        defaultFormat: tokenFormat,
+                        variablePrefix: tokenPrefix.trim() || 'sys-color',
+                        namingConvention: newNaming,
+                        includeComments: tokenIncludeComments
+                      }
+                    });
+                  }}
+                  className="w-full bg-[#111827] border border-white/[0.1] rounded-lg p-2.5 text-white focus:outline-none focus:border-[#06B6D4]"
+                >
+                  <option value="kebab-case">kebab-case (--{tokenPrefix || 'sys-color'}-primary-500)</option>
+                  <option value="camelCase">camelCase ({tokenPrefix || 'sysColor'}Primary500)</option>
+                  <option value="snake_case">snake_case ({tokenPrefix || 'sys_color'}_primary_500)</option>
                 </select>
               </div>
-            </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <input
+                  type="checkbox"
+                  id="includeCommentsCheck"
+                  checked={tokenIncludeComments}
+                  onChange={(e) => {
+                    const newInc = e.target.checked;
+                    setTokenIncludeComments(newInc);
+                    onUpdateProfile({
+                      exportPreferences: {
+                        defaultFormat: tokenFormat,
+                        variablePrefix: tokenPrefix.trim() || 'sys-color',
+                        namingConvention: tokenNaming,
+                        includeComments: newInc
+                      }
+                    });
+                  }}
+                  className="rounded bg-[#111827] border-white/20 text-[#06B6D4] focus:ring-0 cursor-pointer"
+                />
+                <label htmlFor="includeCommentsCheck" className="text-[#94A3B8] cursor-pointer select-none text-xs">
+                  Incluir comentários explicativos e metadados de acessibilidade (WCAG) nos tokens
+                </label>
+              </div>
+
+              {/* Live Preview Box */}
+              <div className="p-3 bg-[#111827] border border-white/[0.06] rounded-lg mt-3">
+                <span className="text-[10px] text-[#64748B] block mb-1 font-mono uppercase tracking-wider">
+                  Pré-visualização do Token em Tempo Real:
+                </span>
+                <code className="text-[#06B6D4] text-xs">
+                  {tokenNaming === 'kebab-case' && `--${tokenPrefix || 'sys-color'}-primary-500: ${
+                    tokenFormat === 'OKLCH' ? 'oklch(0.68 0.19 235);' :
+                    tokenFormat === 'HEX' ? '#06B6D4;' :
+                    tokenFormat === 'RGB' ? 'rgb(6, 182, 212);' : 'hsl(189, 94%, 43%);'
+                  }`}
+                  {tokenNaming === 'camelCase' && `${tokenPrefix || 'sysColor'}Primary500 = "${
+                    tokenFormat === 'OKLCH' ? 'oklch(0.68 0.19 235)' :
+                    tokenFormat === 'HEX' ? '#06B6D4' :
+                    tokenFormat === 'RGB' ? 'rgb(6, 182, 212)' : 'hsl(189, 94%, 43%)'
+                  }";`}
+                  {tokenNaming === 'snake_case' && `${tokenPrefix || 'sys_color'}_primary_500 = "${
+                    tokenFormat === 'OKLCH' ? 'oklch(0.68 0.19 235)' :
+                    tokenFormat === 'HEX' ? '#06B6D4' :
+                    tokenFormat === 'RGB' ? 'rgb(6, 182, 212)' : 'hsl(189, 94%, 43%)'
+                  }";`}
+                </code>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="h-9 px-4 rounded-lg bg-[#06B6D4] hover:bg-[#08BBD9] text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-cyan-500/10"
+                >
+                  <Check className="w-4 h-4" />
+                  <span>Salvar Preferências</span>
+                </button>
+              </div>
+            </form>
           </div>
 
           <div className="bg-[#181C24] border border-white/[0.08] rounded-xl p-6 shadow-xl flex items-center justify-between">

@@ -20,7 +20,8 @@ import {
   ExternalLink,
   ShieldCheck,
   LayoutDashboard,
-  LogIn
+  LogIn,
+  BarChart3
 } from 'lucide-react';
 import { ColorGamut, NavigationTab, UserProfile, AuthUser } from '../types';
 
@@ -140,6 +141,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         description: 'Artigos e curadoria'
       }
     ] : []),
+    {
+      id: 'user_dashboard' as NavigationTab,
+      label: 'Dashboard de Cores',
+      shortLabel: 'Dashboard',
+      icon: BarChart3,
+      badge: 'Recharts',
+      description: 'Frequência, gamuts & evolução'
+    },
     {
       id: 'profile' as NavigationTab,
       label: 'Meu Perfil & Espaço',

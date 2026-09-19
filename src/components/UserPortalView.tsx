@@ -23,10 +23,10 @@ import { exportCssTokens } from '../utils/colorUtils';
 
 interface UserPortalViewProps {
   currentUser: AuthUser;
-  palettes: Palette[];
-  submissions: CommunitySubmission[];
-  collections: CollectionBoard[];
-  favoriteColors: string[];
+  palettes?: Palette[];
+  submissions?: CommunitySubmission[];
+  collections?: CollectionBoard[];
+  favoriteColors?: string[];
   onOpenInGenerator: (colors: string[]) => void;
   onOpenExport: (colors: string[], title?: string) => void;
   onOpenSubmissionModal: () => void;
@@ -36,10 +36,10 @@ interface UserPortalViewProps {
 
 export const UserPortalView: React.FC<UserPortalViewProps> = ({
   currentUser,
-  palettes,
-  submissions,
-  collections,
-  favoriteColors,
+  palettes = [],
+  submissions = [],
+  collections = [],
+  favoriteColors = [],
   onOpenInGenerator,
   onOpenExport,
   onOpenSubmissionModal,
@@ -50,10 +50,15 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
 
+  const safePalettes = palettes || [];
+  const safeSubmissions = submissions || [];
+  const safeCollections = collections || [];
+  const safeFavoriteColors = favoriteColors || [];
+
   // Edit account state
-  const [editName, setEditName] = useState(currentUser.name);
-  const [editHandle, setEditHandle] = useState(currentUser.handle);
-  const [editBio, setEditBio] = useState(currentUser.bio || '');
+  const [editName, setEditName] = useState(currentUser?.name || '');
+  const [editHandle, setEditHandle] = useState(currentUser?.handle || '');
+  const [editBio, setEditBio] = useState(currentUser?.bio || '');
   const [savedFeedback, setSavedFeedback] = useState(false);
 
   const handleCopyTokens = (p: Palette) => {
@@ -80,10 +85,10 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
     setTimeout(() => setSavedFeedback(false), 2500);
   };
 
-  // Submissions filtered for current user
-  const mySubmissions = submissions.filter(s => 
-    s.authorHandle.toLowerCase() === currentUser.handle.toLowerCase() ||
-    s.author.toLowerCase() === currentUser.name.toLowerCase()
+  // Submissions filtered for current user safely
+  const mySubmissions = safeSubmissions.filter(s => 
+    (s?.authorHandle && currentUser?.handle && s.authorHandle.toLowerCase() === currentUser.handle.toLowerCase()) ||
+    (s?.author && currentUser?.name && s.author.toLowerCase() === currentUser.name.toLowerCase())
   );
 
   return (
@@ -137,22 +142,22 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-white/[0.06]">
           <div className="bg-[#10141D] border border-white/[0.04] p-3 rounded-xl">
             <span className="text-[11px] font-mono text-[#94A3B8] uppercase block">Paletas Criadas</span>
-            <span className="text-xl font-bold text-white font-mono mt-0.5 block">{palettes.length}</span>
+            <span className="text-xl font-bold text-white font-mono mt-0.5 block">{safePalettes.length}</span>
           </div>
 
           <div className="bg-[#10141D] border border-white/[0.04] p-3 rounded-xl">
             <span className="text-[11px] font-mono text-[#94A3B8] uppercase block">Cores Favoritas</span>
-            <span className="text-xl font-bold text-[#EC4899] font-mono mt-0.5 block">{favoriteColors.length}</span>
+            <span className="text-xl font-bold text-[#EC4899] font-mono mt-0.5 block">{safeFavoriteColors.length}</span>
           </div>
 
           <div className="bg-[#10141D] border border-white/[0.04] p-3 rounded-xl">
             <span className="text-[11px] font-mono text-[#94A3B8] uppercase block">Coleções Ativas</span>
-            <span className="text-xl font-bold text-[#06B6D4] font-mono mt-0.5 block">{collections.length}</span>
+            <span className="text-xl font-bold text-[#06B6D4] font-mono mt-0.5 block">{safeCollections.length}</span>
           </div>
 
           <div className="bg-[#10141D] border border-white/[0.04] p-3 rounded-xl">
             <span className="text-[11px] font-mono text-[#94A3B8] uppercase block">Submissões</span>
-            <span className="text-xl font-bold text-purple-400 font-mono mt-0.5 block">{mySubmissions.length || submissions.length}</span>
+            <span className="text-xl font-bold text-purple-400 font-mono mt-0.5 block">{mySubmissions.length || safeSubmissions.length}</span>
           </div>
         </div>
       </div>
@@ -168,7 +173,7 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
           }`}
         >
           <PaletteIcon className="w-3.5 h-3.5" />
-          <span>Minhas Paletas & Forks ({palettes.length})</span>
+          <span>Minhas Paletas & Forks ({safePalettes.length})</span>
         </button>
 
         <button
@@ -180,7 +185,7 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
           }`}
         >
           <Award className="w-3.5 h-3.5" />
-          <span>Status de Submissões ({mySubmissions.length || submissions.length})</span>
+          <span>Status de Submissões ({mySubmissions.length || safeSubmissions.length})</span>
         </button>
 
         <button
@@ -192,7 +197,7 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
           }`}
         >
           <Bookmark className="w-3.5 h-3.5" />
-          <span>Cores Salvas ({favoriteColors.length})</span>
+          <span>Cores Salvas ({safeFavoriteColors.length})</span>
         </button>
 
         <button
@@ -211,7 +216,7 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
       {/* SUB-TAB 1: MY PALETTES */}
       {tab === 'my_palettes' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {palettes.map((p) => (
+          {safePalettes.map((p) => (
             <div 
               key={p.id}
               className="bg-[#141822] border border-white/[0.08] hover:border-white/[0.2] rounded-xl p-5 shadow-lg flex flex-col justify-between transition-all group"
@@ -297,7 +302,7 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
           </div>
 
           <div className="space-y-3">
-            {(mySubmissions.length > 0 ? mySubmissions : submissions).map((sub) => (
+            {(mySubmissions.length > 0 ? mySubmissions : safeSubmissions).map((sub) => (
               <div 
                 key={sub.id} 
                 className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
@@ -356,13 +361,13 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
             <span className="text-xs font-mono text-[#64748B]">Clique para copiar código HEX</span>
           </div>
 
-          {favoriteColors.length === 0 ? (
+          {safeFavoriteColors.length === 0 ? (
             <p className="text-xs text-[#94A3B8] py-8 text-center">
               Nenhuma cor individual favoritada ainda. No gerador ou na roda, clique no ícone de coração para guardar aqui.
             </p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {favoriteColors.map((hex, idx) => (
+              {safeFavoriteColors.map((hex, idx) => (
                 <div
                   key={idx}
                   onClick={() => handleCopyColorHex(hex)}

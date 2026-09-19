@@ -21,27 +21,31 @@ interface SavePaletteModalProps {
   isOpen: boolean;
   colors: string[];
   initialTitle?: string;
-  projects: ProjectWorkspace[];
-  collections: CollectionBoard[];
+  projects?: ProjectWorkspace[];
+  collections?: CollectionBoard[];
   onClose: () => void;
   onSaveToVault: (vaultPalette: VaultPalette) => void;
   onSaveToProject: (projectId: string, projectPalette: ProjectPalette) => void;
   onCreateProjectWithPalette?: (newProject: ProjectWorkspace) => void;
   onSaveToCollection: (collectionId: string, colors: string[]) => void;
+  onCreateCollection?: (newCollection: CollectionBoard) => void;
 }
 
 export const SavePaletteModal: React.FC<SavePaletteModalProps> = ({
   isOpen,
   colors,
   initialTitle = 'Nova Paleta Harmônica',
-  projects,
-  collections,
+  projects = [],
+  collections = [],
   onClose,
   onSaveToVault,
   onSaveToProject,
   onCreateProjectWithPalette,
-  onSaveToCollection
+  onSaveToCollection,
+  onCreateCollection
 }) => {
+  const safeProjects = projects || [];
+  const safeCollections = collections || [];
   const [saveTarget, setSaveTarget] = useState<'vault' | 'project' | 'collection'>('vault');
 
   // Vault form state
@@ -52,7 +56,7 @@ export const SavePaletteModal: React.FC<SavePaletteModalProps> = ({
   const [vaultGamut, setVaultGamut] = useState('Display P3');
 
   // Project form state
-  const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || '');
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(safeProjects[0]?.id || '');
   const [paletteNameInProject, setPaletteNameInProject] = useState(initialTitle);
   const [paletteRoleInProject, setPaletteRoleInProject] = useState<'Primária' | 'Secundária' | 'Acentos' | 'UI / Superfícies' | 'Semântica' | 'Dark Mode'>('Primária');
   const [paletteDescInProject, setPaletteDescInProject] = useState('');
@@ -62,21 +66,30 @@ export const SavePaletteModal: React.FC<SavePaletteModalProps> = ({
   const [newProjDesc, setNewProjDesc] = useState('');
 
   // Collection form state
-  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(collections[0]?.id || '');
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string>(safeCollections[0]?.id || '');
+  const [isCreatingNewCollection, setIsCreatingNewCollection] = useState(false);
+  const [newColTitle, setNewColTitle] = useState('');
+  const [newColDesc, setNewColDesc] = useState('');
+  const [newColTags, setNewColTags] = useState('Design System, UI Tokens');
+  const [newColPrivate, setNewColPrivate] = useState(false);
 
   // Reset title whenever opened with new initialTitle or colors
   useEffect(() => {
     if (isOpen) {
       setVaultTitle(initialTitle || 'Nova Paleta Harmônica');
       setPaletteNameInProject(initialTitle || 'Nova Paleta Harmônica');
-      if (projects.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(projects[0].id);
+      setNewColTitle(initialTitle || 'Nova Coleção');
+      if (safeProjects.length > 0 && !selectedProjectId) {
+        setSelectedProjectId(safeProjects[0].id);
       }
-      if (collections.length > 0 && !selectedCollectionId) {
-        setSelectedCollectionId(collections[0].id);
+      if (safeCollections.length > 0 && !selectedCollectionId) {
+        setSelectedCollectionId(safeCollections[0].id);
+      }
+      if (safeCollections.length === 0) {
+        setIsCreatingNewCollection(true);
       }
     }
-  }, [isOpen, initialTitle, projects, collections, selectedProjectId, selectedCollectionId]);
+  }, [isOpen, initialTitle, safeProjects, safeCollections, selectedProjectId, selectedCollectionId]);
 
   if (!isOpen) return null;
 
@@ -157,8 +170,29 @@ export const SavePaletteModal: React.FC<SavePaletteModalProps> = ({
 
   const handleCollectionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCollectionId) return;
-    onSaveToCollection(selectedCollectionId, colors);
+
+    if (isCreatingNewCollection) {
+      if (!newColTitle.trim()) return;
+      const newCol: CollectionBoard = {
+        id: `col-${Date.now()}`,
+        title: newColTitle.trim(),
+        description: newColDesc.trim() || 'Coleção temática de paletas curadas.',
+        tags: newColTags.split(',').map(t => t.trim()).filter(Boolean),
+        isPrivate: newColPrivate,
+        paletteIds: [],
+        coverColors: [...colors],
+        createdAt: 'Hoje'
+      };
+      if (onCreateCollection) {
+        onCreateCollection(newCol);
+      } else {
+        onSaveToCollection(newCol.id, colors);
+      }
+    } else {
+      if (!selectedCollectionId) return;
+      onSaveToCollection(selectedCollectionId, colors);
+    }
+
     onClose();
   };
 
@@ -467,26 +501,171 @@ export const SavePaletteModal: React.FC<SavePaletteModalProps> = ({
           {/* TAB 3: COLEÇÃO / MOODBOARD */}
           {saveTarget === 'collection' && (
             <form id="collection-form" onSubmit={handleCollectionSubmit} className="space-y-4">
-              <div>
-                <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">
-                  Selecione a Coleção:
-                </label>
-                <select
-                  value={selectedCollectionId}
-                  onChange={(e) => setSelectedCollectionId(e.target.value)}
-                  className="w-full bg-[#0D111A] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-mono uppercase text-[#94A3B8]">
+                  <Bookmark className="w-3.5 h-3.5 text-[#06B6D4]" />
+                  <span>Quadro de Coleção</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingNewCollection(!isCreatingNewCollection)}
+                  className="text-xs font-mono text-[#06B6D4] hover:text-[#08BBD9] flex items-center gap-1.5 cursor-pointer bg-[#06B6D4]/10 hover:bg-[#06B6D4]/20 border border-[#06B6D4]/30 px-2.5 py-1 rounded-lg transition-colors"
                 >
-                  {collections.map((col) => (
-                    <option key={col.id} value={col.id}>
-                      {col.title} ({col.isPrivate ? 'Privada' : 'Pública'})
-                    </option>
-                  ))}
-                </select>
+                  <FolderPlus className="w-3.5 h-3.5" />
+                  <span>{isCreatingNewCollection ? 'Escolher Coleção Existente' : '+ Inserir Nova Coleção'}</span>
+                </button>
               </div>
 
-              <div className="p-3 bg-[#0D111A] rounded-xl border border-white/[0.04] text-xs text-[#94A3B8]">
-                A paleta completa será salva como paleta de destaque nesta coleção e ficará acessível no seu perfil e na aba Coleções.
-              </div>
+              {!isCreatingNewCollection ? (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-mono uppercase text-[#94A3B8] block">
+                        Selecione a Coleção:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingNewCollection(true)}
+                        className="text-[11px] text-[#06B6D4] hover:underline cursor-pointer flex items-center gap-1"
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>Nova coleção</span>
+                      </button>
+                    </div>
+                    <select
+                      value={selectedCollectionId}
+                      onChange={(e) => {
+                        if (e.target.value === '__new_collection__') {
+                          setIsCreatingNewCollection(true);
+                        } else {
+                          setSelectedCollectionId(e.target.value);
+                        }
+                      }}
+                      className="w-full bg-[#0D111A] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                    >
+                      {safeCollections.map((col) => (
+                        <option key={col.id} value={col.id}>
+                          {col.title} ({col.isPrivate ? 'Privada' : 'Pública'})
+                        </option>
+                      ))}
+                      <option value="__new_collection__" className="text-[#06B6D4] font-semibold bg-[#181C26]">
+                        + Inserir Nova Coleção...
+                      </option>
+                    </select>
+                  </div>
+
+                  <div className="p-3 bg-[#0D111A] rounded-xl border border-white/[0.04] text-xs text-[#94A3B8] flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-[#06B6D4] shrink-0 mt-0.5" />
+                    <span>
+                      A paleta completa será salva como paleta de destaque nesta coleção e ficará acessível no seu perfil e na aba Coleções.
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="space-y-3 bg-[#0D111A] p-4 rounded-xl border border-white/[0.06]">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-[#06B6D4]" />
+                      <span className="text-xs font-mono font-semibold text-white uppercase">Dados da Nova Coleção</span>
+                    </div>
+                    {safeCollections.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingNewCollection(false)}
+                        className="text-[11px] text-[#94A3B8] hover:text-white underline cursor-pointer"
+                      >
+                        Cancelar e selecionar existente
+                      </button>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">
+                      Nome da Coleção: <span className="text-[#06B6D4]">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ex: Identidade Minimalista 2026"
+                      value={newColTitle}
+                      onChange={(e) => setNewColTitle(e.target.value)}
+                      className="w-full bg-[#181C26] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">
+                      Descrição / Conceito (opcional):
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Ex: Curadoria temática de paletas calibradas para interfaces e design editorial..."
+                      value={newColDesc}
+                      onChange={(e) => setNewColDesc(e.target.value)}
+                      className="w-full bg-[#181C26] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">
+                      Tags (separadas por vírgula):
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ex: UI Tokens, Cyberpunk, Editorial, Dark Mode"
+                      value={newColTags}
+                      onChange={(e) => setNewColTags(e.target.value)}
+                      className="w-full bg-[#181C26] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
+                    />
+                  </div>
+
+                  <div className="pt-1">
+                    <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1.5">
+                      Visibilidade da Coleção:
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setNewColPrivate(false)}
+                        className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                          !newColPrivate
+                            ? 'bg-[#06B6D4]/10 border-[#06B6D4]/50 text-white'
+                            : 'bg-[#181C26] border-white/[0.06] text-[#94A3B8] hover:text-white'
+                        }`}
+                      >
+                        <span className="text-xs font-bold block">Pública</span>
+                        <span className="text-[10px] text-[#94A3B8] block">Visível no perfil comunitário</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setNewColPrivate(true)}
+                        className={`p-2.5 rounded-lg border text-left transition-colors cursor-pointer ${
+                          newColPrivate
+                            ? 'bg-amber-400/10 border-amber-400/50 text-white'
+                            : 'bg-[#181C26] border-white/[0.06] text-[#94A3B8] hover:text-white'
+                        }`}
+                      >
+                        <span className="text-xs font-bold block">Privada</span>
+                        <span className="text-[10px] text-[#94A3B8] block">Apenas você terá acesso</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Visual preview of palette colors applied to the collection */}
+                  <div className="pt-2 border-t border-white/[0.06]">
+                    <div className="text-[11px] font-mono text-[#94A3B8] mb-1.5 flex items-center justify-between">
+                      <span>Cores de capa da coleção:</span>
+                      <span>{colors.length} amostras</span>
+                    </div>
+                    <div className="h-6 w-full rounded-lg overflow-hidden flex border border-white/[0.1]">
+                      {colors.map((c, i) => (
+                        <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </form>
           )}
         </div>
@@ -524,7 +703,7 @@ export const SavePaletteModal: React.FC<SavePaletteModalProps> = ({
                 ? 'Salvar no Cofre Privado' 
                 : saveTarget === 'project' 
                 ? (isCreatingNewProject ? 'Criar Projeto com Paleta' : 'Salvar no Projeto')
-                : 'Salvar na Coleção'}
+                : (isCreatingNewCollection ? 'Criar Coleção com Paleta' : 'Salvar na Coleção')}
             </span>
           </button>
         </div>

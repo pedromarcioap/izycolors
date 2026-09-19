@@ -24,7 +24,15 @@ export const ExportModal: React.FC<ExportModalProps> = ({
 }) => {
   const [format, setFormat] = useState<'illustrator' | 'ase' | 'css' | 'tailwind' | 'json' | 'svg' | 'scss'>('illustrator');
   const [copied, setCopied] = useState(false);
-  const [prefix, setPrefix] = useState('color');
+  const [prefix, setPrefix] = useState(() => {
+    try {
+      const prefs = localStorage.getItem('chromatica_token_prefs');
+      if (prefs) return JSON.parse(prefs).variablePrefix || 'color';
+      const user = localStorage.getItem('chromatica_user_profile');
+      if (user) return JSON.parse(user).exportPreferences?.variablePrefix || 'color';
+    } catch {}
+    return 'color';
+  });
 
   if (!isOpen) return null;
 
