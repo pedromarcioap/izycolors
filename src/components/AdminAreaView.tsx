@@ -976,6 +976,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                   <option value="user">Usuário Comum (Criador)</option>
                   <option value="pro">Assinante Pro (Recursos Avançados)</option>
                   <option value="editor">Editor de Conteúdo (CMS & Curadoria)</option>
+                  <option value="moderator">Moderador (Curadoria & Revisão)</option>
                   <option value="admin">Administrador Master</option>
                   <option value="guest">Visitante (Convidado)</option>
                 </select>
