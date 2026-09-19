@@ -19,17 +19,20 @@ import {
   Sparkles,
   Info,
   Eye,
-  EyeOff
+  EyeOff,
+  ShieldCheck
 } from 'lucide-react';
 import { ColorItem, ColorDetails } from '../types';
 import { 
   getColorDetails, 
   generateRandomHarmoniousPalette, 
   generateHarmonies,
+  getContrastRatio,
   hslToRgb,
   rgbToHex,
   rgbToHsl
 } from '../utils/colorUtils';
+import { WcagTooltip } from './WcagTooltip';
 
 interface GeneratorViewProps {
   initialColors?: string[];
@@ -63,6 +66,12 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
   const [isFocusMode, setIsFocusMode] = useState(false);
   const [harmonyMode, setHarmonyMode] = useState<string>('smart');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [hoveredSwatch, setHoveredSwatch] = useState<{
+    index: number;
+    hex: string;
+    name: string;
+    position: { x: number; y: number };
+  } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const showToast = (msg: string) => {
@@ -419,11 +428,38 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
             formattedValue = `oklch(${details.oklch.l} ${details.oklch.c} ${details.oklch.h})`;
           }
 
+          const ratioW = getContrastRatio('#FFFFFF', col.hex);
+          const ratioB = getContrastRatio('#000000', col.hex);
+          const bestR = Math.max(ratioW, ratioB);
+          const wcagBadgeLabel = bestR >= 7.0 ? 'AAA' : bestR >= 4.5 ? 'AA' : bestR >= 3.0 ? 'AA Grande' : 'Falha';
+
           return (
             <div
               key={col.id}
-              className="flex-1 min-h-[140px] md:min-h-0 relative flex flex-col justify-between p-4 sm:p-6 transition-colors duration-200 group border-b md:border-b-0 md:border-r border-black/10 last:border-none"
+              className="flex-1 min-h-[140px] md:min-h-0 relative flex flex-col justify-between p-4 sm:p-6 transition-colors duration-200 group border-b md:border-b-0 md:border-r border-black/10 last:border-none cursor-crosshair"
               style={{ backgroundColor: col.hex }}
+              onMouseEnter={(e) => {
+                setHoveredSwatch({
+                  index: idx,
+                  hex: col.hex,
+                  name: col.name,
+                  position: { x: e.clientX, y: e.clientY }
+                });
+              }}
+              onMouseMove={(e) => {
+                setHoveredSwatch(prev => {
+                  if (prev && prev.index === idx) {
+                    return { ...prev, position: { x: e.clientX, y: e.clientY } };
+                  }
+                  return {
+                    index: idx,
+                    hex: col.hex,
+                    name: col.name,
+                    position: { x: e.clientX, y: e.clientY }
+                  };
+                });
+              }}
+              onMouseLeave={() => setHoveredSwatch(null)}
             >
               {/* Top Controls on Hover */}
               <div className="flex items-center justify-between opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity">
@@ -432,7 +468,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                   <button
                     onClick={() => moveColumn(idx, 'left')}
                     disabled={idx === 0}
-                    className="p-1.5 rounded transition-colors disabled:opacity-20"
+                    className="p-1.5 rounded transition-colors disabled:opacity-20 cursor-pointer"
                     style={{ backgroundColor: buttonBg, color: textColor }}
                     title="Mover para esquerda"
                   >
@@ -441,7 +477,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                   <button
                     onClick={() => moveColumn(idx, 'right')}
                     disabled={idx === colors.length - 1}
-                    className="p-1.5 rounded transition-colors disabled:opacity-20"
+                    className="p-1.5 rounded transition-colors disabled:opacity-20 cursor-pointer"
                     style={{ backgroundColor: buttonBg, color: textColor }}
                     title="Mover para direita"
                   >
@@ -456,7 +492,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                       onSaveToFavorites(col.hex, `Swatch ${idx + 1}`);
                       showToast(`Cor ${col.hex} salva no Cofre!`);
                     }}
-                    className="p-1.5 rounded transition-colors"
+                    className="p-1.5 rounded transition-colors cursor-pointer"
                     style={{ backgroundColor: buttonBg, color: textColor }}
                     title="Salvar cor no Cofre de Favoritos"
                   >
@@ -466,7 +502,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                   {/* Adjust color details / sliders */}
                   <button
                     onClick={() => setEditingIndex(editingIndex === idx ? null : idx)}
-                    className="p-1.5 rounded transition-colors"
+                    className="p-1.5 rounded transition-colors cursor-pointer"
                     style={{ backgroundColor: buttonBg, color: textColor }}
                     title="Ajustar Matiz e Luminosidade"
                   >
@@ -477,7 +513,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                   {colors.length > 2 && (
                     <button
                       onClick={() => deleteColumn(idx)}
-                      className="p-1.5 rounded transition-colors"
+                      className="p-1.5 rounded transition-colors cursor-pointer"
                       style={{ backgroundColor: buttonBg, color: textColor }}
                       title="Excluir coluna"
                     >
@@ -492,7 +528,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                 {/* Lock Toggle Button */}
                 <button
                   onClick={() => toggleLock(idx)}
-                  className={`p-3 rounded-full transition-all duration-200 shadow-md ${
+                  className={`p-3 rounded-full transition-all duration-200 shadow-md cursor-pointer ${
                     col.locked 
                       ? 'scale-110 ring-2 ring-white/50' 
                       : 'opacity-70 group-hover:opacity-100 hover:scale-105'
@@ -509,7 +545,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                 {/* Color Code Value Button */}
                 <button
                   onClick={() => copyColor(idx, formattedValue)}
-                  className="flex flex-col items-center group/btn focus:outline-none"
+                  className="flex flex-col items-center group/btn focus:outline-none cursor-pointer"
                   title="Clique para copiar"
                 >
                   <span 
@@ -540,8 +576,14 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
               {/* Bottom Color Science Metrics */}
               <div className="flex items-center justify-between text-[11px] font-mono" style={{ color: mutedTextColor }}>
                 <span>Lum: {Math.round(details.luminance * 100)}%</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px]" style={{ backgroundColor: buttonBg }}>
-                  WCAG {details.luminance > 0.45 ? 'Preto 14:1' : 'Branco 12:1'}
+                <span 
+                  className="px-2 py-0.5 rounded text-[10px] flex items-center gap-1 font-semibold border border-white/10 shadow-sm cursor-help transition-transform hover:scale-105" 
+                  style={{ backgroundColor: buttonBg }}
+                  title="Auditoria de acessibilidade WCAG"
+                >
+                  <ShieldCheck className="w-3 h-3 text-[#06B6D4]" />
+                  <span>WCAG {wcagBadgeLabel}</span>
+                  <span className="opacity-80 text-[9px]">({bestR.toFixed(1)}:1)</span>
                 </span>
               </div>
 
@@ -549,7 +591,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
               {idx < colors.length - 1 && (
                 <button
                   onClick={() => addColumn(idx)}
-                  className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-[#111827] border border-white/20 text-white opacity-0 group-hover:opacity-100 hover:scale-125 transition-all flex items-center justify-center shadow-lg"
+                  className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 w-6 h-6 rounded-full bg-[#111827] border border-white/20 text-white opacity-0 group-hover:opacity-100 hover:scale-125 transition-all flex items-center justify-center shadow-lg cursor-pointer"
                   title="Adicionar coluna aqui"
                 >
                   <Plus className="w-3.5 h-3.5" />
@@ -566,7 +608,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                     <span className="font-semibold font-['Geist']">Ajustar Cor {idx + 1}</span>
                     <button 
                       onClick={() => setEditingIndex(null)}
-                      className="text-[#94A3B8] hover:text-white"
+                      className="text-[#94A3B8] hover:text-white cursor-pointer"
                     >
                       ✕
                     </button>
@@ -650,6 +692,18 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
           );
         })}
       </div>
+
+      {/* Render WCAG Contrast Tooltip automatically on hover */}
+      {hoveredSwatch && editingIndex === null && (
+        <WcagTooltip
+          colorHex={hoveredSwatch.hex}
+          colorName={hoveredSwatch.name}
+          index={hoveredSwatch.index}
+          prevColorHex={colors[hoveredSwatch.index - 1]?.hex}
+          nextColorHex={colors[hoveredSwatch.index + 1]?.hex}
+          position={hoveredSwatch.position}
+        />
+      )}
     </div>
   );
 };
