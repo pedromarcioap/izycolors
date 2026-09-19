@@ -7,7 +7,6 @@ import {
 import { AuthUser, UserRole } from '../types';
 import {
   authenticateUser,
-  PUBLIC_SIGNUP_ROLE,
   registerUser,
   logoutAuthUser,
   switchDemoRole,
@@ -429,39 +428,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg pl-9 pr-3 py-2 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#EC4899]"
                   />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
-                  Nível de Acesso (Cargo)
-                </label>
-                <div
-                  aria-disabled="true"
-                  title="O nível de acesso é definido automaticamente no cadastro e só pode ser alterado por um Administrador no Painel de Usuários."
-                  className="w-full bg-[#10141D]/60 border border-white/[0.08] rounded-lg pl-9 pr-3 py-2 text-xs flex items-center justify-between relative cursor-not-allowed select-none"
-                >
-                  <User className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
-                  <span className="text-white font-semibold flex items-center gap-1.5">
-                    Usuário Comum
-                    <span className="text-[10px] font-mono uppercase text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-1.5 py-0.5 rounded">
-                      {PUBLIC_SIGNUP_ROLE}
-                    </span>
-                  </span>
-                  <span className="flex items-center gap-1 text-[10px] font-mono text-[#64748B]">
-                    <Lock className="w-3 h-3" />
-                    Fixo
-                  </span>
-                </div>
-              </div>
-
-              <div className="p-3 bg-[#10141D] border border-white/[0.08] rounded-xl flex items-start gap-2.5 text-xs">
-                <ShieldCheck className="w-4 h-4 text-[#06B6D4] shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <span className="text-white font-semibold block">Cadastro restrito ao nível Usuário Comum</span>
-                  <p className="text-[#94A3B8] text-[11px] leading-relaxed">
-                    Todo cadastro feito pelo portal é criado automaticamente como <strong className="text-[#06B6D4]">Usuário Comum</strong>. Cargos como Administrador, Moderador, Editor ou Pro são atribuídos exclusivamente por um Administrador na página de Usuários.
-                  </p>
                 </div>
               </div>
 

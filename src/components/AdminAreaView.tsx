@@ -3,18 +3,11 @@ import {
   ShieldCheck,
   Users,
   FileText,
-  CheckCircle2,
-  Clock,
-  AlertTriangle,
   Plus,
   Search,
-  Sliders,
   Check,
   X,
-  ArrowUpRight,
-  RefreshCw,
   Lock,
-  Unlock,
   UserCheck,
   UserX,
   Sparkles,
@@ -22,9 +15,7 @@ import {
   Activity,
   Database,
   Eye,
-  SlidersHorizontal,
   ChevronRight,
-  TrendingUp,
   BarChart2
 } from 'lucide-react';
 import { AuthUser, CommunitySubmission, CmsArticle, AuditLogItem, UserRole } from '../types';
