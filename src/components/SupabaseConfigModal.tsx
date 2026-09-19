@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { X, Database, Check, AlertCircle, RefreshCw, Key, Globe, Shield, Sparkles } from 'lucide-react';
+import { X, Database, Check, AlertCircle, RefreshCw, Key, Globe, Shield, Lock, ShieldAlert } from 'lucide-react';
 import { getSupabaseCredentials, setCustomSupabaseCredentials, getSupabaseClient } from '../services/supabase';
+import { AuthUser } from '../types';
 
 interface SupabaseConfigModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConnectionChange: () => void;
+  authUser?: AuthUser;
 }
 
 export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
   isOpen,
   onClose,
-  onConnectionChange
+  onConnectionChange,
+  authUser
 }) => {
   const currentCreds = getSupabaseCredentials();
   const [url, setUrl] = useState(currentCreds.url);
@@ -20,6 +23,67 @@ export const SupabaseConfigModal: React.FC<SupabaseConfigModalProps> = ({
   const [isTesting, setIsTesting] = useState(false);
 
   if (!isOpen) return null;
+
+  // Strict RBAC Guard: Exclusive to admin users
+  if (authUser && authUser.role !== 'admin') {
+    return (
+      <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+        <div 
+          className="w-full max-w-md bg-[#111827] border border-amber-500/30 rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in fade-in zoom-in-95"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="p-4 sm:p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#141A24]">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                <Lock className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white font-['Geist']">
+                  Acesso Restrito
+                </h3>
+                <p className="text-xs text-[#94A3B8]">
+                  Configuração de Banco de Dados
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          {/* Body */}
+          <div className="p-6 text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-amber-500/10 border border-amber-500/30 flex items-center justify-center mx-auto text-amber-400">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <h4 className="text-sm font-bold text-white">
+              Permissão de Administrador Necessária
+            </h4>
+            <p className="text-xs text-[#94A3B8] leading-relaxed">
+              Apenas usuários com a função de <strong className="text-purple-400">Administrador (Admin)</strong> possuem autorização para visualizar ou alterar as chaves de API e URLs de conexão do Supabase.
+            </p>
+            <div className="p-3 bg-[#0B0F17] rounded-lg border border-white/[0.06] text-[11px] font-mono text-[#64748B]">
+              Sua conta atual: <span className="text-white">{authUser.name}</span> (<span className="text-amber-400 uppercase">{authUser.role}</span>)
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="p-4 bg-[#181C24] border-t border-white/[0.08] flex items-center justify-end">
+            <button
+              onClick={onClose}
+              className="h-9 px-4 rounded-lg bg-[#262A33] hover:bg-[#31353E] text-white text-xs font-medium transition-colors cursor-pointer"
+            >
+              Entendido / Fechar
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleSaveAndTest = async () => {
     setIsTesting(true);

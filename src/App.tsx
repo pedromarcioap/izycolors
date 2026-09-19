@@ -69,7 +69,7 @@ import {
   initAuthListener
 } from './services/authService';
 
-import { Menu, Sparkles, Sliders, Database, GitFork, Download, Check, ShieldCheck, ShieldAlert, LayoutDashboard, LogIn, User } from 'lucide-react';
+import { Menu, Database, Download, Check, ShieldAlert } from 'lucide-react';
 
 export function App() {
   // Navigation & Gamut State
@@ -236,6 +236,15 @@ export function App() {
   const checkSupabaseStatus = useCallback(() => {
     setIsSupabaseConnected(isSupabaseConfigured());
   }, []);
+
+  // Open Supabase Modal with strict Admin access control
+  const handleOpenSupabaseModal = useCallback(() => {
+    if (authUser.role !== 'admin') {
+      showToast('Acesso negado: A configuração do Supabase é exclusiva para administradores.');
+      return;
+    }
+    setIsSupabaseModalOpen(true);
+  }, [authUser.role, showToast]);
 
   // Persistence to local storage
   useEffect(() => {
@@ -514,7 +523,7 @@ export function App() {
         onLogout={handleLogout}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenExportModal={() => handleOpenExport()}
-        onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+        onOpenSupabaseModal={handleOpenSupabaseModal}
         isSupabaseConnected={isSupabaseConnected}
         favoritesCount={favoriteColors.length}
         projectsCount={projects.length}
@@ -585,13 +594,13 @@ export function App() {
             </button>
 
             <button
-              onClick={() => setIsSupabaseModalOpen(true)}
+              onClick={handleOpenSupabaseModal}
               className={`h-8 px-2.5 rounded-lg text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${
                 isSupabaseConnected 
                   ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400' 
                   : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8] hover:text-white'
               }`}
-              title="Status do Banco de Dados / Supabase"
+              title="Status do Banco de Dados / Supabase (Exclusivo Admin)"
             >
               <Database className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
@@ -656,7 +665,7 @@ export function App() {
               onDeleteCuratedImage={handleDeleteCuratedImage}
               onResetCuratedImages={handleResetCuratedImages}
               isSupabaseConnected={isSupabaseConnected}
-              onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+              onOpenSupabaseModal={handleOpenSupabaseModal}
             />
           )}
 
@@ -753,7 +762,7 @@ export function App() {
                 onOpenInGenerator={handleOpenInGenerator}
                 onNavigateToUserPortal={() => setCurrentTab('profile')}
                 isSupabaseConnected={isSupabaseConnected}
-                onOpenSupabaseModal={() => setIsSupabaseModalOpen(true)}
+                onOpenSupabaseModal={handleOpenSupabaseModal}
               />
             ) : (
               <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
@@ -910,6 +919,7 @@ export function App() {
         isOpen={isSupabaseModalOpen}
         onClose={() => setIsSupabaseModalOpen(false)}
         onConnectionChange={checkSupabaseStatus}
+        authUser={authUser}
       />
 
       {/* Role-Based Authentication & Account Management Modal */}
