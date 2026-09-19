@@ -608,18 +608,6 @@ ${colorItems}
  */
 export function generateAseBlob(colors: string[], paletteTitle: string = 'Izy Colors'): Blob {
   // Adobe Swatch Exchange format:
-  // Header: 'ASEF' (4 bytes), Major Version (uint16 big-endian = 1), Minor Version (uint16 = 0)
-  // Number of blocks: uint32 big-endian
-  // Color block:
-  //   uint16 block type = 0x0001
-  //   uint32 block length
-  //   uint16 name length (including null terminator)
-  //   UTF-16BE characters
-  //   4 bytes color mode ('RGB ')
-  //   float32 values for R, G, B
-  //   uint16 color type: 0 = Global (preferred in Illustrator), 1 = Spot, 2 = Process
-
-  const buffers: Uint8Array[] = [];
 
   // Helper to push uint16 big-endian
   const pushU16 = (val: number, arr: number[]) => {

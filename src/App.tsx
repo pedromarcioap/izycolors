@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { FooterBar } from './components/FooterBar';
 import { GeneratorView } from './components/GeneratorView';
@@ -80,7 +80,7 @@ export function App() {
   // Authentication & Role Governance State
   const [authUser, setAuthUser] = useState<AuthUser>(() => getCurrentAuthUser());
   const [usersList, setUsersList] = useState<AuthUser[]>(() => getStoredUsers());
-  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>(() => getStoredAuditLogs());
+  const [auditLogs] = useState<AuditLogItem[]>(() => getStoredAuditLogs());
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Supabase & Persistence State

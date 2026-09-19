@@ -1,4 +1,4 @@
-import { Palette, UserProfile, ProjectWorkspace, ProjectPalette, CollectionBoard, VaultPalette, FavoriteColor, CmsArticle, CommunitySubmission } from '../types';
+import { Palette, UserProfile, ProjectWorkspace, CollectionBoard, VaultPalette, FavoriteColor, CmsArticle, CommunitySubmission } from '../types';
 
 export const INITIAL_PALETTES: Palette[] = [
   {
