@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   X, LogIn, UserPlus, Sparkles, ShieldCheck, User, Mail, Lock, AtSign, 
   Cloud, AlertCircle, CheckCircle2, LogOut, Check, ArrowRight, KeyRound, 
-  Crown, Edit3, Eye, EyeOff 
+  Crown, Edit3, Eye, EyeOff, Award 
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types';
 import { 
@@ -146,6 +146,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     switch (role) {
       case 'admin':
         return 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+      case 'moderator':
+        return 'bg-rose-500/20 text-rose-300 border-rose-500/40';
       case 'editor':
         return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
       case 'pro':
@@ -355,7 +357,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="text-center pt-1 border-t border-white/[0.06] mt-4">
                 <p className="text-[11px] text-[#64748B]">
-                  Contas demo: <code className="text-purple-300 font-mono">admin@izycolors.com</code>, <code className="text-amber-300 font-mono">editor@izycolors.com</code>, <code className="text-emerald-300 font-mono">pro@izycolors.com</code>
+                  Contas demo: <code className="text-purple-300 font-mono">admin@izycolors.com</code>, <code className="text-rose-300 font-mono">moderador@izycolors.com</code>, <code className="text-amber-300 font-mono">editor@izycolors.com</code>, <code className="text-emerald-300 font-mono">pro@izycolors.com</code>
                 </p>
               </div>
             </form>
@@ -466,6 +468,19 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
                   <button
                     type="button"
+                    onClick={() => setSelectedRole('moderator')}
+                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
+                      selectedRole === 'moderator'
+                        ? 'bg-rose-500/15 border-rose-500 text-white'
+                        : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
+                    }`}
+                  >
+                    <Award className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Moderador</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => setSelectedRole('editor')}
                     className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
                       selectedRole === 'editor'
@@ -480,7 +495,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setSelectedRole('admin')}
-                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors ${
+                    className={`p-2 rounded-lg border text-xs font-medium flex items-center gap-2 cursor-pointer transition-colors col-span-2 ${
                       selectedRole === 'admin'
                         ? 'bg-purple-500/15 border-purple-500 text-white'
                         : 'bg-[#10141D] border-white/[0.08] text-[#94A3B8]'
@@ -583,6 +598,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
               </div>
 
+              {/* Moderator Card */}
+              <div 
+                onClick={() => handleQuickSwitch('moderator')}
+                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${
+                  currentUser.role === 'moderator'
+                    ? 'bg-rose-950/30 border-rose-500/60 ring-1 ring-rose-500/40 shadow-lg'
+                    : 'bg-[#181C26] border-white/[0.08] hover:border-rose-500/40 hover:bg-[#1E2330]'
+                }`}
+              >
+                <div className="w-9 h-9 rounded-xl bg-rose-500/20 border border-rose-500/40 flex items-center justify-center shrink-0">
+                  <Award className="w-4 h-4 text-rose-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-white">Moderador</span>
+                    <span className="text-[10px] font-mono text-rose-300">@anabeatriz_mod</span>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8]">Moderação de submissões, curadoria de Staff Picks e revisão de paletas.</p>
+                </div>
+              </div>
+
               {/* Editor Card */}
               <div 
                 onClick={() => handleQuickSwitch('editor')}
@@ -600,7 +636,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     <span className="text-xs font-semibold text-white">Editor / Curador</span>
                     <span className="text-[10px] font-mono text-amber-300">@bruno_editor</span>
                   </div>
-                  <p className="text-[11px] text-[#94A3B8]">Gestão de artigos do CMS e curadoria de Staff Picks.</p>
+                  <p className="text-[11px] text-[#94A3B8]">Gestão de artigos do CMS e curadoria editorial.</p>
                 </div>
               </div>
 

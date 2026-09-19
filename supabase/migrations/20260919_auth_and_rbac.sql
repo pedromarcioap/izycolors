@@ -1,5 +1,5 @@
 -- Migration SQL para Supabase: Autenticação & Níveis de Acesso (RBAC)
--- Suporta os níveis: admin (Administrador), editor (Moderador), user (Usuário Comum), pro (Pro), guest (Visitante)
+-- Suporta os níveis: admin (Administrador), moderator (Moderador), editor (Editor/Curador), user (Usuário Comum), pro (Pro), guest (Visitante)
 
 -- 1. Criar tabela public.profiles vinculada ao auth.users
 CREATE TABLE IF NOT EXISTS public.profiles (
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   handle TEXT NOT NULL,
-  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'editor', 'pro', 'user', 'guest')),
+  role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('admin', 'moderator', 'editor', 'pro', 'user', 'guest')),
   avatar TEXT,
   bio TEXT,
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),

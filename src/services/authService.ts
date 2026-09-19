@@ -38,6 +38,21 @@ export const INITIAL_USERS: AuthUser[] = [
     submissionsCount: 22
   },
   {
+    id: 'usr-moderator-1',
+    name: 'Ana Beatriz Fonseca',
+    email: 'moderador@izycolors.com',
+    role: 'moderator',
+    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&auto=format&fit=crop&q=80',
+    handle: '@anabeatriz_mod',
+    bio: 'Moderadora da Comunidade Izy Colors. Revisão de paletas, curadoria de Staff Picks e gestão de submissões.',
+    status: 'active',
+    createdAt: '2026-02-05',
+    lastLoginAt: 'Hoje, 10:30',
+    palettesCount: 19,
+    favoritesCount: 56,
+    submissionsCount: 35
+  },
+  {
     id: 'usr-pro-1',
     name: 'Camila Albuquerque',
     email: 'pro@izycolors.com',
@@ -409,7 +424,7 @@ export async function logoutAuthUser(): Promise<void> {
     }
   }
   // Reset to default regular user or guest representation
-  const defaultUser = INITIAL_USERS[1]; // Pedro Márcio (user)
+  const defaultUser = INITIAL_USERS.find(u => u.role === 'user') || INITIAL_USERS[0];
   setCurrentAuthUser(defaultUser);
   logAuditEvent(defaultUser.name, defaultUser.role, 'Log Out', 'Sessão encerrada com sucesso', 'auth');
 }
@@ -524,7 +539,7 @@ export function initAuthListener(onUserChange: (user: AuthUser) => void): () => 
   };
 }
 
-// Quick switch between demo roles (Admin, Editor, Pro, User, Guest)
+// Quick switch between demo roles (Admin, Moderator, Editor, Pro, User, Guest)
 export function switchDemoRole(targetRole: UserRole): AuthUser {
   if (targetRole === 'guest') {
     const guestUser: AuthUser = {

@@ -136,14 +136,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
         description: 'Gestão de usuários e auditoria'
       }
     ] : []),
-    ...(authUser.role === 'admin' || authUser.role === 'editor' ? [
+    ...(authUser.role === 'admin' || authUser.role === 'moderator' || authUser.role === 'editor' ? [
       {
         id: 'cms' as NavigationTab,
         label: 'CMS Editorial',
         shortLabel: 'CMS',
         icon: FileText,
-        badge: authUser.role === 'admin' ? 'Editorial' : 'Curador',
-        description: 'Artigos e curadoria'
+        badge: authUser.role === 'admin' ? 'Editorial' : authUser.role === 'moderator' ? 'Moderador' : 'Curador',
+        description: authUser.role === 'moderator' ? 'Moderação & curadoria' : 'Artigos e curadoria'
       }
     ] : []),
     {
@@ -393,6 +393,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             />
             <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0B0F17] ${
               authUser.role === 'admin' ? 'bg-purple-400' :
+              authUser.role === 'moderator' ? 'bg-rose-400' :
               authUser.role === 'editor' ? 'bg-amber-400' :
               authUser.role === 'pro' ? 'bg-emerald-400' : 'bg-[#06B6D4]'
             }`} />
@@ -427,6 +428,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div className="flex items-center gap-1.5 mt-0.5">
                 <span className={`text-[9px] font-mono font-bold uppercase px-1 rounded border ${
                   authUser.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+                  authUser.role === 'moderator' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' :
                   authUser.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
                   authUser.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
                   authUser.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :

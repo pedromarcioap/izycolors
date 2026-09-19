@@ -72,7 +72,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'moderation' | 'cms' | 'logs' | 'settings'>('overview');
   const [userSearch, setUserSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'editor' | 'pro' | 'user'>('all');
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'moderator' | 'editor' | 'pro' | 'user'>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended'>('all');
 
   // New User Modal
@@ -166,6 +166,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   // Statistics
   const pendingSubmissionsCount = submissions.filter(s => s.status === 'Pendente').length;
   const adminCount = usersList.filter(u => u.role === 'admin').length;
+  const moderatorCount = usersList.filter(u => u.role === 'moderator').length;
   const editorCount = usersList.filter(u => u.role === 'editor').length;
   const proCount = usersList.filter(u => u.role === 'pro').length;
   const regularCount = usersList.filter(u => u.role === 'user' || u.role === 'guest').length;
@@ -470,6 +471,19 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                   </p>
                 </div>
 
+                <div className="p-4 bg-[#181C26] border border-rose-500/20 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <Award className="w-4 h-4 text-rose-400" />
+                      Moderadores
+                    </span>
+                    <span className="text-lg font-bold font-mono text-rose-400">{moderatorCount}</span>
+                  </div>
+                  <p className="text-[11px] text-[#94A3B8] mt-2">
+                    Moderação de submissões da comunidade, curadoria de Staff Picks e revisão de paletas submetidas.
+                  </p>
+                </div>
+
                 <div className="p-4 bg-[#181C26] border border-[#06B6D4]/20 rounded-xl">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold text-white flex items-center gap-1.5">
@@ -525,6 +539,12 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                   className={`px-2.5 py-1 rounded ${roleFilter === 'admin' ? 'bg-purple-600/30 text-purple-300' : 'text-[#94A3B8] hover:text-white'}`}
                 >
                   Admins ({adminCount})
+                </button>
+                <button
+                  onClick={() => setRoleFilter('moderator')}
+                  className={`px-2.5 py-1 rounded ${roleFilter === 'moderator' ? 'bg-rose-600/30 text-rose-300' : 'text-[#94A3B8] hover:text-white'}`}
+                >
+                  Moderadores ({moderatorCount})
                 </button>
                 <button
                   onClick={() => setRoleFilter('editor')}
@@ -612,16 +632,18 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                       <td className="p-3.5">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${
                           user.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+                          user.role === 'moderator' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' :
                           user.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
                           user.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
                           user.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :
                           'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
                         }`}>
                           {user.role === 'admin' && <ShieldCheck className="w-3 h-3 text-purple-400" />}
+                          {user.role === 'moderator' && <Award className="w-3 h-3 text-rose-400" />}
                           {user.role === 'editor' && <FileText className="w-3 h-3 text-amber-400" />}
                           {user.role === 'pro' && <Sparkles className="w-3 h-3 text-emerald-400" />}
                           {(user.role === 'user' || user.role === 'guest') && <Users className="w-3 h-3 text-[#06B6D4]" />}
-                          {user.role.toUpperCase()}
+                          {user.role === 'moderator' ? 'MODERADOR' : user.role.toUpperCase()}
                         </span>
                       </td>
 
@@ -659,6 +681,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                             title={isCurrentSession ? 'Você não pode alterar seu próprio cargo nesta sessão' : 'Alterar cargo do usuário'}
                           >
                             <option value="admin">ADMIN</option>
+                            <option value="moderator">MODERADOR</option>
                             <option value="editor">EDITOR</option>
                             <option value="pro">PRO</option>
                             <option value="user">USER</option>

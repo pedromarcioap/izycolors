@@ -227,7 +227,7 @@ export function App() {
     if (currentTab === 'admin' && authUser.role !== 'admin') {
       setCurrentTab('profile');
     }
-    if (currentTab === 'cms' && authUser.role !== 'admin' && authUser.role !== 'editor') {
+    if (currentTab === 'cms' && authUser.role !== 'admin' && authUser.role !== 'moderator' && authUser.role !== 'editor') {
       setCurrentTab('profile');
     }
   }, [authUser.role, currentTab]);

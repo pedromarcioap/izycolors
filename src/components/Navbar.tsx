@@ -202,7 +202,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                     ? 'bg-white/[0.08] border-white/30'
                     : 'bg-[#181C24] border-white/[0.08] hover:border-white/20'
                 }`}
-                title={`Logado como ${authUser.name} (${authUser.role === 'admin' ? 'Administrador' : 'Usuário Comum'})`}
+                title={`Logado como ${authUser.name} (${
+                  authUser.role === 'admin' ? 'Administrador' :
+                  authUser.role === 'moderator' ? 'Moderador' :
+                  authUser.role === 'editor' ? 'Editor' :
+                  authUser.role === 'pro' ? 'Pro' : 'Usuário Comum'
+                })`}
               >
                 <div className="relative">
                   <img 
@@ -211,18 +216,26 @@ export const Navbar: React.FC<NavbarProps> = ({
                     className="w-6 h-6 rounded-full object-cover border border-white/20"
                   />
                   <span className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#0B0F17] ${
-                    authUser.role === 'admin' ? 'bg-purple-400' : 'bg-[#06B6D4]'
+                    authUser.role === 'admin' ? 'bg-purple-400' :
+                    authUser.role === 'moderator' ? 'bg-rose-400' :
+                    authUser.role === 'editor' ? 'bg-amber-400' :
+                    authUser.role === 'pro' ? 'bg-emerald-400' : 'bg-[#06B6D4]'
                   }`} />
                 </div>
                 <span className="text-xs font-semibold text-white/90 hidden md:inline">
                   {authUser.name.split(' ')[0]}
                 </span>
                 <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.2 rounded border ${
-                  authUser.role === 'admin'
-                    ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                    : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+                  authUser.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
+                  authUser.role === 'moderator' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' :
+                  authUser.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
+                  authUser.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
+                  'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
                 }`}>
-                  {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
+                  {authUser.role === 'admin' ? 'ADMIN' :
+                   authUser.role === 'moderator' ? 'MOD' :
+                   authUser.role === 'editor' ? 'EDITOR' :
+                   authUser.role === 'pro' ? 'PRO' : 'USUÁRIO'}
                 </span>
               </button>
 
