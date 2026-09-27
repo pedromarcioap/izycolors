@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
-import { 
-  Sparkles, 
-  Layers, 
-  Compass, 
-  SlidersHorizontal, 
-  Download, 
-  CheckCircle2, 
-  User, 
-  FileText, 
+import React from 'react';
+import {
+  Sparkles,
+  Layers,
+  Compass,
+  SlidersHorizontal,
+  Download,
+  CheckCircle2,
+  User,
+  FileText,
   Command,
   Eye,
   Disc3,
@@ -15,23 +15,17 @@ import {
   PanelLeftOpen,
   Database,
   Search,
-  ChevronRight,
-  GitFork,
-  ExternalLink,
   ShieldCheck,
-  LayoutDashboard,
-  LogIn,
   LogOut,
   BarChart3
 } from 'lucide-react';
-import { ColorGamut, NavigationTab, UserProfile, AuthUser } from '../types';
+import { ColorGamut, NavigationTab, AuthUser, UserRole } from '../types';
 
 interface SidebarProps {
   currentTab: NavigationTab;
   onTabChange: (tab: NavigationTab) => void;
   gamut: ColorGamut;
   onGamutChange: (gamut: ColorGamut) => void;
-  userProfile: UserProfile;
   authUser: AuthUser;
   onOpenAuthModal: () => void;
   onLogout?: () => void;
@@ -46,12 +40,160 @@ interface SidebarProps {
   onToggleExpanded: () => void;
 }
 
+const GAMUT_LABELS: Record<ColorGamut, string> = {
+  'sRGB': 'sRGB',
+  'Display P3': 'P3',
+  'Rec.2020': '2020',
+};
+
+const roleBadgeClasses: Record<UserRole, string> = {
+  admin: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+  moderator: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+  editor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  pro: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+  user: 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40',
+  guest: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
+};
+
+const roleStatusDotClasses: Record<UserRole, string> = {
+  admin: 'bg-purple-400',
+  moderator: 'bg-rose-400',
+  editor: 'bg-amber-400',
+  pro: 'bg-emerald-400',
+  user: 'bg-[#06B6D4]',
+  guest: 'bg-[#06B6D4]',
+};
+
+interface NavItem {
+  id: NavigationTab;
+  label: string;
+  shortLabel: string;
+  icon: React.ElementType;
+  badge?: string;
+  description: string;
+  count?: number | string;
+}
+
+const getNavItems = (
+  authUser: AuthUser,
+  projectsCount: number,
+  favoritesCount: number,
+  forksCount: number
+): NavItem[] => {
+  const canAccessCms =
+    authUser.role === 'admin' ||
+    authUser.role === 'moderator' ||
+    authUser.role === 'editor';
+
+  const cmsBadgeLabelByRole: Record<string, string> = {
+    admin: 'Editorial',
+    moderator: 'Moderador',
+    editor: 'Curador'
+  };
+  const cmsBadgeLabel = cmsBadgeLabelByRole[authUser.role] ?? 'Curador';
+
+  return [
+    {
+      id: 'generator',
+      label: 'Gerador Procedural',
+      shortLabel: 'Gerador',
+      icon: Sparkles,
+      badge: 'Espaço',
+      description: 'Geração procedural Oklch'
+    },
+    {
+      id: 'projects',
+      label: 'Projetos & Cofre',
+      shortLabel: 'Cofre',
+      icon: Layers,
+      count: projectsCount + favoritesCount,
+      description: 'Workspaces e tokens salvos'
+    },
+    {
+      id: 'explorer',
+      label: 'Explorar & Forks',
+      shortLabel: 'Explorar',
+      icon: Compass,
+      count: forksCount > 0 ? `${forksCount} forks` : undefined,
+      badge: 'Comunidade',
+      description: 'Feed e derivações de paletas'
+    },
+    {
+      id: 'wheel',
+      label: 'Roda Harmônica Adobe',
+      shortLabel: 'Harmonia',
+      icon: Disc3,
+      badge: 'Adobe',
+      description: 'Regras de harmonia cromática'
+    },
+    {
+      id: 'extractor',
+      label: 'Extrator de Imagem',
+      shortLabel: 'Extrator',
+      icon: Eye,
+      badge: 'K-Means',
+      description: 'Imagens curadas e upload'
+    },
+    {
+      id: 'lab',
+      label: 'Color Space Lab',
+      shortLabel: 'Lab',
+      icon: SlidersHorizontal,
+      badge: 'OKLCH',
+      description: 'Gamuts P3 & Rec.2020'
+    },
+    {
+      id: 'accessibility',
+      label: 'Auditoria WCAG / APCA',
+      shortLabel: 'Acessibilidade',
+      icon: CheckCircle2,
+      badge: 'AAA',
+      description: 'Simulador de daltonismo'
+    },
+    ...(authUser.role === 'admin' ? [
+      {
+        id: 'admin' as NavigationTab,
+        label: 'Painel Admin',
+        shortLabel: 'Admin',
+        icon: ShieldCheck,
+        badge: 'Admin',
+        description: 'Gestão de usuários e auditoria'
+      }
+    ] : []),
+    ...(canAccessCms ? [
+      {
+        id: 'cms' as NavigationTab,
+        label: 'CMS Editorial',
+        shortLabel: 'CMS',
+        icon: FileText,
+        badge: cmsBadgeLabel,
+        description: authUser.role === 'moderator' ? 'Moderação & curadoria' : 'Artigos e curadoria'
+      }
+    ] : []),
+    {
+      id: 'user_dashboard',
+      label: 'Dashboard de Cores',
+      shortLabel: 'Dashboard',
+      icon: BarChart3,
+      badge: 'Analytics',
+      description: 'Frequência, gamuts & evolução'
+    },
+    {
+      id: 'profile',
+      label: 'Meu Perfil & Espaço',
+      shortLabel: 'Perfil',
+      icon: User,
+      badge: authUser.role.toUpperCase(),
+      description: authUser.handle || authUser.name
+    }
+  ];
+};
+
 export const Sidebar: React.FC<SidebarProps> = ({
   currentTab,
   onTabChange,
   gamut,
   onGamutChange,
-  userProfile,
   authUser,
   onOpenAuthModal,
   onLogout,
@@ -65,117 +207,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isExpanded,
   onToggleExpanded
 }) => {
-  const [hoveredTab, setHoveredTab] = useState<string | null>(null);
-
-  const navItems = [
-    {
-      id: 'generator' as NavigationTab,
-      label: 'Gerador Procedural',
-      shortLabel: 'Gerador',
-      icon: Sparkles,
-      badge: 'Espaço',
-      description: 'Geração procedural Oklch'
-    },
-    {
-      id: 'projects' as NavigationTab,
-      label: 'Projetos & Cofre',
-      shortLabel: 'Cofre',
-      icon: Layers,
-      count: projectsCount + favoritesCount,
-      description: 'Workspaces e tokens salvos'
-    },
-    {
-      id: 'explorer' as NavigationTab,
-      label: 'Explorar & Forks',
-      shortLabel: 'Explorar',
-      icon: Compass,
-      count: forksCount > 0 ? `${forksCount} forks` : undefined,
-      badge: 'Comunidade',
-      description: 'Feed e derivações de paletas'
-    },
-    {
-      id: 'wheel' as NavigationTab,
-      label: 'Roda Harmônica Adobe',
-      shortLabel: 'Harmonia',
-      icon: Disc3,
-      badge: 'Adobe',
-      description: 'Regras de harmonia cromática'
-    },
-    {
-      id: 'extractor' as NavigationTab,
-      label: 'Extrator de Imagem',
-      shortLabel: 'Extrator',
-      icon: Eye,
-      badge: 'K-Means',
-      description: 'Imagens curadas e upload'
-    },
-    {
-      id: 'lab' as NavigationTab,
-      label: 'Color Space Lab',
-      shortLabel: 'Lab',
-      icon: SlidersHorizontal,
-      badge: 'OKLCH',
-      description: 'Gamuts P3 & Rec.2020'
-    },
-    {
-      id: 'accessibility' as NavigationTab,
-      label: 'Auditoria WCAG / APCA',
-      shortLabel: 'Acessibilidade',
-      icon: CheckCircle2,
-      badge: 'AAA',
-      description: 'Simulador de daltonismo'
-    },
-    // Role-restricted navigation items
-    ...(authUser.role === 'admin' ? [
-      {
-        id: 'admin' as NavigationTab,
-        label: 'Painel Admin',
-        shortLabel: 'Admin',
-        icon: ShieldCheck,
-        badge: 'Admin',
-        description: 'Gestão de usuários e auditoria'
-      }
-    ] : []),
-    ...(authUser.role === 'admin' || authUser.role === 'moderator' || authUser.role === 'editor' ? [
-      {
-        id: 'cms' as NavigationTab,
-        label: 'CMS Editorial',
-        shortLabel: 'CMS',
-        icon: FileText,
-        badge: authUser.role === 'admin' ? 'Editorial' : authUser.role === 'moderator' ? 'Moderador' : 'Curador',
-        description: authUser.role === 'moderator' ? 'Moderação & curadoria' : 'Artigos e curadoria'
-      }
-    ] : []),
-    {
-      id: 'user_dashboard' as NavigationTab,
-      label: 'Dashboard de Cores',
-      shortLabel: 'Dashboard',
-      icon: BarChart3,
-      badge: 'Analytics',
-      description: 'Frequência, gamuts & evolução'
-    },
-    {
-      id: 'profile' as NavigationTab,
-      label: 'Meu Perfil & Espaço',
-      shortLabel: 'Perfil',
-      icon: User,
-      badge: authUser.role.toUpperCase(),
-      description: authUser.handle || authUser.name
-    }
-  ];
+  const navItems = getNavItems(authUser, projectsCount, favoritesCount, forksCount);
 
   return (
-    <aside 
-      className={`fixed top-0 left-0 bottom-0 z-40 bg-[#0B0F17] border-r border-white/[0.08] flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl ${
-        isExpanded ? 'w-64' : 'w-16'
-      }`}
+    <aside
+      className={`fixed top-0 left-0 bottom-0 z-40 bg-[#0B0F17] border-r border-white/[0.08] flex flex-col justify-between transition-all duration-300 ease-in-out select-none shadow-2xl ${isExpanded ? 'w-64' : 'w-16'
+        }`}
     >
       {/* Top Header: Brand & Collapse Toggle */}
       <div>
         <div className="h-16 px-3 flex items-center justify-between border-b border-white/[0.06]">
-          <button 
+          <button
             onClick={() => onTabChange('generator')}
-            className="flex items-center gap-2.5 focus:outline-none overflow-hidden text-left"
+            className="flex items-center gap-2.5 focus:outline-none overflow-hidden text-left cursor-pointer"
             title="Izy Colors"
           >
             <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-[#6366F1] via-[#EC4899] to-[#06B6D4] p-[1.5px] shadow-lg shadow-indigo-500/20 shrink-0 hover:scale-105 transition-transform">
@@ -199,9 +243,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {/* Expand / Retract Toggle Button */}
           <button
             onClick={onToggleExpanded}
-            className={`p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 ${
-              !isExpanded ? 'mx-auto' : ''
-            }`}
+            className={`p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0 ${!isExpanded ? 'mx-auto' : ''
+              }`}
             title={isExpanded ? 'Retrair barra lateral (apenas ícones)' : 'Expandir barra lateral (exibir texto)'}
             aria-label={isExpanded ? 'Retrair menu' : 'Expandir menu'}
           >
@@ -226,11 +269,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     key={g}
                     onClick={() => onGamutChange(g)}
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono transition-colors ${
-                      gamut === g ? 'bg-[#6366F1] text-white font-bold' : 'text-[#64748B] hover:text-white'
-                    }`}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-mono cursor-pointer transition-colors ${gamut === g ? 'bg-[#6366F1] text-white font-bold' : 'text-[#64748B] hover:text-white'
+                      }`}
                   >
-                    {g === 'Display P3' ? 'P3' : g === 'Rec.2020' ? '2020' : 'sRGB'}
+                    {GAMUT_LABELS[g]}
                   </button>
                 ))}
               </div>
@@ -238,7 +280,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : (
           <div className="py-2 flex justify-center">
-            <div 
+            <div
               className="w-2 h-2 rounded-full bg-[#06B6D4] animate-pulse cursor-pointer"
               title={`Gamut: ${gamut}`}
             />
@@ -254,36 +296,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <div key={item.id} className="relative group">
                 <button
                   onClick={() => onTabChange(item.id)}
-                  onMouseEnter={() => setHoveredTab(item.id)}
-                  onMouseLeave={() => setHoveredTab(null)}
-                  className={`w-full flex items-center rounded-lg transition-all duration-150 cursor-pointer ${
-                    isExpanded ? 'px-3 py-2.5 gap-3' : 'h-10 w-10 mx-auto justify-center'
-                  } ${
-                    isActive
+                  className={`w-full flex items-center rounded-lg transition-all duration-150 cursor-pointer ${isExpanded ? 'px-3 py-2.5 gap-3' : 'h-10 w-10 mx-auto justify-center'
+                    } ${isActive
                       ? 'bg-[#6366F1] text-white shadow-md shadow-indigo-600/30 font-semibold'
                       : 'text-[#94A3B8] hover:text-white hover:bg-[#181C24]'
-                  }`}
+                    }`}
                   aria-label={item.label}
                 >
-                  <Icon className={`w-4 h-4 shrink-0 transition-transform ${
-                    isActive ? 'scale-110 text-white' : 'text-[#94A3B8] group-hover:text-[#06B6D4]'
-                  }`} />
+                  <Icon className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'scale-110 text-white' : 'text-[#94A3B8] group-hover:text-[#06B6D4]'
+                    }`} />
 
                   {isExpanded && (
                     <div className="flex-1 flex items-center justify-between min-w-0 text-left">
                       <span className="text-xs font-medium truncate">{item.label}</span>
                       <div className="flex items-center gap-1 shrink-0 ml-1.5">
                         {item.count !== undefined && (
-                          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
-                            isActive ? 'bg-white/25 text-white' : 'bg-[#262A33] text-[#06B6D4]'
-                          }`}>
+                          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isActive ? 'bg-white/25 text-white' : 'bg-[#262A33] text-[#06B6D4]'
+                            }`}>
                             {item.count}
                           </span>
                         )}
                         {item.badge && (
-                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                            isActive ? 'bg-white/20 text-white' : 'bg-[#181C24] text-[#94A3B8] border border-white/[0.06]'
-                          }`}>
+                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isActive ? 'bg-white/20 text-white' : 'bg-[#181C24] text-[#94A3B8] border border-white/[0.06]'
+                            }`}>
                             {item.badge}
                           </span>
                         )}
@@ -319,9 +354,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Quick Export Button */}
         <button
           onClick={onOpenExportModal}
-          className={`w-full rounded-lg bg-gradient-to-r from-[#6366F1] to-[#4F46E5] hover:from-[#5254E0] hover:to-[#4338CA] text-white text-xs font-semibold flex items-center transition-all shadow-md shadow-indigo-600/20 cursor-pointer ${
-            isExpanded ? 'px-3 py-2.5 justify-between' : 'h-10 w-10 mx-auto justify-center'
-          }`}
+          className={`w-full rounded-lg bg-gradient-to-r from-[#6366F1] to-[#4F46E5] hover:from-[#5254E0] hover:to-[#4338CA] text-white text-xs font-semibold flex items-center transition-all shadow-md shadow-indigo-600/20 cursor-pointer ${isExpanded ? 'px-3 py-2.5 justify-between' : 'h-10 w-10 mx-auto justify-center'
+            }`}
           title="Exportar para Adobe Illustrator e Tokens"
         >
           <div className="flex items-center gap-2">
@@ -338,9 +372,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Command Palette Trigger */}
         <button
           onClick={onOpenCommandPalette}
-          className={`w-full rounded-lg bg-[#141822] hover:bg-[#1C2028] border border-white/[0.08] text-xs text-[#94A3B8] hover:text-white flex items-center transition-colors cursor-pointer ${
-            isExpanded ? 'px-3 py-2 justify-between' : 'h-10 w-10 mx-auto justify-center'
-          }`}
+          className={`w-full rounded-lg bg-[#141822] hover:bg-[#1C2028] border border-white/[0.08] text-xs text-[#94A3B8] hover:text-white flex items-center transition-colors cursor-pointer ${isExpanded ? 'px-3 py-2 justify-between' : 'h-10 w-10 mx-auto justify-center'
+            }`}
           title="Busca Global e Atalhos (⌘K)"
         >
           <div className="flex items-center gap-2">
@@ -357,9 +390,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {/* Supabase Persistence Indicator & Trigger */}
         <button
           onClick={onOpenSupabaseModal}
-          className={`w-full rounded-lg bg-[#141822] hover:bg-[#1C2028] border border-white/[0.08] text-xs transition-colors cursor-pointer flex items-center ${
-            isExpanded ? 'px-3 py-2 justify-between' : 'h-10 w-10 mx-auto justify-center'
-          }`}
+          className={`w-full rounded-lg bg-[#141822] hover:bg-[#1C2028] border border-white/[0.08] text-xs transition-colors cursor-pointer flex items-center ${isExpanded ? 'px-3 py-2 justify-between' : 'h-10 w-10 mx-auto justify-center'
+            }`}
           title="Status do Banco de Dados / Supabase"
         >
           <div className="flex items-center gap-2">
@@ -376,28 +408,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </button>
 
         {/* User Account / Role Badge & Auth Switcher */}
-        <div 
-          className={`rounded-lg bg-[#141822] border border-white/[0.08] flex items-center transition-all ${
-            isExpanded ? 'p-2.5 gap-2.5' : 'p-1.5 justify-center'
-          }`}
+        <div
+          className={`rounded-lg bg-[#141822] border border-white/[0.08] flex items-center transition-all ${isExpanded ? 'p-2.5 gap-2.5' : 'p-1.5 justify-center'
+            }`}
         >
-          <div 
+          <button
+            type="button"
             onClick={() => onTabChange(authUser.role === 'admin' ? 'admin' : 'user_dashboard')}
-            className="relative shrink-0 cursor-pointer"
+            className="relative shrink-0 cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-500/50 rounded-full"
             title={`${authUser.name} (${authUser.role === 'admin' ? 'Administrador' : 'Usuário'})`}
+            aria-label={`Perfil de ${authUser.name}`}
           >
-            <img 
-              src={authUser.avatar} 
+            <img
+              src={authUser.avatar}
               alt={authUser.name}
               className="w-8 h-8 rounded-full object-cover border border-white/20 hover:border-white/50 transition-colors"
             />
-            <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0B0F17] ${
-              authUser.role === 'admin' ? 'bg-purple-400' :
-              authUser.role === 'moderator' ? 'bg-rose-400' :
-              authUser.role === 'editor' ? 'bg-amber-400' :
-              authUser.role === 'pro' ? 'bg-emerald-400' : 'bg-[#06B6D4]'
-            }`} />
-          </div>
+            <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border border-[#0B0F17] ${roleStatusDotClasses[authUser.role]}`} />
+          </button>
 
           {isExpanded && (
             <div className="flex-1 min-w-0 text-left">
@@ -426,14 +454,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 </div>
               </div>
               <div className="flex items-center gap-1.5 mt-0.5">
-                <span className={`text-[9px] font-mono font-bold uppercase px-1 rounded border ${
-                  authUser.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
-                  authUser.role === 'moderator' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' :
-                  authUser.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
-                  authUser.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
-                  authUser.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :
-                  'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
-                }`}>
+                <span className={`text-[9px] font-mono font-bold uppercase px-1 rounded border ${roleBadgeClasses[authUser.role]}`}>
                   {authUser.role.toUpperCase()}
                 </span>
                 <span className="text-[10px] font-mono text-[#64748B] truncate">

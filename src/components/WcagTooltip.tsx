@@ -7,7 +7,6 @@ export interface WcagTooltipProps {
   prevColorHex?: string;
   nextColorHex?: string;
   colorName?: string;
-  index?: number;
   position?: { x: number; y: number } | null;
   alignment?: 'center' | 'left' | 'right';
   className?: string;
@@ -40,6 +39,25 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
   const blackAa = ratioBlack >= 4.5;
   const blackAaa = ratioBlack >= 7.0;
 
+  // Resolve per-text-color badge styling and label without nested ternaries
+  const getTextBadge = (aaa: boolean, aa: boolean) => {
+    let className = 'text-rose-400';
+    let label = 'Reprovado';
+
+    if (aaa) {
+      className = 'text-emerald-400 font-bold';
+      label = 'AAA';
+    } else if (aa) {
+      className = 'text-[#06B6D4]';
+      label = 'AA';
+    }
+
+    return { className, label };
+  };
+
+  const whiteBadge = getTextBadge(whiteAaa, whiteAa);
+  const blackBadge = getTextBadge(blackAaa, blackAa);
+
   // Adjacent contrasts
   const prevContrast = prevColorHex ? getContrastRatio(prevColorHex, colorHex) : null;
   const nextContrast = nextColorHex ? getContrastRatio(nextColorHex, colorHex) : null;
@@ -49,11 +67,11 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
   if (position) {
     const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
     const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
-    
+
     // Clamp to screen bounds
     const tooltipWidth = 280;
     const tooltipHeight = 250;
-    
+
     let left = position.x;
     let top = position.y - 15;
 
@@ -97,15 +115,14 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
           )}
         </div>
         <div
-          className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border shadow-sm ${
-            normalAaa
-              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-              : normalAa
+          className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border shadow-sm ${normalAaa
+            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+            : normalAa
               ? 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
               : largeAa
-              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-              : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-          }`}
+                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+            }`}
         >
           {normalAaa ? 'WCAG AAA' : normalAa ? 'WCAG AA' : largeAa ? 'AA Grande' : 'Falha WCAG'}
         </div>
@@ -115,11 +132,10 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
       <div className="grid grid-cols-2 gap-2 mb-2.5">
         {/* White Text Box */}
         <div
-          className={`p-2 rounded-lg border text-center transition-all ${
-            bestText === 'white'
-              ? 'bg-white/15 border-white/40 shadow-md ring-1 ring-white/20'
-              : 'bg-[#111827]/60 border-white/5 opacity-75'
-          }`}
+          className={`p-2 rounded-lg border text-center transition-all ${bestText === 'white'
+            ? 'bg-white/15 border-white/40 shadow-md ring-1 ring-white/20'
+            : 'bg-[#111827]/60 border-white/5 opacity-75'
+            }`}
         >
           <div className="flex items-center justify-center gap-1 text-[10px] text-white font-medium mb-0.5">
             <span className="w-2 h-2 rounded-full bg-white border border-black/40 inline-block shrink-0" />
@@ -129,19 +145,16 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
             {ratioWhite.toFixed(2)}:1
           </div>
           <div className="text-[9px] font-mono mt-0.5 flex justify-center gap-1">
-            <span className={whiteAaa ? 'text-emerald-400 font-bold' : whiteAa ? 'text-[#06B6D4]' : 'text-rose-400'}>
-              {whiteAaa ? 'AAA' : whiteAa ? 'AA' : 'Reprovado'}
-            </span>
+            <span className={whiteBadge.className}>{whiteBadge.label}</span>
           </div>
         </div>
 
         {/* Black Text Box */}
         <div
-          className={`p-2 rounded-lg border text-center transition-all ${
-            bestText === 'black'
-              ? 'bg-white/15 border-white/40 shadow-md ring-1 ring-white/20'
-              : 'bg-[#111827]/60 border-white/5 opacity-75'
-          }`}
+          className={`p-2 rounded-lg border text-center transition-all ${bestText === 'black'
+            ? 'bg-white/15 border-white/40 shadow-md ring-1 ring-white/20'
+            : 'bg-[#111827]/60 border-white/5 opacity-75'
+            }`}
         >
           <div className="flex items-center justify-center gap-1 text-[10px] text-[#94A3B8] font-medium mb-0.5">
             <span className="w-2 h-2 rounded-full bg-black border border-white/40 inline-block shrink-0" />
@@ -151,9 +164,7 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
             {ratioBlack.toFixed(2)}:1
           </div>
           <div className="text-[9px] font-mono mt-0.5 flex justify-center gap-1">
-            <span className={blackAaa ? 'text-emerald-400 font-bold' : blackAa ? 'text-[#06B6D4]' : 'text-rose-400'}>
-              {blackAaa ? 'AAA' : blackAa ? 'AA' : 'Reprovado'}
-            </span>
+            <span className={blackBadge.className}>{blackBadge.label}</span>
           </div>
         </div>
       </div>

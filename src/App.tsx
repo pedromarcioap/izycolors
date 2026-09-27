@@ -19,33 +19,33 @@ import { SubmitPaletteModal } from './components/SubmitPaletteModal';
 import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { SavePaletteModal } from './components/SavePaletteModal';
 
-import { 
-  NavigationTab, 
-  ColorGamut, 
-  Palette, 
-  ProjectWorkspace, 
+import {
+  NavigationTab,
+  ColorGamut,
+  Palette,
+  ProjectWorkspace,
   ProjectPalette,
-  CollectionBoard, 
-  FavoriteColor, 
+  CollectionBoard,
+  FavoriteColor,
   VaultPalette,
-  CmsArticle, 
-  CommunitySubmission, 
+  CmsArticle,
+  CommunitySubmission,
   UserProfile,
   CuratedDemoImage,
   AuthUser,
   AuditLogItem
 } from './types';
 
-import { 
-  INITIAL_PALETTES, 
-  INITIAL_USER_PROFILE, 
-  INITIAL_PROJECTS, 
-  INITIAL_COLLECTIONS, 
-  INITIAL_FAVORITE_COLORS, 
+import {
+  INITIAL_PALETTES,
+  INITIAL_USER_PROFILE,
+  INITIAL_PROJECTS,
+  INITIAL_COLLECTIONS,
+  INITIAL_FAVORITE_COLORS,
   INITIAL_VAULT_PALETTES,
-  INITIAL_CMS_ARTICLES, 
-  INITIAL_SUBMISSIONS, 
-  INITIAL_TAXONOMY_TAGS 
+  INITIAL_CMS_ARTICLES,
+  INITIAL_SUBMISSIONS,
+  INITIAL_TAXONOMY_TAGS
 } from './data/initialData';
 
 import {
@@ -57,12 +57,12 @@ import {
   isSupabaseConfigured
 } from './services/supabase';
 
-import { 
-  getStoredUsers, 
-  saveStoredUsers, 
-  getCurrentAuthUser, 
-  setCurrentAuthUser, 
-  getStoredAuditLogs, 
+import {
+  getStoredUsers,
+  saveStoredUsers,
+  getCurrentAuthUser,
+  setCurrentAuthUser,
+  getStoredAuditLogs,
   switchDemoRole,
   checkCurrentSession,
   logoutAuthUser,
@@ -143,7 +143,7 @@ export function App() {
       bio: current.bio || savedProfile.bio || INITIAL_USER_PROFILE.bio,
       exportPreferences: {
         ...INITIAL_USER_PROFILE.exportPreferences,
-        ...(savedProfile.exportPreferences || {})
+        ...savedProfile.exportPreferences
       }
     };
   });
@@ -517,7 +517,6 @@ export function App() {
         onTabChange={setCurrentTab}
         gamut={gamut}
         onGamutChange={setGamut}
-        userProfile={userProfile}
         authUser={authUser}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onLogout={handleLogout}
@@ -533,10 +532,9 @@ export function App() {
       />
 
       {/* Main Content Viewport (offset by sidebar width dynamically) */}
-      <div 
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${
-          isSidebarExpanded ? 'pl-64' : 'pl-16'
-        }`}
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ease-in-out ${isSidebarExpanded ? 'pl-64' : 'pl-16'
+          }`}
       >
         {/* Slim Top Bar with Current Tab Context & Mobile Toggle */}
         <header className="h-16 bg-[#0E131E]/90 backdrop-blur-md border-b border-white/[0.08] sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between">
@@ -576,30 +574,28 @@ export function App() {
               className="h-8 px-2 sm:px-2.5 rounded-lg bg-[#181C24] hover:bg-[#202534] border border-white/[0.08] hover:border-white/20 text-xs flex items-center gap-2 transition-colors cursor-pointer"
               title={`Conta: ${authUser.name} (${authUser.role === 'admin' ? 'Administrador' : 'Usuário Comum'}) - Clique para gerenciar`}
             >
-              <img 
-                src={authUser.avatar} 
-                alt={authUser.name} 
+              <img
+                src={authUser.avatar}
+                alt={authUser.name}
                 className="w-5 h-5 rounded-full object-cover border border-white/20"
               />
               <span className="hidden sm:inline text-white font-medium text-xs">
                 {authUser.name.split(' ')[0]}
               </span>
-              <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border ${
-                authUser.role === 'admin'
-                  ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                  : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
-              }`}>
+              <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border ${authUser.role === 'admin'
+                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+                : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+                }`}>
                 {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
               </span>
             </button>
 
             <button
               onClick={handleOpenSupabaseModal}
-              className={`h-8 px-2.5 rounded-lg text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${
-                isSupabaseConnected 
-                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400' 
-                  : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8] hover:text-white'
-              }`}
+              className={`h-8 px-2.5 rounded-lg text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${isSupabaseConnected
+                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8] hover:text-white'
+                }`}
               title="Status do Banco de Dados / Supabase (Exclusivo Admin)"
             >
               <Database className="w-3.5 h-3.5" />
@@ -810,10 +806,10 @@ export function App() {
               onOpenExport={handleOpenExport}
               onUpdateProfile={(updated) => {
                 setUserProfile(prev => {
-                  const nextProfile = { 
-                    ...prev, 
+                  const nextProfile = {
+                    ...prev,
                     ...updated,
-                    exportPreferences: updated.exportPreferences 
+                    exportPreferences: updated.exportPreferences
                       ? { ...prev.exportPreferences, ...updated.exportPreferences }
                       : prev.exportPreferences
                   };
@@ -833,7 +829,7 @@ export function App() {
                       ...prev,
                       name: updated.name || prev.name,
                       handle: updated.handle || prev.handle,
-                      bio: updated.bio !== undefined ? updated.bio : prev.bio
+                      bio: updated.bio ?? prev.bio
                     };
                     setCurrentAuthUser(nextUser);
                     setUsersList(curr => {
