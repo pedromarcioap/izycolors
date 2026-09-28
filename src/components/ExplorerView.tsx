@@ -1,22 +1,20 @@
 import React, { useState } from 'react';
-import { 
-  Heart, 
-  Bookmark, 
-  Code, 
-  Sliders, 
-  Sparkles, 
-  Trophy, 
-  Filter, 
-  ChevronDown, 
-  ExternalLink,
+import {
+  Heart,
+  Bookmark,
+  Code,
+  Sliders,
+  Sparkles,
+  Trophy,
+  Filter,
+  ChevronDown,
   Flame,
   Clock,
   Award,
   CheckCircle2,
-  Share2,
-  Copy,
   Check,
-  GitFork
+  GitFork,
+  ShieldCheck
 } from 'lucide-react';
 import { Palette } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
@@ -28,6 +26,7 @@ interface ExplorerViewProps {
   onLikePalette: (paletteId: string) => void;
   onForkPalette?: (palette: Palette) => void;
   onOpenSubmissionModal: () => void;
+  onSendToAudit: (colors: string[]) => void;
 }
 
 export const ExplorerView: React.FC<ExplorerViewProps> = ({
@@ -36,7 +35,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   onSaveToCollection,
   onLikePalette,
   onForkPalette,
-  onOpenSubmissionModal
+  onOpenSubmissionModal,
+  onSendToAudit
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'trending' | 'popular' | 'forks' | 'newest' | 'staff'>('trending');
   const [selectedTag, setSelectedTag] = useState<string>('Dark Mode');
@@ -96,7 +96,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
     if (activeSubTab === 'forks' && !p.isFork && (!p.forks || p.forks === 0)) return false;
     if (selectedTag && selectedTag !== 'all') {
       const matchTag = p.tags.some(t => t.toLowerCase().includes(selectedTag.toLowerCase())) ||
-                       p.title.toLowerCase().includes(selectedTag.toLowerCase());
+        p.title.toLowerCase().includes(selectedTag.toLowerCase());
       if (!matchTag && selectedTag === 'Dark Mode') {
         // Allow dark mode palettes
         return p.tags.includes('Dark Mode') || p.tags.includes('Dark Mode Safe');
@@ -123,11 +123,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveSubTab('trending')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-                activeSubTab === 'trending'
-                  ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
-                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'trending'
+                ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
+                : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+                }`}
             >
               <Flame className="w-3.5 h-3.5" />
               <span>Tendências</span>
@@ -135,11 +134,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 
             <button
               onClick={() => setActiveSubTab('popular')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-                activeSubTab === 'popular'
-                  ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
-                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'popular'
+                ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
+                : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+                }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Mais Populares</span>
@@ -147,11 +145,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 
             <button
               onClick={() => setActiveSubTab('forks')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-                activeSubTab === 'forks'
-                  ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
-                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'forks'
+                ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
+                : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+                }`}
             >
               <GitFork className="w-3.5 h-3.5 text-[#06B6D4]" />
               <span>Forks & Clones</span>
@@ -159,11 +156,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 
             <button
               onClick={() => setActiveSubTab('newest')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-                activeSubTab === 'newest'
-                  ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
-                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'newest'
+                ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
+                : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+                }`}
             >
               <Clock className="w-3.5 h-3.5" />
               <span>Novas Adições</span>
@@ -171,11 +167,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
 
             <button
               onClick={() => setActiveSubTab('staff')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${
-                activeSubTab === 'staff'
-                  ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
-                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-              }`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all cursor-pointer ${activeSubTab === 'staff'
+                ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
+                : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+                }`}
             >
               <Award className="w-3.5 h-3.5" />
               <span>Staff Picks</span>
@@ -185,7 +180,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           {/* Counts & Sort Dropdown */}
           <div className="flex items-center gap-3 self-end md:self-auto text-xs">
             <span className="text-[#94A3B8] font-mono hidden sm:inline">
-              <span className="w-2 h-2 rounded-full inline-block bg-[#06B6D4] mr-1.5" />
+              <span className="w-2 h-2 rounded-full inline-block bg-[#06B6D4] mr-1.5"></span>{' '}
               1,842 Paletas Ativas
             </span>
 
@@ -216,11 +211,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               <button
                 key={dot.id}
                 onClick={() => setSelectedHue(dot.id)}
-                className={`w-5 h-5 rounded-full transition-all flex items-center justify-center ${
-                  selectedHue === dot.id
-                    ? 'ring-2 ring-white scale-110'
-                    : 'hover:scale-105 opacity-80 hover:opacity-100'
-                } ${dot.color}`}
+                className={`w-5 h-5 rounded-full transition-all flex items-center justify-center ${selectedHue === dot.id
+                  ? 'ring-2 ring-white scale-110'
+                  : 'hover:scale-105 opacity-80 hover:opacity-100'
+                  } ${dot.color}`}
                 title={`Filtrar por ${dot.label}`}
               >
                 {dot.isInf && <span className="text-[10px] text-white font-bold leading-none">∞</span>}
@@ -234,11 +228,10 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               <button
                 key={tag}
                 onClick={() => setSelectedTag(selectedTag === tag ? '' : tag)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                  selectedTag === tag
-                    ? 'bg-[#06B6D4] text-[#003640] font-semibold'
-                    : 'bg-[#181C24] text-[#94A3B8] hover:text-white border border-white/[0.06]'
-                }`}
+                className={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${selectedTag === tag
+                  ? 'bg-[#06B6D4] text-[#003640] font-semibold'
+                  : 'bg-[#181C24] text-[#94A3B8] hover:text-white border border-white/[0.06]'
+                  }`}
               >
                 {tag}
               </button>
@@ -254,7 +247,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
           <div>
             <div className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-              Exploração Global
+              <span>Exploração Global</span>
             </div>
             <h1 className="text-2xl font-bold text-white tracking-tight font-['Geist'] mt-0.5">
               Paletas da Comunidade
@@ -280,6 +273,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               onOpenInGenerator={() => onOpenInGenerator(palette.colors)}
               onSaveToCollection={() => onSaveToCollection(palette.colors)}
               onCopyTokens={() => handleCopyTokens(palette)}
+              onSendToAudit={onSendToAudit}
             />
           ))}
         </div>
@@ -287,7 +281,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         {/* Weekly Challenge Promo Banner (Exact from Image 1) */}
         <div className="my-8 rounded-xl bg-gradient-to-r from-[#181C24] via-[#1C2028] to-[#181C24] border border-white/[0.08] p-6 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-96 h-96 bg-[#6366F1]/5 rounded-full blur-3xl pointer-events-none" />
-          
+
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-[#262A33] border border-white/[0.08] flex items-center justify-center shrink-0 text-white shadow-inner">
               <Trophy className="w-6 h-6 text-[#06B6D4]" />
@@ -339,6 +333,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
               onOpenInGenerator={() => onOpenInGenerator(palette.colors)}
               onSaveToCollection={() => onSaveToCollection(palette.colors)}
               onCopyTokens={() => handleCopyTokens(palette)}
+              onSendToAudit={onSendToAudit}
             />
           ))}
         </div>
@@ -347,7 +342,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
         <div className="mt-12 flex flex-col items-center justify-center text-center">
           <button
             onClick={() => setVisibleCount(c => c + 4)}
-            className="h-11 px-6 rounded-xl bg-[#181C24] hover:bg-[#262A33] border border-white/[0.1] text-white text-xs font-medium flex items-center gap-2 transition-all hover:scale-[1.02] shadow-lg cursor-pointer"
+            className="h-11 px-6 rounded-xl bg-[#181C24] hover:bg-[#262A33] border border-white/[0.1] text-[#DFE2EE] hover:text-white text-xs font-medium flex items-center gap-2 transition-all hover:scale-[1.02] shadow-lg cursor-pointer"
           >
             <Sparkles className="w-4 h-4 text-[#06B6D4]" />
             <span>Carregar Mais Paletas da Comunidade</span>
@@ -371,6 +366,7 @@ interface PaletteCardProps {
   onOpenInGenerator: () => void;
   onSaveToCollection: () => void;
   onCopyTokens: () => void;
+  onSendToAudit: (colors: string[]) => void;
 }
 
 const PaletteCard: React.FC<PaletteCardProps> = ({
@@ -381,26 +377,48 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
   onFork,
   onOpenInGenerator,
   onSaveToCollection,
-  onCopyTokens
+  onCopyTokens,
+  onSendToAudit
 }) => {
   return (
     <div className="bg-[#181C24] border border-white/[0.08] rounded-xl overflow-hidden shadow-lg hover:border-white/[0.18] transition-all duration-200 flex flex-col group">
       {/* Color preview stripes (75% of card visual impact) */}
-      <div 
-        onClick={onOpenInGenerator}
+      <div
         className="h-44 sm:h-48 w-full flex cursor-pointer relative overflow-hidden"
-        title="Clique para abrir no Gerador"
+        title="Clique para abrir no Gerador | Shift+clique para Auditar Contraste"
       >
-        {palette.colors.map((c, i) => (
-          <div 
-            key={i} 
-            className="flex-1 h-full transition-transform hover:scale-105 duration-150 relative group/stripe" 
+        {palette.colors.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={(e) => {
+              if (e.shiftKey) {
+                e.stopPropagation();
+                onSendToAudit([c]);
+              } else {
+                onOpenInGenerator();
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                  e.stopPropagation();
+                  onSendToAudit([c]);
+                } else {
+                  onOpenInGenerator();
+                }
+              }
+            }}
+            className="flex-1 h-full transition-transform hover:scale-105 duration-150 relative group/stripe cursor-pointer border-0 p-0 appearance-none"
             style={{ backgroundColor: c }}
+            title={`${c} - Clique para abrir no Gerador (Shift+clique para auditar apenas esta cor)`}
+            aria-label={`${c} - Abrir no Gerador (Shift+clique para auditar apenas esta cor)`}
           >
-            <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono opacity-0 group-hover/stripe:opacity-100 bg-black/60 text-white px-1 py-0.5 rounded transition-opacity">
+            <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono opacity-0 group-hover/stripe:opacity-100 bg-black/60 text-white px-1 py-0.5 rounded transition-opacity pointer-events-none">
               {c}
             </span>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -418,11 +436,14 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
           )}
 
           <div className="flex items-center justify-between mb-1.5">
-            <h3 
-              onClick={onOpenInGenerator}
-              className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] transition-colors font-['Geist']"
-            >
-              {palette.title}
+            <h3 className="font-['Geist']">
+              <button
+                type="button"
+                onClick={onOpenInGenerator}
+                className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] transition-colors font-['Geist'] text-left"
+              >
+                {palette.title}
+              </button>
             </h3>
 
             {/* Like & Fork Counters */}
@@ -438,9 +459,8 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
 
               <button
                 onClick={onLike}
-                className={`flex items-center gap-1 text-xs font-mono transition-colors cursor-pointer ${
-                  isLiked ? 'text-[#EC4899]' : 'text-[#94A3B8] hover:text-white'
-                }`}
+                className={`flex items-center gap-1 text-xs font-mono transition-colors cursor-pointer ${isLiked ? 'text-[#EC4899]' : 'text-[#94A3B8] hover:text-white'
+                  }`}
               >
                 <Heart className={`w-3.5 h-3.5 ${isLiked ? 'fill-[#EC4899]' : ''}`} />
                 <span>{isLiked ? (palette.likes + 1).toLocaleString() : palette.likes.toLocaleString()}</span>
@@ -450,10 +470,10 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
 
           {/* Author */}
           <div className="flex items-center gap-2 mb-3">
-            <img 
-              src={palette.author.avatar} 
+            <img
+              src={palette.author.avatar}
               alt={palette.author.name}
-              className="w-4 h-4 rounded-full object-cover" 
+              className="w-4 h-4 rounded-full object-cover"
             />
             <span className="text-xs text-[#94A3B8] font-mono">{palette.author.handle}</span>
           </div>
@@ -464,9 +484,9 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
               <CheckCircle2 className="w-2.5 h-2.5" />
               {palette.wcagLevel}
             </span>
-            {palette.tags.map((t, idx) => (
-              <span 
-                key={idx} 
+            {palette.tags.map((t) => (
+              <span
+                key={t}
                 className="px-2 py-0.5 rounded-full bg-[#262A33] text-[#94A3B8] text-[10px]"
               >
                 {t}
@@ -497,6 +517,14 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
           </div>
 
           <div className="flex items-center gap-1">
+            <button
+              onClick={() => onSendToAudit(palette.colors)}
+              className="p-2 rounded-lg text-[#94A3B8] hover:text-[#06B6D4] hover:bg-[#262A33] transition-colors relative cursor-pointer"
+              title="Auditar Contraste & Daltonismo"
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+            </button>
+
             <button
               onClick={onSaveToCollection}
               className="p-2 rounded-lg text-[#94A3B8] hover:text-white hover:bg-[#262A33] transition-colors cursor-pointer"

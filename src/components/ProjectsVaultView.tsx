@@ -1,29 +1,21 @@
 import React, { useState } from 'react';
-import { 
-  Layers, 
-  Bookmark, 
-  Heart, 
-  Plus, 
-  Code, 
-  Trash2, 
-  Sparkles, 
-  Lock, 
-  Globe, 
-  Sliders, 
-  Copy, 
-  Check, 
-  FolderPlus,
-  Tag,
+import {
+  Layers,
+  Bookmark,
+  Plus,
+  Trash2,
+  Sparkles,
+  Lock,
+  Globe,
+  Copy,
+  Check,
   Download,
   ShieldCheck,
   Palette as PaletteIcon,
-  ArrowRight,
   PlusCircle,
-  FileText,
-  ExternalLink
+  FileText
 } from 'lucide-react';
 import { ProjectWorkspace, ProjectPalette, CollectionBoard, FavoriteColor, VaultPalette } from '../types';
-import { exportCssTokens, getColorDetails } from '../utils/colorUtils';
 
 interface ProjectsVaultViewProps {
   projects: ProjectWorkspace[];
@@ -41,6 +33,7 @@ interface ProjectsVaultViewProps {
   onCreateCollection: (collection: CollectionBoard) => void;
   onDeleteFavoriteColor: (id: string) => void;
   onDeleteCollection: (id: string) => void;
+  onSendToAudit: (colors: string[]) => void;
 }
 
 export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
@@ -58,7 +51,8 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
   onDeleteVaultPalette,
   onCreateCollection,
   onDeleteFavoriteColor,
-  onDeleteCollection
+  onDeleteCollection,
+  onSendToAudit
 }) => {
   const [activeTab, setActiveTab] = useState<'projects' | 'collections' | 'favorites'>('projects');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -100,7 +94,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
     setTimeout(() => setCopiedId(null), 1500);
   };
 
-  const handleCreateProjectSubmit = (e: React.FormEvent) => {
+  const handleCreateProjectSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newProjectName.trim()) return;
     const newProj: ProjectWorkspace = {
@@ -140,7 +134,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
     setNewProjectDesc('');
   };
 
-  const handleAddPaletteToProjectSubmit = (e: React.FormEvent) => {
+  const handleAddPaletteToProjectSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!targetProjectId || !newPaletteName.trim()) return;
 
@@ -151,8 +145,8 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
       .filter(c => /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(c))
       .map(c => c.toUpperCase());
 
-    const colorsToUse = parsedColors.length > 0 
-      ? parsedColors 
+    const colorsToUse = parsedColors.length > 0
+      ? parsedColors
       : ['#08BBD9', '#3B82F6', '#9354F5', '#FF2A85', '#10B981'];
 
     const newPal: ProjectPalette = {
@@ -172,7 +166,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
     setNewPaletteColorsInput('#08BBD9, #3B82F6, #9354F5, #FF2A85, #10B981');
   };
 
-  const handleSaveVaultPaletteSubmit = (e: React.FormEvent) => {
+  const handleSaveVaultPaletteSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newVaultTitle.trim()) return;
 
@@ -182,8 +176,8 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
       .filter(c => /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(c))
       .map(c => c.toUpperCase());
 
-    const colorsToUse = parsedColors.length > 0 
-      ? parsedColors 
+    const colorsToUse = parsedColors.length > 0
+      ? parsedColors
       : ['#0B0F17', '#181C24', '#08BBD9', '#6366F1', '#EC4899'];
 
     const newVaultPal: VaultPalette = {
@@ -205,7 +199,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
     setNewVaultNotes('');
   };
 
-  const handleCreateCollectionSubmit = (e: React.FormEvent) => {
+  const handleCreateCollectionSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newColTitle.trim()) return;
     const newCol: CollectionBoard = {
@@ -232,7 +226,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-            Gerenciamento de Paletas & Tokens
+            {' '}Gerenciamento de Paletas & Tokens
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-['Geist'] mt-1">
             Projetos, Coleções & Cofre Privado
@@ -293,11 +287,10 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
       <div className="flex items-center gap-2 border-b border-white/[0.08] mb-8 overflow-x-auto pb-1">
         <button
           onClick={() => setActiveTab('projects')}
-          className={`px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'projects'
-              ? 'bg-[#181C24] text-white border border-white/[0.12] shadow-sm'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${activeTab === 'projects'
+            ? 'bg-[#181C24] text-white border border-white/[0.12] shadow-sm'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <Layers className="w-4 h-4 text-[#6366F1]" />
           <span>Projetos & Design Systems</span>
@@ -308,11 +301,10 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
         <button
           onClick={() => setActiveTab('collections')}
-          className={`px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'collections'
-              ? 'bg-[#181C24] text-white border border-white/[0.12] shadow-sm'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${activeTab === 'collections'
+            ? 'bg-[#181C24] text-white border border-white/[0.12] shadow-sm'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <Bookmark className="w-4 h-4 text-[#06B6D4]" />
           <span>Coleções & Moodboards</span>
@@ -323,11 +315,10 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
         <button
           onClick={() => setActiveTab('favorites')}
-          className={`px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${
-            activeTab === 'favorites'
-              ? 'bg-[#181C24] text-white border border-white/[0.12] shadow-sm'
-              : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-          }`}
+          className={`px-4 py-2.5 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer ${activeTab === 'favorites'
+            ? 'bg-[#181C24] text-white border border-white/[0.12] shadow-sm'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
         >
           <Lock className="w-4 h-4 text-amber-400" />
           <span>Cofre Privado (Vault)</span>
@@ -460,6 +451,13 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                               >
                                 <Download className="w-3.5 h-3.5" />
                               </button>
+                              <button
+                                onClick={() => onSendToAudit(pal.colors)}
+                                className="p-1 text-[#94A3B8] hover:text-[#06B6D4] transition-colors cursor-pointer"
+                                title="Auditar Contraste & Daltonismo"
+                              >
+                                <ShieldCheck className="w-3.5 h-3.5" />
+                              </button>
                               {onDeletePaletteFromProject && (
                                 <button
                                   onClick={() => onDeletePaletteFromProject(proj.id, pal.id)}
@@ -475,17 +473,19 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                           {/* Palette color strip */}
                           <div className="h-10 rounded-lg overflow-hidden flex shadow-inner border border-white/10">
                             {pal.colors.map((hex, i) => (
-                              <div
-                                key={i}
+                              <button
+                                key={`${pal.id}-${hex}-${i}`}
+                                type="button"
                                 onClick={() => handleCopy(hex, hex)}
-                                className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/color"
+                                className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/color border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4] focus-visible:ring-inset"
                                 style={{ backgroundColor: hex }}
                                 title={`${hex} - Clique para copiar`}
+                                aria-label={`Copiar cor ${hex}`}
                               >
-                                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono font-bold opacity-0 group-hover/color:opacity-100 bg-black/60 text-white transition-opacity">
+                                <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono font-bold opacity-0 group-hover/color:opacity-100 group-focus-visible/color:opacity-100 bg-black/60 text-white transition-opacity">
                                   {copiedId === hex ? '✓' : hex}
                                 </span>
-                              </div>
+                              </button>
                             ))}
                           </div>
 
@@ -513,10 +513,12 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                     </span>
                     <div className="grid grid-cols-3 gap-2">
                       {proj.primaryColors.map((hex, i) => (
-                        <div
-                          key={i}
+                        <button
+                          key={`${proj.id}-primary-${hex}-${i}`}
+                          type="button"
                           onClick={() => handleCopy(hex, hex)}
-                          className="p-2.5 rounded-lg border border-white/[0.06] bg-[#111827] flex items-center gap-2.5 cursor-pointer hover:border-white/20 transition-all group"
+                          className="p-2.5 rounded-lg border border-white/[0.06] bg-[#111827] flex items-center gap-2.5 cursor-pointer hover:border-white/20 transition-all group text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4]"
+                          aria-label={`Copiar cor ${hex}`}
                         >
                           <div className="w-6 h-6 rounded-md shrink-0 border border-white/10" style={{ backgroundColor: hex }} />
                           <div className="truncate">
@@ -525,7 +527,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                             </span>
                             <span className="text-[10px] text-[#64748B] font-mono">primary-{i + 1}</span>
                           </div>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -536,17 +538,19 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                     </span>
                     <div className="h-10 rounded-lg overflow-hidden flex shadow-inner border border-white/10">
                       {proj.neutralGrays.map((hex, i) => (
-                        <div
-                          key={i}
+                        <button
+                          key={`${proj.id}-neutral-${hex}-${i}`}
+                          type="button"
                           onClick={() => handleCopy(hex, hex)}
-                          className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/neu"
+                          className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/neu border-0 p-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4] focus-visible:ring-inset"
                           style={{ backgroundColor: hex }}
                           title={`${hex} - Clique para copiar`}
+                          aria-label={`Copiar cor ${hex}`}
                         >
-                          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono opacity-0 group-hover/neu:opacity-100 bg-black/60 text-white transition-opacity">
+                          <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono opacity-0 group-hover/neu:opacity-100 group-focus-visible/neu:opacity-100 bg-black/60 text-white transition-opacity">
                             {copiedId === hex ? '✓' : hex}
                           </span>
-                        </div>
+                        </button>
                       ))}
                     </div>
                   </div>
@@ -566,25 +570,29 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               className="bg-[#181C24] border border-white/[0.08] rounded-xl overflow-hidden shadow-xl flex flex-col justify-between group hover:border-white/20 transition-all"
             >
               {/* Color Stripes Header */}
-              <div 
+              <button
+                type="button"
                 onClick={() => onOpenInGenerator(col.coverColors)}
-                className="h-32 w-full flex cursor-pointer"
+                className="h-32 w-full flex cursor-pointer border-0 p-0 bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4] focus-visible:ring-inset"
                 title="Clique para abrir no Gerador"
+                aria-label={`Abrir a coleção ${col.title} no Gerador`}
               >
                 {col.coverColors.map((c, i) => (
-                  <div key={i} className="flex-1 h-full transition-transform hover:scale-105" style={{ backgroundColor: c }} />
+                  <div key={`${col.id}-cover-${c}-${i}`} className="flex-1 h-full transition-transform hover:scale-105" style={{ backgroundColor: c }} />
                 ))}
-              </div>
+              </button>
 
               <div className="p-5 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <h3 
+                    <button
+                      type="button"
                       onClick={() => onOpenInGenerator(col.coverColors)}
-                      className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] font-['Geist']"
+                      className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] font-['Geist'] bg-transparent border-0 p-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4] rounded"
+                      aria-label={`Abrir a coleção ${col.title} no Gerador`}
                     >
                       {col.title}
-                    </h3>
+                    </button>
                     {col.isPrivate ? (
                       <span className="text-[#94A3B8] p-1 bg-white/[0.04] rounded" title="Coleção Privada">
                         <Lock className="w-3.5 h-3.5" />
@@ -602,8 +610,8 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
                   {/* Tags */}
                   <div className="flex flex-wrap gap-1.5 mb-4">
-                    {col.tags.map((t, idx) => (
-                      <span key={idx} className="px-2 py-0.5 rounded-full bg-[#111827] text-[#94A3B8] text-[10px] font-mono">
+                    {col.tags.map((t) => (
+                      <span key={`${col.id}-tag-${t}`} className="px-2 py-0.5 rounded-full bg-[#111827] text-[#94A3B8] text-[10px] font-mono">
                         #{t}
                       </span>
                     ))}
@@ -619,6 +627,14 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                       className="h-7 px-2.5 rounded bg-[#6366F1] hover:bg-[#5254E0] text-white text-[11px] font-medium transition-colors cursor-pointer"
                     >
                       Abrir
+                    </button>
+                    <button
+                      onClick={() => onSendToAudit(col.coverColors)}
+                      className="h-7 px-2.5 rounded bg-[#181C24] hover:bg-[#262A33] text-[#06B6D4] hover:text-white text-[11px] font-medium transition-colors border border-[#06B6D4]/30 flex items-center gap-1 cursor-pointer"
+                      title="Auditar Contraste & Daltonismo"
+                    >
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      <span>Auditar</span>
                     </button>
                     <button
                       onClick={() => onDeleteCollection(col.id)}
@@ -683,31 +699,28 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
             <div className="flex items-center gap-2 border-b border-white/[0.06] pb-3 mb-6">
               <button
                 onClick={() => setVaultFilter('all')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  vaultFilter === 'all'
-                    ? 'bg-amber-400/10 text-amber-300 font-semibold border border-amber-400/30'
-                    : 'text-[#94A3B8] hover:text-white'
-                }`}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${vaultFilter === 'all'
+                  ? 'bg-amber-400/10 text-amber-300 font-semibold border border-amber-400/30'
+                  : 'text-[#94A3B8] hover:text-white'
+                  }`}
               >
                 Todas as Entradas ({vaultPalettes.length + favoriteColors.length})
               </button>
               <button
                 onClick={() => setVaultFilter('palettes')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  vaultFilter === 'palettes'
-                    ? 'bg-amber-400/10 text-amber-300 font-semibold border border-amber-400/30'
-                    : 'text-[#94A3B8] hover:text-white'
-                }`}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${vaultFilter === 'palettes'
+                  ? 'bg-amber-400/10 text-amber-300 font-semibold border border-amber-400/30'
+                  : 'text-[#94A3B8] hover:text-white'
+                  }`}
               >
                 Paletas Inteiras ({vaultPalettes.length})
               </button>
               <button
                 onClick={() => setVaultFilter('swatches')}
-                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
-                  vaultFilter === 'swatches'
-                    ? 'bg-amber-400/10 text-amber-300 font-semibold border border-amber-400/30'
-                    : 'text-[#94A3B8] hover:text-white'
-                }`}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer ${vaultFilter === 'swatches'
+                  ? 'bg-amber-400/10 text-amber-300 font-semibold border border-amber-400/30'
+                  : 'text-[#94A3B8] hover:text-white'
+                  }`}
               >
                 Amostras Individuais ({favoriteColors.length})
               </button>
@@ -773,17 +786,19 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                           {/* Color strip */}
                           <div className="h-12 rounded-lg overflow-hidden flex border border-white/10 shadow-inner">
                             {pal.colors.map((hex, i) => (
-                              <div
-                                key={i}
+                              <button
+                                key={`${pal.id}-${hex}-${i}`}
+                                type="button"
                                 onClick={() => handleCopy(hex, hex)}
-                                className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/c"
+                                className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/c focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-inset"
                                 style={{ backgroundColor: hex }}
                                 title={`${hex} - Clique para copiar`}
+                                aria-label={`Copiar cor ${hex}`}
                               >
-                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold opacity-0 group-hover/c:opacity-100 bg-black/60 text-white transition-opacity">
+                                <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold opacity-0 group-hover/c:opacity-100 group-focus-visible/c:opacity-100 bg-black/60 text-white transition-opacity">
                                   {copiedId === hex ? '✓' : hex}
                                 </span>
-                              </div>
+                              </button>
                             ))}
                           </div>
 
@@ -796,8 +811,8 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
                           {pal.tags && pal.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
-                              {pal.tags.map((t, idx) => (
-                                <span key={idx} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] text-[#94A3B8] font-mono">
+                              {pal.tags.map((t) => (
+                                <span key={`${pal.id}-tag-${t}`} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] text-[#94A3B8] font-mono">
                                   #{t}
                                 </span>
                               ))}
@@ -820,6 +835,14 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                               className="px-2 py-1 rounded bg-[#181C24] hover:bg-white/[0.08] text-[#94A3B8] hover:text-white text-[11px] font-medium transition-colors cursor-pointer"
                             >
                               Exportar
+                            </button>
+                            <button
+                              onClick={() => onSendToAudit(pal.colors)}
+                              className="px-2 py-1 rounded bg-[#181C24] hover:bg-[#262A33] text-[#06B6D4] hover:text-white text-[11px] font-medium transition-colors border border-[#06B6D4]/30 flex items-center gap-1 cursor-pointer"
+                              title="Auditar Contraste & Daltonismo"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5" />
+                              <span>Auditar</span>
                             </button>
                             <button
                               onClick={() => onOpenInGenerator(pal.colors)}
@@ -866,8 +889,8 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                             {fav.note}
                           </p>
                           <div className="flex flex-wrap gap-1 mt-2">
-                            {fav.tags.map((t, idx) => (
-                              <span key={idx} className="px-1.5 py-0.2 rounded bg-white/[0.06] text-[10px] text-[#06B6D4] font-mono">
+                            {fav.tags.map((t) => (
+                              <span key={`${fav.id}-tag-${t}`} className="px-1.5 py-0.2 rounded bg-white/[0.06] text-[10px] text-[#06B6D4] font-mono">
                                 {t}
                               </span>
                             ))}
@@ -876,6 +899,13 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                       </div>
 
                       <div className="flex flex-col items-end gap-2 shrink-0">
+                        <button
+                          onClick={() => onSendToAudit([fav.hex])}
+                          className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] text-[#94A3B8] hover:text-[#06B6D4] transition-colors cursor-pointer"
+                          title="Auditar Contraste & Daltonismo"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5" />
+                        </button>
                         <button
                           onClick={() => handleCopy(fav.id, fav.hex)}
                           className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
@@ -911,8 +941,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
             <form onSubmit={handleAddPaletteToProjectSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Selecione o Projeto:</label>
+                <label htmlFor="add-palette-project" className="text-xs font-mono text-[#94A3B8] block mb-1">Selecione o Projeto:</label>
                 <select
+                  id="add-palette-project"
                   value={targetProjectId}
                   onChange={(e) => setTargetProjectId(e.target.value)}
                   className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
@@ -926,8 +957,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Nome da Paleta:</label>
+                <label htmlFor="add-palette-name" className="text-xs font-mono text-[#94A3B8] block mb-1">Nome da Paleta:</label>
                 <input
+                  id="add-palette-name"
                   type="text"
                   required
                   placeholder="Ex: Escala de Acentos & Gráficos"
@@ -939,8 +971,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-mono text-[#94A3B8] block mb-1">Função / Papel no Sistema:</label>
+                  <label htmlFor="add-palette-role" className="text-xs font-mono text-[#94A3B8] block mb-1">Função / Papel no Sistema:</label>
                   <select
+                    id="add-palette-role"
                     value={newPaletteRole}
                     onChange={(e) => setNewPaletteRole(e.target.value as any)}
                     className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
@@ -955,8 +988,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                 </div>
 
                 <div>
-                  <label className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição Breve:</label>
+                  <label htmlFor="add-palette-desc" className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição Breve:</label>
                   <input
+                    id="add-palette-desc"
                     type="text"
                     placeholder="Ex: Utilizada em relatórios e CTAs"
                     value={newPaletteDesc}
@@ -967,10 +1001,11 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">
+                <label htmlFor="add-palette-colors" className="text-xs font-mono text-[#94A3B8] block mb-1">
                   Cores HEX da Paleta (separadas por vírgula):
                 </label>
                 <input
+                  id="add-palette-colors"
                   type="text"
                   required
                   placeholder="#08BBD9, #3B82F6, #9354F5, #FF2A85, #10B981"
@@ -1011,8 +1046,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
             <form onSubmit={handleSaveVaultPaletteSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Título da Paleta:</label>
+                <label htmlFor="new-vault-title" className="text-xs font-mono text-[#94A3B8] block mb-1">Título da Paleta:</label>
                 <input
+                  id="new-vault-title"
                   type="text"
                   required
                   placeholder="Ex: Obsidian Quantum High Contrast"
@@ -1023,8 +1059,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição / Contexto:</label>
+                <label htmlFor="new-vault-desc" className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição / Contexto:</label>
                 <input
+                  id="new-vault-desc"
                   type="text"
                   placeholder="Ex: Paleta balanceada para interfaces escuras"
                   value={newVaultDesc}
@@ -1034,10 +1071,11 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">
+                <label htmlFor="new-vault-colors" className="text-xs font-mono text-[#94A3B8] block mb-1">
                   Cores HEX da Paleta (separadas por vírgula):
                 </label>
                 <input
+                  id="new-vault-colors"
                   type="text"
                   required
                   placeholder="#0B0F17, #181C24, #08BBD9, #6366F1, #EC4899"
@@ -1048,8 +1086,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Tags (separadas por vírgula):</label>
+                <label htmlFor="new-vault-tags" className="text-xs font-mono text-[#94A3B8] block mb-1">Tags (separadas por vírgula):</label>
                 <input
+                  id="new-vault-tags"
                   type="text"
                   placeholder="Dark Mode, Oklch, UI"
                   value={newVaultTags}
@@ -1059,8 +1098,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Notas Técnicas de Uso:</label>
+                <label htmlFor="new-vault-notes" className="text-xs font-mono text-[#94A3B8] block mb-1">Notas Técnicas de Uso:</label>
                 <textarea
+                  id="new-vault-notes"
                   rows={2}
                   placeholder="Ex: Usar a cor 1 no fundo e a 3 para foco ativo..."
                   value={newVaultNotes}
@@ -1098,8 +1138,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
             </h3>
             <form onSubmit={handleCreateProjectSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Nome do Projeto:</label>
+                <label htmlFor="new-project-name" className="text-xs font-mono text-[#94A3B8] block mb-1">Nome do Projeto:</label>
                 <input
+                  id="new-project-name"
                   type="text"
                   required
                   placeholder="Ex: Banco Neon Mobile System"
@@ -1109,8 +1150,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                 />
               </div>
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Cliente ou Marca:</label>
+                <label htmlFor="new-project-client" className="text-xs font-mono text-[#94A3B8] block mb-1">Cliente ou Marca:</label>
                 <input
+                  id="new-project-client"
                   type="text"
                   placeholder="Ex: Fintech Alpha"
                   value={newProjectClient}
@@ -1119,8 +1161,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                 />
               </div>
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição do Sistema:</label>
+                <label htmlFor="new-project-desc" className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição do Sistema:</label>
                 <textarea
+                  id="new-project-desc"
                   rows={3}
                   placeholder="Objetivos de acessibilidade, público-alvo e regras cromáticas..."
                   value={newProjectDesc}
@@ -1157,8 +1200,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
             </h3>
             <form onSubmit={handleCreateCollectionSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Título da Coleção:</label>
+                <label htmlFor="new-collection-title" className="text-xs font-mono text-[#94A3B8] block mb-1">Título da Coleção:</label>
                 <input
+                  id="new-collection-title"
                   type="text"
                   required
                   placeholder="Ex: Gráficos de Dados Biológicos"
@@ -1168,8 +1212,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                 />
               </div>
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição:</label>
+                <label htmlFor="new-collection-desc" className="text-xs font-mono text-[#94A3B8] block mb-1">Descrição:</label>
                 <textarea
+                  id="new-collection-desc"
                   rows={2}
                   placeholder="Contexto ou humor das paletas..."
                   value={newColDesc}
@@ -1178,8 +1223,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                 />
               </div>
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Tags (separadas por vírgula):</label>
+                <label htmlFor="new-collection-tags" className="text-xs font-mono text-[#94A3B8] block mb-1">Tags (separadas por vírgula):</label>
                 <input
+                  id="new-collection-tags"
                   type="text"
                   placeholder="Bio, Oklch, Dark Mode, Dados"
                   value={newColTags}

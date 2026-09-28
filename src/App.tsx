@@ -145,8 +145,9 @@ export function App() {
     };
   });
 
-  // Generator Seed State
+  // Generator Seed & Audit State
   const [generatorSeed, setGeneratorSeed] = useState<string[]>(['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85']);
+  const [auditColors, setAuditColors] = useState<string[]>([]);
 
   // Modals state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -277,6 +278,12 @@ export function App() {
   const handleOpenInGenerator = (colors: string[]) => {
     setGeneratorSeed(colors);
     setCurrentTab('generator');
+  };
+
+  // Send palette or swatches to Accessibility Audit View
+  const handleSendToAudit = (colors: string[]) => {
+    setAuditColors(colors);
+    setCurrentTab('accessibility');
   };
 
   // Open Export Modal with given or default colors
@@ -612,6 +619,7 @@ export function App() {
               onLikePalette={handleLikePalette}
               onForkPalette={handleForkPalette}
               onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
+              onSendToAudit={handleSendToAudit}
             />
           )}
 
@@ -643,7 +651,7 @@ export function App() {
 
           {currentTab === 'accessibility' && (
             <AccessibilityView
-              initialColors={generatorSeed}
+              initialColors={auditColors.length > 0 ? auditColors : generatorSeed}
               onOpenInGenerator={handleOpenInGenerator}
             />
           )}
@@ -668,6 +676,7 @@ export function App() {
               onDeleteVaultPalette={handleDeleteVaultPalette}
               onDeleteFavoriteColor={handleDeleteFavoriteColor}
               onDeleteCollection={handleDeleteCollection}
+              onSendToAudit={handleSendToAudit}
             />
           )}
 
