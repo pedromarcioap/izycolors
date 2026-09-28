@@ -6,9 +6,12 @@ import {
   Plus,
   Award,
   X,
-  Check
+  Check,
+  Sparkles
 } from 'lucide-react';
 import { CmsArticle, CommunitySubmission } from '../types';
+import { ArticleAiAssistantModal } from './ArticleAiAssistantModal';
+import { AiArticleResponse, slugifyArticle } from '../services/aiArticleService';
 
 interface CmsAdminViewProps {
   articles: CmsArticle[];
@@ -39,6 +42,9 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
   const [newCategory, setNewCategory] = useState('Teoria da Cor');
   const [newSummary, setNewSummary] = useState('');
   const [newContent, setNewContent] = useState('');
+  const [newSlug, setNewSlug] = useState('');
+  const [newMetaDescription, setNewMetaDescription] = useState('');
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
 
   // New Tag State
   const [newTagName, setNewTagName] = useState('');
@@ -50,7 +56,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
     const article: CmsArticle = {
       id: `art-${Date.now()}`,
       title: newTitle,
-      slug: newTitle.toLowerCase().replace(/\s+/g, '-'),
+      slug: newSlug.trim() || slugifyArticle(newTitle),
       category: newCategory as CmsArticle['category'],
       summary: newSummary,
       content: newContent || newSummary,
@@ -59,13 +65,25 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
       status: 'Publicado',
       featured: false,
       publishedAt: 'Hoje',
-      views: 1
+      views: 1,
+      metaDescription: newMetaDescription.trim() || undefined
     };
     onCreateArticle(article);
     setShowArticleModal(false);
     setNewTitle('');
     setNewSummary('');
     setNewContent('');
+    setNewSlug('');
+    setNewMetaDescription('');
+  };
+
+  // Preenche o formulário do CMS com o artigo gerado pelo assistente de IA.
+  const handleApplyAiResult = (result: AiArticleResponse) => {
+    setNewTitle(result.title);
+    setNewSlug(result.slug || slugifyArticle(result.title));
+    setNewSummary(result.excerpt);
+    setNewMetaDescription(result.metaDescription);
+    setNewContent(result.content);
   };
 
   const handleAddTagSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
@@ -480,8 +498,32 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                   required
                   placeholder="Ex: Como calibrar matrizes de contraste no Figma"
                   value={newTitle}
-                  onChange={(e) => setNewTitle(e.target.value)}
+                  onChange={(e) => {
+                    setNewTitle(e.target.value);
+                    if (!newSlug) setNewSlug(slugifyArticle(e.target.value));
+                  }}
                   className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAiAssistant(true)}
+                className="w-full h-10 rounded-lg bg-gradient-to-r from-[#6366F1] to-[#06B6D4] hover:opacity-95 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-600/25 transition-all active:scale-[0.99]"
+              >
+                <Sparkles className="w-4 h-4" />
+                Escrever com Assistente IA
+              </button>
+
+              <div>
+                <label htmlFor="article-slug" className="text-xs font-mono text-[#94A3B8] block mb-1">Slug (URL amigável):</label>
+                <input
+                  id="article-slug"
+                  type="text"
+                  placeholder="como-calibrar-matrizes-de-contraste"
+                  value={newSlug}
+                  onChange={(e) => setNewSlug(e.target.value)}
+                  className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white font-mono focus:outline-none focus:border-[#6366F1]"
                 />
               </div>
 
@@ -511,6 +553,22 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                   onChange={(e) => setNewSummary(e.target.value)}
                   className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="article-meta-description" className="text-xs font-mono text-[#94A3B8] block mb-1">Meta Description (SEO — máx. 160 caracteres):</label>
+                <input
+                  id="article-meta-description"
+                  type="text"
+                  maxLength={160}
+                  placeholder="Descrição concisa para mecanismos de busca..."
+                  value={newMetaDescription}
+                  onChange={(e) => setNewMetaDescription(e.target.value)}
+                  className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                />
+                <span className="text-[10px] font-mono text-[#64748B] mt-1 block">
+                  {newMetaDescription.length}/160
+                </span>
               </div>
 
               <div>
@@ -544,6 +602,13 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Assistente Editorial IA */}
+      <ArticleAiAssistantModal
+        isOpen={showAiAssistant}
+        onClose={() => setShowAiAssistant(false)}
+        onApply={handleApplyAiResult}
+      />
     </div>
   );
 };

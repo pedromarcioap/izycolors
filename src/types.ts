@@ -1,5 +1,11 @@
 export type ColorGamut = 'sRGB' | 'Display P3' | 'Rec.2020';
 
+/** Supported color representation formats for token export. */
+export type ColorFormat = 'OKLCH' | 'HEX' | 'RGB' | 'HSL';
+
+/** Supported naming conventions for generated CSS variables. */
+export type NamingConvention = 'kebab-case' | 'camelCase' | 'snake_case';
+
 export type ColorBlindnessType = 'protanopia' | 'deuteranopia' | 'tritanopia' | 'achromatopsia';
 
 export type UserRole = 'admin' | 'moderator' | 'editor' | 'pro' | 'user';
@@ -168,6 +174,7 @@ export interface CmsArticle {
   slug: string;
   category: 'Teoria da Cor' | 'Design Systems' | 'Acessibilidade' | 'Tendências' | 'Estudos de Caso';
   summary: string;
+  metaDescription?: string;
   content: string;
   author: string;
   readTime: string;
@@ -214,9 +221,9 @@ export interface UserProfile {
     editorialFeaturedCount: number;
   };
   exportPreferences: {
-    defaultFormat: 'HEX' | 'RGB' | 'HSL' | 'OKLCH';
+    defaultFormat: ColorFormat;
     variablePrefix: string;
-    namingConvention: 'kebab-case' | 'camelCase' | 'snake_case';
+    namingConvention: NamingConvention;
     includeComments: boolean;
   };
 }

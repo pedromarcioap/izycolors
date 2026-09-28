@@ -17,6 +17,7 @@ import { ExportModal } from './components/ExportModal';
 import { SubmitPaletteModal } from './components/SubmitPaletteModal';
 import { SavePaletteModal } from './components/SavePaletteModal';
 import { WorkflowDock } from './components/WorkflowDock';
+import { AvatarEditorModal } from './components/AvatarEditorModal';
 
 import {
   NavigationTab,
@@ -54,8 +55,18 @@ import {
   deleteCuratedImage,
   resetCuratedImages,
   recordPaletteFork,
-  isSupabaseConfigured
+  isSupabaseConfigured,
+  getSupabaseClient
 } from './services/supabase';
+
+import {
+  uploadUserAvatar,
+  removeUserAvatar,
+  updateProfileAvatar,
+  processAvatarImage,
+  blobToDataUrl,
+  getInitialsAvatarUrl
+} from './services/avatarService';
 
 import {
   getStoredUsers,
@@ -77,7 +88,8 @@ import {
   Eye,
   Disc3,
   SlidersHorizontal,
-  Bookmark
+  Bookmark,
+  AlertTriangle
 } from 'lucide-react';
 
 const DEFAULT_PALETTE = ['#1A1A1A', '#2563EB', '#38BDF8', '#F1F5F9', '#FFFFFF'];
@@ -312,13 +324,82 @@ export function App() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSavePaletteModalOpen, setIsSavePaletteModalOpen] = useState(false);
+  const [isAvatarEditorOpen, setIsAvatarEditorOpen] = useState(false);
   const [savePaletteModalTitle, setSavePaletteModalTitle] = useState<string>('Nova Paleta Harmônica');
-  const [notificationToast, setNotificationToast] = useState<string | null>(null);
+  const [notificationToast, setNotificationToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const showToast = useCallback((msg: string) => {
-    setNotificationToast(msg);
+  const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
+    setNotificationToast({ message, type });
     setTimeout(() => setNotificationToast(null), 3500);
   }, []);
+
+  // Propaga o novo avatar para todos os pontos da interface (cabeçalho, menu lateral e perfil).
+  const applyAvatarChange = (avatarUrl: string | null) => {
+    const fallbackAvatar = getInitialsAvatarUrl(authUser.email || authUser.name || 'user');
+    const nextAvatar = avatarUrl || fallbackAvatar;
+
+    const nextUser: AuthUser = { ...authUser, avatar: nextAvatar };
+    setAuthUser(nextUser);
+    setCurrentAuthUser(nextUser);
+
+    const updatedUsers = usersList.map(user => (user.id === nextUser.id ? nextUser : user));
+    setUsersList(updatedUsers);
+    saveStoredUsers(updatedUsers);
+
+    setUserProfile(prev => ({ ...prev, avatar: nextAvatar }));
+  };
+
+  // Envia (ou persiste localmente) o novo avatar, mantendo o anterior em caso de falha.
+  const handleSaveAvatar = async (file: File) => {
+    const supabase = getSupabaseClient();
+    let hasSupabaseSession = false;
+
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        hasSupabaseSession = Boolean(data.session);
+      } catch {
+        hasSupabaseSession = false;
+      }
+    }
+
+    let nextAvatar: string | null = null;
+
+    if (supabase && hasSupabaseSession) {
+      nextAvatar = await uploadUserAvatar(file);
+      await updateProfileAvatar(nextAvatar);
+    } else {
+      // Fallback local para contas fora da nuvem: imagem processada persiste como Data URL.
+      const blob = await processAvatarImage(file);
+      nextAvatar = await blobToDataUrl(blob);
+    }
+
+    applyAvatarChange(nextAvatar);
+    showToast('Foto do perfil atualizada com sucesso.');
+  };
+
+  // Remove o avatar existente (mantendo o anterior em caso de falha no envio).
+  const handleRemoveAvatar = async () => {
+    const supabase = getSupabaseClient();
+    let hasSupabaseSession = false;
+
+    if (supabase) {
+      try {
+        const { data } = await supabase.auth.getSession();
+        hasSupabaseSession = Boolean(data.session);
+      } catch {
+        hasSupabaseSession = false;
+      }
+    }
+
+    if (supabase && hasSupabaseSession) {
+      await removeUserAvatar();
+      await updateProfileAvatar(null);
+    }
+
+    applyAvatarChange(null);
+    showToast('Foto do perfil removida.');
+  };
 
   // Load curated images and sync active auth session on mount
   useEffect(() => {
@@ -754,10 +835,19 @@ export function App() {
 
         {/* Floating Toast Notification */}
         {notificationToast && (
-          <div className="fixed top-20 right-6 z-50 bg-[#141A24] border border-[#06B6D4]/40 text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top-4">
-            <Check className="w-4 h-4 text-[#06B6D4] shrink-0" />
-            <span>{notificationToast}</span>
-          </div>
+          <output
+            className={`fixed top-20 right-6 z-50 bg-[#141A24] text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top-4 ${notificationToast.type === 'error'
+              ? 'border border-red-500/50'
+              : 'border border-[#06B6D4]/40'
+              }`}
+          >
+            {notificationToast.type === 'error' ? (
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+            ) : (
+              <Check className="w-4 h-4 text-[#06B6D4] shrink-0" />
+            )}
+            <span>{notificationToast.message}</span>
+          </output>
         )}
 
         {/* Main Studio Views Router */}
@@ -984,6 +1074,7 @@ export function App() {
               }}
               onDeleteVaultPalette={handleDeleteVaultPalette}
               onOpenAuthModal={() => setIsAuthModalOpen(true)}
+              onOpenAvatarEditor={() => setIsAvatarEditorOpen(true)}
               onLogout={handleLogout}
               onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
               isSupabaseConnected={isSupabaseConnected}
@@ -1074,6 +1165,16 @@ export function App() {
         onLogout={handleLogout}
         onNavigateToAdmin={() => setCurrentTab('admin')}
         onNavigateToUserPortal={() => setCurrentTab('user_dashboard')}
+      />
+
+      {/* Avatar Upload / Change / Remove Modal */}
+      <AvatarEditorModal
+        isOpen={isAvatarEditorOpen}
+        currentAvatar={authUser.avatar}
+        userName={authUser.name}
+        onClose={() => setIsAvatarEditorOpen(false)}
+        onSaveAvatar={handleSaveAvatar}
+        onRemoveAvatar={handleRemoveAvatar}
       />
     </div>
   );
