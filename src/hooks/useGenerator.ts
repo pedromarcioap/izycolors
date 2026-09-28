@@ -70,7 +70,7 @@ export function useGenerator(options: UseGeneratorOptions = {}) {
 
   // Unified generation function taking seed colors, mood keywords & harmony rules into account
   const generatePalette = useCallback((overrideMood?: string) => {
-    const activeMood = overrideMood !== undefined ? overrideMood : moodKeyword;
+    const activeMood = overrideMood ?? moodKeyword;
 
     setColors(prev => {
       let newHexes: string[] = [];

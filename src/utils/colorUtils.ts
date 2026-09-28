@@ -7,7 +7,7 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } {
   if (cleanHex.length === 3) {
     fullHex = cleanHex.split('').map(c => c + c).join('');
   }
-  const num = parseInt(fullHex, 16);
+  const num = Number.parseInt(fullHex, 16);
   return {
     r: (num >> 16) & 255,
     g: (num >> 8) & 255,
@@ -167,7 +167,7 @@ export function rgbToLab(r: number, g: number, b: number): { l: number; a: numbe
 
 // Convert LAB to LCH
 export function labToLch(l: number, a: number, b: number): { l: number; c: number; h: number } {
-  const c = Math.sqrt(a * a + b * b);
+  const c = Math.hypot(a, b);
   let h = Math.atan2(b, a) * (180 / Math.PI);
   if (h < 0) h += 360;
   return {
@@ -198,7 +198,7 @@ export function rgbToOklch(r: number, g: number, b: number): { l: number; c: num
   const a = 1.9779984951 * lPrime - 2.4285922050 * mPrime + 0.4505937099 * sPrime;
   const bLab = 0.0259040371 * lPrime + 0.7827717662 * mPrime - 0.8086757660 * sPrime;
 
-  const C = Math.sqrt(a * a + bLab * bLab);
+  const C = Math.hypot(a, bLab);
   let H = Math.atan2(bLab, a) * (180 / Math.PI);
   if (H < 0) H += 360;
 
@@ -288,8 +288,8 @@ export function generateHarmonies(
   const hues = offsets.map(offset => (baseH + offset + 3600) % 360);
 
   return hues.slice(0, count).map((h, i) => {
-    let s = baseSaturation;
-    let l = baseLightness;
+    let s: number;
+    let l: number;
     if (harmonyType === 'monochromatic') {
       s = Math.max(10, Math.min(100, baseSaturation - i * 6));
       l = Math.max(15, Math.min(88, (baseLightness - 20) + (i * (45 / Math.max(1, count - 1)))));
@@ -304,28 +304,38 @@ export function generateHarmonies(
   });
 }
 
+function getRandomFloat(): number {
+  const cryptoObj = typeof window !== 'undefined' ? window.crypto : globalThis.crypto;
+  if (cryptoObj?.getRandomValues) {
+    const buf = new Uint32Array(1);
+    cryptoObj.getRandomValues(buf);
+    return buf[0] / 4294967296;
+  }
+  return (Date.now() % 1000) / 1000;
+}
+
 // Generate random harmonious palette for the Spacebar generator
 export function generateRandomHarmoniousPalette(count: number = 5): string[] {
   const modes = ['analogous', 'triad', 'complementary', 'split-complementary', 'tetradic', 'coolors-smart'];
-  const mode = modes[Math.floor(Math.random() * modes.length)];
-  const randomHue = Math.floor(Math.random() * 360);
+  const mode = modes[Math.floor(getRandomFloat() * modes.length)];
+  const randomHue = Math.floor(getRandomFloat() * 360);
 
   if (mode === 'coolors-smart') {
     // Generates a curated, high-aesthetic color scheme with deep contrast
     const baseH = randomHue;
-    const saturation = 65 + Math.random() * 25;
-    const colors: string[] = [];
-    
-    // Primary deep/dark anchor
-    colors.push(rgbToHex(...Object.values(hslToRgb(baseH, 40, 18)) as [number, number, number]));
-    // Secondary bright hue
-    colors.push(rgbToHex(...Object.values(hslToRgb((baseH + 40) % 360, saturation, 56)) as [number, number, number]));
-    // Vivid accent
-    colors.push(rgbToHex(...Object.values(hslToRgb((baseH + 160) % 360, saturation + 10, 60)) as [number, number, number]));
-    // Contrast lighter tone
-    colors.push(rgbToHex(...Object.values(hslToRgb((baseH + 210) % 360, 70, 72)) as [number, number, number]));
-    // Soft tint or dark plum
-    colors.push(rgbToHex(...Object.values(hslToRgb((baseH + 280) % 360, 55, 85)) as [number, number, number]));
+    const saturation = 65 + getRandomFloat() * 25;
+    const colors: string[] = [
+      // Primary deep/dark anchor
+      rgbToHex(...Object.values(hslToRgb(baseH, 40, 18)) as [number, number, number]),
+      // Secondary bright hue
+      rgbToHex(...Object.values(hslToRgb((baseH + 40) % 360, saturation, 56)) as [number, number, number]),
+      // Vivid accent
+      rgbToHex(...Object.values(hslToRgb((baseH + 160) % 360, saturation + 10, 60)) as [number, number, number]),
+      // Contrast lighter tone
+      rgbToHex(...Object.values(hslToRgb((baseH + 210) % 360, 70, 72)) as [number, number, number]),
+      // Soft tint or dark plum
+      rgbToHex(...Object.values(hslToRgb((baseH + 280) % 360, 55, 85)) as [number, number, number])
+    ];
     
     return colors.slice(0, count);
   }
@@ -431,7 +441,7 @@ export function parseMoodToHslRules(prompt: string): MoodHslConfig {
   // Deterministic String Hash fallback for any custom prompt:
   let hash = 0;
   for (let i = 0; i < norm.length; i++) {
-    hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+    hash = (norm.codePointAt(i) ?? 0) + ((hash << 5) - hash);
   }
   const baseH = Math.abs(hash) % 360;
   const satMod = 50 + (Math.abs(hash >> 3) % 40); // 50 - 90
@@ -457,7 +467,7 @@ export function convertPromptToPalette(
 
   for (let i = 0; i < count; i++) {
     const item = existingColors[i];
-    if (item && item.locked) {
+    if (item?.locked) {
       result.push(item.hex);
       continue;
     }
@@ -471,12 +481,12 @@ export function convertPromptToPalette(
       const span = maxH >= minH ? maxH - minH : maxH + 360 - minH;
       h = (minH + (i * span) / Math.max(1, count - 1)) % 360;
     } else {
-      h = (i * (360 / count) + (Math.random() * 20 - 10)) % 360;
+      h = (i * (360 / count) + (getRandomFloat() * 20 - 10)) % 360;
     }
 
     const minS = config.saturationRange[0];
     const maxS = config.saturationRange[1];
-    const s = Math.round(minS + Math.random() * (maxS - minS));
+    const s = Math.round(minS + getRandomFloat() * (maxS - minS));
 
     const minL = config.lightnessRange[0];
     const maxL = config.lightnessRange[1];
@@ -544,7 +554,7 @@ export function generateSeedBasedPalette(
     if (col.locked) return;
 
     // Determine target hue for this unlocked slot based on surrounding locked colors or complementary angle
-    let targetHue = (lockedHues[0] + (idx + 1) * (360 / count)) % 360;
+    let targetHue: number;
     if (lockedHues.length === 2) {
       // Complementary or triad offset from primary locked hues
       const h1 = lockedHues[0];
@@ -651,12 +661,13 @@ export function simulateColorBlindness(hex: string, type: DeficiencyType): strin
       simG = 0.43333 * gLin + 0.56667 * bLin;
       simB = 0.475 * gLin + 0.525 * bLin;
       break;
-    case 'achromatopsia': // Monochromacy
+    case 'achromatopsia': { // Monochromacy
       const gray = 0.299 * rLin + 0.587 * gLin + 0.114 * bLin;
       simR = gray;
       simG = gray;
       simB = gray;
       break;
+    }
   }
 
   return rgbToHex(toGamma(simR), toGamma(simG), toGamma(simB));
@@ -701,13 +712,64 @@ ${rects}
 </svg>`;
 }
 
+function sampleImagePixels(ctx: CanvasRenderingContext2D, sampleSize: number): { r: number; g: number; b: number }[] {
+  const imgData = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
+  const pixels: { r: number; g: number; b: number }[] = [];
+
+  for (let i = 0; i < imgData.length; i += 16) {
+    if (imgData[i + 3] > 128) {
+      pixels.push({ r: imgData[i], g: imgData[i + 1], b: imgData[i + 2] });
+    }
+  }
+  return pixels;
+}
+
+function runKMeans(pixels: { r: number; g: number; b: number }[], colorCount: number): string[] {
+  const step = Math.floor(pixels.length / colorCount);
+  let centroids = Array.from({ length: colorCount }, (_, idx) => ({ ...pixels[idx * step] }));
+
+  for (let iter = 0; iter < 5; iter++) {
+    const clusters: { r: number; g: number; b: number }[][] = Array.from({ length: colorCount }, () => []);
+
+    for (const p of pixels) {
+      let minDist = Infinity;
+      let closestIdx = 0;
+      for (let k = 0; k < centroids.length; k++) {
+        const c = centroids[k];
+        const dist = (p.r - c.r) ** 2 + (p.g - c.g) ** 2 + (p.b - c.b) ** 2;
+        if (dist < minDist) {
+          minDist = dist;
+          closestIdx = k;
+        }
+      }
+      clusters[closestIdx].push(p);
+    }
+
+    centroids = centroids.map((c, idx) => {
+      const cluster = clusters[idx];
+      if (cluster.length === 0) return c;
+      const sum = cluster.reduce((acc, curr) => ({ r: acc.r + curr.r, g: acc.g + curr.g, b: acc.b + curr.b }), { r: 0, g: 0, b: 0 });
+      return {
+        r: Math.round(sum.r / cluster.length),
+        g: Math.round(sum.g / cluster.length),
+        b: Math.round(sum.b / cluster.length)
+      };
+    });
+  }
+
+  const result = centroids.map(c => rgbToHex(c.r, c.g, c.b));
+  result.sort((a, b) => getColorDetails(a).luminance - getColorDetails(b).luminance);
+  return result;
+}
+
 // Quantize colors from HTML image element (K-Means simplified sampling)
 export function extractPaletteFromImage(imgElement: HTMLImageElement, colorCount: number = 5): string[] {
+  const defaultPalette = ['#0B1B2B', '#1E3A5F', '#08BBD9', '#FF2A85', '#E2E8F0'];
   try {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     if (!ctx) {
-      return ['#0B1B2B', '#1E3A5F', '#08BBD9', '#FF2A85', '#E2E8F0'];
+      return defaultPalette;
     }
 
     const sampleSize = 120;
@@ -715,67 +777,15 @@ export function extractPaletteFromImage(imgElement: HTMLImageElement, colorCount
     canvas.height = sampleSize;
     ctx.drawImage(imgElement, 0, 0, sampleSize, sampleSize);
 
-    const imgData = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
-    const pixels: { r: number; g: number; b: number }[] = [];
-
-    // Sample every 4th pixel for performance
-    for (let i = 0; i < imgData.length; i += 16) {
-      const a = imgData[i + 3];
-      if (a > 128) {
-        pixels.push({
-          r: imgData[i],
-          g: imgData[i + 1],
-          b: imgData[i + 2]
-        });
-      }
-    }
-
+    const pixels = sampleImagePixels(ctx, sampleSize);
     if (pixels.length === 0) {
-      return ['#0B1B2B', '#1E3A5F', '#08BBD9', '#FF2A85', '#E2E8F0'];
+      return defaultPalette;
     }
 
-    // Initialize k cluster centroids spread throughout sample
-    const step = Math.floor(pixels.length / colorCount);
-    let centroids = Array.from({ length: colorCount }, (_, idx) => ({ ...pixels[idx * step] }));
-
-    // Run 5 iterations of K-means
-    for (let iter = 0; iter < 5; iter++) {
-      const clusters: { r: number; g: number; b: number }[][] = Array.from({ length: colorCount }, () => []);
-
-      for (const p of pixels) {
-        let minDist = Infinity;
-        let closestIdx = 0;
-
-        for (let k = 0; k < centroids.length; k++) {
-          const c = centroids[k];
-          const dist = (p.r - c.r) ** 2 + (p.g - c.g) ** 2 + (p.b - c.b) ** 2;
-          if (dist < minDist) {
-            minDist = dist;
-            closestIdx = k;
-          }
-        }
-        clusters[closestIdx].push(p);
-      }
-
-      centroids = centroids.map((c, idx) => {
-        const cluster = clusters[idx];
-        if (cluster.length === 0) return c;
-        const sum = cluster.reduce((acc, curr) => ({ r: acc.r + curr.r, g: acc.g + curr.g, b: acc.b + curr.b }), { r: 0, g: 0, b: 0 });
-        return {
-          r: Math.round(sum.r / cluster.length),
-          g: Math.round(sum.g / cluster.length),
-          b: Math.round(sum.b / cluster.length)
-        };
-      });
-    }
-
-    // Sort extracted palette by perceived luminance
-    const result = centroids.map(c => rgbToHex(c.r, c.g, c.b));
-    result.sort((a, b) => getColorDetails(a).luminance - getColorDetails(b).luminance);
-    return result;
+    return runKMeans(pixels, colorCount);
   } catch (err) {
     console.warn('Canvas image sampling failed, falling back to preset', err);
-    return ['#0B1B2B', '#1E3A5F', '#08BBD9', '#FF2A85', '#E2E8F0'];
+    return defaultPalette;
   }
 }
 
@@ -789,7 +799,7 @@ export function extractPaletteFromImage(imgElement: HTMLImageElement, colorCount
  * to immediately generate native swatches grouped by palette title.
  */
 export function exportIllustratorScript(colors: string[], paletteTitle: string = 'Izy Colors Swatches'): string {
-  const safeTitle = paletteTitle.replace(/"/g, '\\"');
+  const safeTitle = paletteTitle.replaceAll('"', String.raw`\"`);
   const colorItems = colors.map((hex, idx) => {
     const rgb = hexToRgb(hex);
     const details = getColorDetails(hex);
@@ -907,16 +917,14 @@ export function generateAseBlob(colors: string[], paletteTitle: string = 'Izy Co
     const fBuf = new ArrayBuffer(4);
     const fView = new DataView(fBuf);
     fView.setFloat32(0, val, false); // false = big-endian
-    for (let i = 0; i < 4; i++) {
-      arr.push(fView.getUint8(i));
-    }
+    arr.push(fView.getUint8(0), fView.getUint8(1), fView.getUint8(2), fView.getUint8(3));
   };
 
   // Helper to encode string to UTF-16BE with null terminator
   const encodeUtf16BE = (str: string): number[] => {
     const bytes: number[] = [];
     for (let i = 0; i < str.length; i++) {
-      const code = str.charCodeAt(i);
+      const code = str.codePointAt(i) ?? 0;
       bytes.push((code >> 8) & 0xff, code & 0xff);
     }
     // Null terminator (2 bytes 0x00, 0x00)
@@ -940,10 +948,7 @@ export function generateAseBlob(colors: string[], paletteTitle: string = 'Izy Co
 
     const blockData: number[] = [];
     pushU16(nameLengthInChars, blockData);
-    blockData.push(...nameBytes);
-
-    // Color space: 'RGB '
-    blockData.push(0x52, 0x47, 0x42, 0x20);
+    blockData.push(...nameBytes, 0x52, 0x47, 0x42, 0x20);
 
     const rgb = hexToRgb(hex);
     pushFloat32(rgb.r / 255, blockData);

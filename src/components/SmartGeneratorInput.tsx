@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Wand2, X, Command, ArrowRight, Lock, Check } from 'lucide-react';
+import { Wand2, X, Command, ArrowRight, Lock, Check } from 'lucide-react';
 
 interface SmartGeneratorInputProps {
   isOpen: boolean;
@@ -68,7 +68,7 @@ export const SmartGeneratorInput: React.FC<SmartGeneratorInputProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e?: React.FormEvent) => {
+  const handleSubmit = (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
     if (!inputValue.trim()) return;
 
@@ -90,9 +90,8 @@ export const SmartGeneratorInput: React.FC<SmartGeneratorInputProps> = ({
 
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-xl px-4 animate-in fade-in zoom-in-95 duration-200">
-      <div 
+      <div
         className="bg-[#181C24]/85 backdrop-blur-xl border border-white/[0.15] rounded-2xl shadow-2xl p-3.5 sm:p-4 text-white relative overflow-hidden ring-1 ring-white/10"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Subtle top glow effect */}
         <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[#6366F1] to-transparent opacity-70" />
@@ -184,11 +183,10 @@ export const SmartGeneratorInput: React.FC<SmartGeneratorInputProps> = ({
               key={preset.prompt}
               type="button"
               onClick={() => handleSelectPreset(preset.prompt)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${
-                inputValue.toLowerCase() === preset.prompt.toLowerCase()
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border whitespace-nowrap flex items-center gap-1.5 transition-all cursor-pointer ${inputValue.toLowerCase() === preset.prompt.toLowerCase()
                   ? 'bg-[#6366F1] text-white border-[#6366F1] shadow-sm'
                   : 'bg-white/[0.05] hover:bg-white/[0.12] text-[#DFE2EE] border-white/[0.08] hover:border-white/20'
-              }`}
+                }`}
             >
               <span>{preset.icon}</span>
               <span>{preset.label}</span>
