@@ -1,4 +1,4 @@
-import { ColorDetails } from '../types';
+import { ColorDetails, ColorItem } from '../types';
 
 // Convert HEX to RGB
 export function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -331,6 +331,289 @@ export function generateRandomHarmoniousPalette(count: number = 5): string[] {
   }
 
   return generateHarmonies(randomHue, count, mode);
+}
+
+// -------------------------------------------------------------
+// INTELLIGENT & SEMANTIC PALETTE GENERATION (SEED & TEXT-TO-PALETTE)
+// -------------------------------------------------------------
+
+export interface MoodHslConfig {
+  hueRange?: [number, number];
+  presetHues?: number[];
+  saturationRange: [number, number];
+  lightnessRange: [number, number];
+  harmonyMode?: string;
+  description: string;
+}
+
+// Map keywords/moods to HSL rules
+export function parseMoodToHslRules(prompt: string): MoodHslConfig {
+  const norm = prompt.toLowerCase().trim();
+
+  // Cyberpunk / Neon
+  if (/neon|cyberpunk|synthwave|futur|elétric|eletric|vibrant/.test(norm)) {
+    return {
+      presetHues: [300, 180, 210, 100, 55], // Magenta, Cyan, Blue, Electric Lime, Neon Yellow
+      saturationRange: [85, 100],
+      lightnessRange: [48, 65],
+      harmonyMode: 'split-complementary',
+      description: 'Cores vibrantes de altíssima saturação e contraste elétrico'
+    };
+  }
+
+  // Melancholic / Autumn / Melancólico / Outono / Dark
+  if (/melancól|melancol|outono|autumn|sad|triste|sombrio|dark|gót|goti/.test(norm)) {
+    return {
+      hueRange: [15, 45], // Earthy warm browns, burnt orange, deep terracotta
+      presetHues: [25, 18, 35, 205, 215], // Warm amber, deep soil, slate accents
+      saturationRange: [22, 48],
+      lightnessRange: [18, 45],
+      harmonyMode: 'analogous',
+      description: 'Tons terrosos, baixa saturação e curvas de luminosidade suaves'
+    };
+  }
+
+  // Corporate / Clean / Minimalist / Professional
+  if (/corporat|clean|minimal|profissional|tech|saás|saas|business|empresa/.test(norm)) {
+    return {
+      presetHues: [215, 200, 190, 225, 210], // Corporate blues, slates, crisp teal
+      saturationRange: [45, 70],
+      lightnessRange: [15, 90], // High contrast spread for accessibility
+      harmonyMode: 'monochromatic',
+      description: 'Paleta sóbria em escala corporativa de alto contraste e acessibilidade'
+    };
+  }
+
+  // Sunset / Pôr do Sol / Summer / Beach / Tropical
+  if (/pôr do sol|por do sol|sunset|praia|beach|verão|verao|summer|tropic|quente/.test(norm)) {
+    return {
+      presetHues: [350, 15, 38, 52, 280], // Red, Crimson, Orange, Gold, Twilight Violet
+      saturationRange: [75, 95],
+      lightnessRange: [40, 75],
+      harmonyMode: 'triad',
+      description: 'Gradiente térmico aquecido inspirado em crepúsculos tropicais'
+    };
+  }
+
+  // Pastel / Soft / Candy / Momo / Suave
+  if (/pastel|soft|suave|doce|candy|infantil|momo|delicad/.test(norm)) {
+    return {
+      saturationRange: [35, 60],
+      lightnessRange: [72, 88],
+      harmonyMode: 'analogous',
+      description: 'Paleta delicada com alta luminosidade e saturação aveludada'
+    };
+  }
+
+  // Forest / Nature / Eco / Green / Bio
+  if (/nature|floresta|forest|eco|bio|verde|green|folha|jardim/.test(norm)) {
+    return {
+      hueRange: [85, 160], // Moss, Emerald, Leaf, Sage
+      presetHues: [120, 140, 95, 35, 155], // Greens with wood brown accent
+      saturationRange: [35, 75],
+      lightnessRange: [25, 70],
+      harmonyMode: 'analogous',
+      description: 'Tons botânicos e folhagens com acentos orgânicos de madeira'
+    };
+  }
+
+  // Coffee / Cozy / Café / Aconchegante
+  if (/café|cafe|coffee|cozy|aconchegante|quente|chocolate/.test(norm)) {
+    return {
+      presetHues: [25, 32, 20, 42, 15],
+      saturationRange: [30, 65],
+      lightnessRange: [15, 82], // Deep espresso to creamy beige
+      harmonyMode: 'monochromatic',
+      description: 'Aroma de café torrado, tons de espresso e creme aveludado'
+    };
+  }
+
+  // Deterministic String Hash fallback for any custom prompt:
+  let hash = 0;
+  for (let i = 0; i < norm.length; i++) {
+    hash = norm.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const baseH = Math.abs(hash) % 360;
+  const satMod = 50 + (Math.abs(hash >> 3) % 40); // 50 - 90
+  const lightMod = 35 + (Math.abs(hash >> 7) % 35); // 35 - 70
+
+  return {
+    hueRange: [baseH, (baseH + 120) % 360],
+    saturationRange: [satMod - 10, satMod + 10],
+    lightnessRange: [lightMod - 15, lightMod + 20],
+    harmonyMode: 'split-complementary',
+    description: `Paleta gerada semanticamente para "${prompt}"`
+  };
+}
+
+// Convert textual prompt into an array of 5 HEX colors (respecting locked items if passed)
+export function convertPromptToPalette(
+  prompt: string,
+  existingColors: ColorItem[] = []
+): string[] {
+  const config = parseMoodToHslRules(prompt);
+  const count = existingColors.length > 0 ? existingColors.length : 5;
+  const result: string[] = [];
+
+  for (let i = 0; i < count; i++) {
+    const item = existingColors[i];
+    if (item && item.locked) {
+      result.push(item.hex);
+      continue;
+    }
+
+    let h = 0;
+    if (config.presetHues && config.presetHues.length > 0) {
+      h = config.presetHues[i % config.presetHues.length];
+    } else if (config.hueRange) {
+      const minH = config.hueRange[0];
+      const maxH = config.hueRange[1];
+      const span = maxH >= minH ? maxH - minH : maxH + 360 - minH;
+      h = (minH + (i * span) / Math.max(1, count - 1)) % 360;
+    } else {
+      h = (i * (360 / count) + (Math.random() * 20 - 10)) % 360;
+    }
+
+    const minS = config.saturationRange[0];
+    const maxS = config.saturationRange[1];
+    const s = Math.round(minS + Math.random() * (maxS - minS));
+
+    const minL = config.lightnessRange[0];
+    const maxL = config.lightnessRange[1];
+    const lightSpread = [minL, minL + (maxL - minL) * 0.4, minL + (maxL - minL) * 0.75, minL + (maxL - minL) * 0.25, maxL];
+    const l = Math.round(lightSpread[i % lightSpread.length]);
+
+    const rgb = hslToRgb((h + 360) % 360, s, l);
+    result.push(rgbToHex(rgb.r, rgb.g, rgb.b));
+  }
+
+  return result;
+}
+
+// Generate smart palette based on seed / locked colors in existing columns
+export function generateSeedBasedPalette(
+  colors: ColorItem[],
+  harmonyType: string = 'analogous'
+): string[] {
+  const count = colors.length;
+  const lockedIndices = colors.map((c, idx) => c.locked ? idx : -1).filter(idx => idx !== -1);
+
+  if (lockedIndices.length === 0) {
+    return generateRandomHarmoniousPalette(count);
+  }
+
+  // Extract details of locked colors
+  const lockedDetails = lockedIndices.map(idx => ({
+    index: idx,
+    details: getColorDetails(colors[idx].hex)
+  }));
+
+  const result: string[] = colors.map(c => c.hex);
+
+  if (lockedIndices.length === 1) {
+    // 1 Locked Color: Generate chromatic harmonies centered around this seed
+    const seed = lockedDetails[0].details;
+    const baseH = seed.hsl.h;
+    const offsets = getHarmonyOffsets(harmonyType === 'smart' ? 'analogous' : harmonyType, count);
+
+    colors.forEach((col, idx) => {
+      if (col.locked) return;
+      const offset = offsets[idx % offsets.length];
+      const newH = (baseH + offset + 3600) % 360;
+
+      // Calculate harmonious lightness and saturation steps
+      const lightnessDeltas = [0, -18, 16, -28, 22];
+      const satDeltas = [0, -10, 8, -15, -4];
+
+      const newS = Math.max(15, Math.min(95, seed.hsl.s + (satDeltas[idx % satDeltas.length] || 0)));
+      const newL = Math.max(12, Math.min(88, seed.hsl.l + (lightnessDeltas[idx % lightnessDeltas.length] || 0)));
+
+      const rgb = hslToRgb(newH, newS, newL);
+      result[idx] = rgbToHex(rgb.r, rgb.g, rgb.b);
+    });
+
+    return result;
+  }
+
+  // 2 to 4 Locked Colors: Fill missing slots by calculating hue gaps and complementary relationships
+  const lockedHues = lockedDetails.map(d => d.details.hsl.h);
+  const avgSat = Math.round(lockedDetails.reduce((acc, d) => acc + d.details.hsl.s, 0) / lockedDetails.length);
+  const avgLight = Math.round(lockedDetails.reduce((acc, d) => acc + d.details.hsl.l, 0) / lockedDetails.length);
+
+  colors.forEach((col, idx) => {
+    if (col.locked) return;
+
+    // Determine target hue for this unlocked slot based on surrounding locked colors or complementary angle
+    let targetHue = (lockedHues[0] + (idx + 1) * (360 / count)) % 360;
+    if (lockedHues.length === 2) {
+      // Complementary or triad offset from primary locked hues
+      const h1 = lockedHues[0];
+      const h2 = lockedHues[1];
+      const midpoint = (h1 + h2) / 2;
+      targetHue = (midpoint + (idx * 120)) % 360;
+    } else {
+      // Find maximum gap between locked hues
+      const sortedHues = [...lockedHues].sort((a, b) => a - b);
+      let maxGap = 0;
+      let gapStart = sortedHues[0];
+      for (let g = 0; g < sortedHues.length; g++) {
+        const nextH = sortedHues[(g + 1) % sortedHues.length];
+        const gap = nextH >= sortedHues[g] ? nextH - sortedHues[g] : (nextH + 360) - sortedHues[g];
+        if (gap > maxGap) {
+          maxGap = gap;
+          gapStart = sortedHues[g];
+        }
+      }
+      targetHue = (gapStart + maxGap / 2 + (idx * 25)) % 360;
+    }
+
+    // Varied lightness and saturation for dynamic balance
+    const altL = (idx % 2 === 0) ? Math.max(15, avgLight - 20) : Math.min(85, avgLight + 25);
+    const altS = Math.max(25, Math.min(95, avgSat + (idx % 2 === 0 ? 10 : -10)));
+
+    const rgb = hslToRgb((targetHue + 360) % 360, altS, altL);
+    result[idx] = rgbToHex(rgb.r, rgb.g, rgb.b);
+  });
+
+  return result;
+}
+
+// Skeleton for AI LLM Palette Generation (OpenAI / Vercel AI SDK Integration)
+export async function generatePaletteFromPromptAI(
+  prompt: string,
+  existingColors: ColorItem[] = []
+): Promise<string[]> {
+  /*
+   * ESQUELETO DE INTEGRAÇÃO COM LLM (OpenAI / Vercel AI SDK)
+   * 
+   * Exemplo de payload para OpenAI GPT-4o-mini ou Vercel AI SDK:
+   * 
+   * const response = await fetch('https://api.openai.com/v1/chat/completions', {
+   *   method: 'POST',
+   *   headers: {
+   *     'Content-Type': 'application/json',
+   *     'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
+   *   },
+   *   body: JSON.stringify({
+   *     model: 'gpt-4o-mini',
+   *     messages: [
+   *       {
+   *         role: 'system',
+   *         content: 'Você é um especialista em Design System e teoria das cores. Retorne estritamente um JSON com uma array de 5 códigos HEX perfeitos para o conceito fornecido.'
+   *       },
+   *       { role: 'user', content: `Conceito/Mood: "${prompt}"` }
+   *     ],
+   *     response_format: { type: "json_object" }
+   *   })
+   * });
+   */
+
+  // Simulação assíncrona local com fallback para o motor semântico HSL
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      resolve(convertPromptToPalette(prompt, existingColors));
+    }, 300);
+  });
 }
 
 // Color blindness simulation algorithms (Brettel, Vienot, Mollon 1997 / Machado 2009 approximation)

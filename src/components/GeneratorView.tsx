@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Lock,
   Unlock,
@@ -18,18 +18,19 @@ import {
   Sparkles,
   Eye,
   EyeOff,
-  ShieldCheck
+  ShieldCheck,
+  Wand2
 } from 'lucide-react';
 import { ColorItem } from '../types';
 import {
   getColorDetails,
-  generateRandomHarmoniousPalette,
-  generateHarmonies,
   getContrastRatio,
   hslToRgb,
   rgbToHex
 } from '../utils/colorUtils';
 import { WcagTooltip } from './WcagTooltip';
+import { useGenerator } from '../hooks/useGenerator';
+import { SmartGeneratorInput } from './SmartGeneratorInput';
 
 interface GeneratorViewProps {
   initialColors?: string[];
@@ -37,13 +38,6 @@ interface GeneratorViewProps {
   onSaveToCollection: (colors: string[]) => void;
   onOpenExport: (colors: string[]) => void;
 }
-
-// Cryptographically secure pseudorandom number generator replacement for Math.random
-const getRandomNumber = (): number => {
-  const array = new Uint32Array(1);
-  window.crypto.getRandomValues(array);
-  return array[0] / (0xFFFFFFFF + 1);
-};
 
 // Helper function to evaluate WCAG badge labels without nested ternaries
 const getWcagBadgeLabel = (ratio: number): string => {
@@ -132,7 +126,7 @@ const GeneratorColorColumn: React.FC<GeneratorColorColumnProps> = ({
 
   return (
     <div
-      className="flex-1 min-h-[140px] md:min-h-0 relative flex flex-col justify-between p-4 sm:p-6 transition-colors duration-200 group border-b md:border-b-0 md:border-r border-black/10 last:border-none cursor-crosshair"
+      className="flex-1 min-h-[140px] md:min-h-0 relative flex flex-col justify-between p-4 sm:p-6 transition-all duration-300 ease-out group border-b md:border-b-0 md:border-r border-black/10 last:border-none cursor-crosshair"
       style={{ backgroundColor: col.hex }}
       onMouseEnter={(e) => {
         setHoveredSwatch({
@@ -159,7 +153,7 @@ const GeneratorColorColumn: React.FC<GeneratorColorColumnProps> = ({
     >
       {/* Top Controls on Hover */}
       <div className="flex items-center justify-between opacity-80 md:opacity-0 group-hover:opacity-100 transition-opacity">
-        {/* Column movement and remove */}
+        {/* Column movement */}
         <div className="flex items-center gap-1">
           <button
             onClick={() => moveColumn(idx, 'left')}
@@ -403,189 +397,78 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
   onSaveToCollection,
   onOpenExport
 }) => {
-  const [colors, setColors] = useState<ColorItem[]>(() => {
-    const seed = initialColors || ['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85'];
-    return seed.map((hex, i) => ({
-      id: `col-${i}-${Date.now()}`,
-      hex: hex.toUpperCase(),
-      name: `Color ${i + 1}`,
-      locked: false
-    }));
-  });
+  const {
+    colors,
+    lockedColors,
+    moodKeyword,
+    setMoodAndGenerate,
+    clearMood,
+    harmonyMode,
+    setHarmonyMode,
+    activeFormat,
+    setActiveFormat,
+    editingIndex,
+    setEditingIndex,
+    copiedIndex,
+    isFullscreen,
+    isFocusMode,
+    setIsFocusMode,
+    toastMessage,
+    showToast,
+    historyIndex,
+    historyLength,
+    generatePalette,
+    toggleLock,
+    moveColumn,
+    addColumn,
+    deleteColumn,
+    handleColorUpdate,
+    copyColor,
+    handleUndo,
+    handleRedo
+  } = useGenerator({ initialColors });
 
-  const [history, setHistory] = useState<ColorItem[][]>([]);
-  const [historyIndex, setHistoryIndex] = useState(-1);
-  const [activeFormat, setActiveFormat] = useState<'HEX' | 'RGB' | 'HSL' | 'OKLCH'>('HEX');
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isFocusMode, setIsFocusMode] = useState(false);
-  const [harmonyMode, setHarmonyMode] = useState<string>('smart');
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSmartInputOpen, setIsSmartInputOpen] = useState(false);
   const [hoveredSwatch, setHoveredSwatch] = useState<{
     index: number;
     hex: string;
     name: string;
     position: { x: number; y: number };
   } | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const showToast = (msg: string) => {
-    setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 2500);
-  };
-
-  // Generate new colors respecting locked ones
-  const generateNewPalette = useCallback(() => {
-    let newHexes: string[] = [];
-    if (harmonyMode === 'smart') {
-      newHexes = generateRandomHarmoniousPalette(colors.length);
-    } else {
-      const baseH = Math.floor(getRandomNumber() * 360);
-      newHexes = generateHarmonies(baseH, colors.length, harmonyMode);
-    }
-
-    setColors(prev => {
-      // Push previous state to history
-      setHistory(h => [...h.slice(0, historyIndex + 1), prev]);
-      setHistoryIndex(i => i + 1);
-
-      return prev.map((item, idx) => {
-        if (item.locked) return item;
-        return {
-          ...item,
-          hex: newHexes[idx] || rgbToHex(getRandomNumber() * 255, getRandomNumber() * 255, getRandomNumber() * 255)
-        };
-      });
-    });
-  }, [colors.length, harmonyMode, historyIndex]);
-
-  // Spacebar and Escape global event handler
+  // Global key listener for Spacebar, Ctrl+K / Cmd+K, Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if typing in an input or textarea
       const target = e.target as HTMLElement;
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
         return;
       }
-      if (e.code === 'Space') {
+
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        generateNewPalette();
-      }
-      if (e.code === 'Escape' && isFocusMode) {
+        setIsSmartInputOpen(prev => !prev);
+      } else if (e.code === 'Space') {
         e.preventDefault();
-        setIsFocusMode(false);
+        generatePalette();
+      } else if (e.code === 'Escape') {
+        if (isSmartInputOpen) {
+          setIsSmartInputOpen(false);
+        } else if (isFocusMode) {
+          setIsFocusMode(false);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [generateNewPalette, isFocusMode]);
-
-  // Toggle lock on a column
-  const toggleLock = (index: number) => {
-    setColors(prev => prev.map((col, i) => {
-      if (i === index) {
-        const nextLocked = !col.locked;
-        if (nextLocked && editingIndex === index) {
-          setEditingIndex(null);
-        }
-        return { ...col, locked: nextLocked };
-      }
-      return col;
-    }));
-  };
-
-  // Move column left or right
-  const moveColumn = (index: number, direction: 'left' | 'right') => {
-    const targetIndex = direction === 'left' ? index - 1 : index + 1;
-    if (targetIndex < 0 || targetIndex >= colors.length) return;
-    setColors(prev => {
-      const next = [...prev];
-      const temp = next[index];
-      next[index] = next[targetIndex];
-      next[targetIndex] = temp;
-      return next;
-    });
-  };
-
-  // Add column
-  const addColumn = (atIndex: number) => {
-    if (colors.length >= 8) {
-      showToast('Limite de 8 colunas atingido.');
-      return;
-    }
-    const leftHex = colors[atIndex].hex;
-    const details = getColorDetails(leftHex);
-    // Slight variation
-    const nextH = (details.hsl.h + 30) % 360;
-    const rgb = hslToRgb(nextH, details.hsl.s, details.hsl.l);
-    const newHex = rgbToHex(rgb.r, rgb.g, rgb.b);
-
-    setColors(prev => {
-      const next = [...prev];
-      next.splice(atIndex + 1, 0, {
-        id: `col-${Date.now()}-${getRandomNumber()}`,
-        hex: newHex,
-        name: `Color ${next.length + 1}`,
-        locked: false
-      });
-      return next;
-    });
-  };
-
-  // Delete column
-  const deleteColumn = (index: number) => {
-    if (colors.length <= 2) {
-      showToast('A paleta deve conter no mínimo 2 cores.');
-      return;
-    }
-    setColors(prev => prev.filter((_, i) => i !== index));
-    if (editingIndex === index) setEditingIndex(null);
-  };
-
-  // Copy color code
-  const copyColor = (index: number, val: string) => {
-    navigator.clipboard.writeText(val);
-    setCopiedIndex(index);
-    setTimeout(() => setCopiedIndex(null), 1500);
-    showToast(`Copiado: ${val}`);
-  };
-
-  // Undo / Redo
-  const handleUndo = () => {
-    if (historyIndex >= 0) {
-      const targetState = history[historyIndex];
-      setColors(targetState);
-      setHistoryIndex(historyIndex - 1);
-    }
-  };
-
-  const handleRedo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextIndex = historyIndex + 1;
-      setColors(history[nextIndex]);
-      setHistoryIndex(nextIndex);
-    }
-  };
-
-  // Update specific color from picker
-  const handleColorUpdate = (index: number, newHex: string) => {
-    setColors(prev => prev.map((col, i) => {
-      if (i === index) {
-        if (col.locked) return col;
-        return { ...col, hex: newHex.toUpperCase() };
-      }
-      return col;
-    }));
-  };
+  }, [generatePalette, isFocusMode, isSmartInputOpen]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       containerRef.current?.requestFullscreen?.();
-      setIsFullscreen(true);
     } else {
       document.exitFullscreen?.();
-      setIsFullscreen(false);
     }
   };
 
@@ -598,6 +481,19 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
           : "flex-1 flex flex-col bg-[#0B0F17] select-none min-h-[calc(100vh-88px)]"
       }
     >
+      {/* Floating Smart Generator Input (Command Bar / Mood Generator) */}
+      <SmartGeneratorInput
+        isOpen={isSmartInputOpen}
+        onClose={() => setIsSmartInputOpen(false)}
+        onSubmitMood={(prompt) => {
+          setMoodAndGenerate(prompt);
+          showToast(`Gerando paleta semântica para: "${prompt}"`);
+        }}
+        activeMood={moodKeyword}
+        onClearMood={clearMood}
+        lockedCount={lockedColors.length}
+      />
+
       {/* Toast feedback */}
       {toastMessage && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-[#181C24] border border-[#6366F1]/50 text-white text-xs font-medium rounded-full shadow-2xl animate-in fade-in slide-in-from-top-4 flex items-center gap-2">
@@ -617,12 +513,22 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
           <div className="w-px h-4 bg-white/10" />
 
           <button
-            onClick={generateNewPalette}
+            onClick={() => generatePalette()}
             className="h-7 px-3 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95"
           >
             <Sparkles className="w-3 h-3" />
             <span>Gerar</span>
             <span className="text-[9px] bg-white/20 px-1 rounded font-mono">Espaço</span>
+          </button>
+
+          {/* Trigger Smart Input from Focus Mode */}
+          <button
+            onClick={() => setIsSmartInputOpen(prev => !prev)}
+            className="h-7 px-2.5 bg-gradient-to-r from-indigo-500/20 to-cyan-500/20 text-indigo-300 border border-indigo-500/30 rounded-full text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+            title="Geração Inteligente por Prompt / Mood (Ctrl+K)"
+          >
+            <Wand2 className="w-3 h-3 text-[#06B6D4]" />
+            <span>Mood</span>
           </button>
 
           {/* Undo / Redo */}
@@ -638,7 +544,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
             <div className="w-[1px] h-3 bg-white/10" />
             <button
               onClick={handleRedo}
-              disabled={historyIndex >= history.length - 1}
+              disabled={historyIndex >= historyLength - 1}
               className="p-1 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
               title="Refazer"
             >
@@ -663,13 +569,36 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
         <div className="h-12 bg-[#111827] border-b border-white/[0.08] px-4 sm:px-6 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-2">
             <button
-              onClick={generateNewPalette}
+              onClick={() => generatePalette()}
               className="h-8 px-3.5 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded text-xs font-semibold flex items-center gap-2 shadow-sm shadow-indigo-500/20 transition-all cursor-pointer active:scale-95"
             >
               <Sparkles className="w-3.5 h-3.5" />
               <span>Gerar</span>
               <span className="hidden sm:inline text-[10px] bg-white/20 px-1 rounded font-mono">Espaço</span>
             </button>
+
+            {/* Smart Text-to-Palette Mood Generator Button */}
+            <button
+              onClick={() => setIsSmartInputOpen(prev => !prev)}
+              className={`h-8 px-3 rounded text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                isSmartInputOpen || moodKeyword
+                  ? 'bg-gradient-to-r from-[#6366F1] to-[#06B6D4] text-white shadow-md'
+                  : 'bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] text-[#DFE2EE]'
+              }`}
+              title="Geração Inteligente e Semântica por Prompt & Mood (Ctrl+K)"
+            >
+              <Wand2 className="w-3.5 h-3.5 text-[#06B6D4]" />
+              <span className="hidden sm:inline">Gerar por Mood</span>
+              <span className="text-[9px] bg-white/10 px-1 rounded font-mono">⌘K</span>
+            </button>
+
+            {/* Seed Colors Active Badge */}
+            {lockedColors.length > 0 && (
+              <span className="hidden lg:flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30" title="Geração Harmônica baseada nas cores travadas">
+                <Lock className="w-2.5 h-2.5" />
+                <span>{lockedColors.length} {lockedColors.length === 1 ? 'semente' : 'sementes'}</span>
+              </span>
+            )}
 
             {/* Harmony Mode Selector */}
             <div className="hidden sm:flex items-center bg-[#181C24] p-0.5 rounded border border-white/[0.08] text-xs">
@@ -737,7 +666,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
               <div className="w-[1px] h-3 bg-white/[0.08]" />
               <button
                 onClick={handleRedo}
-                disabled={historyIndex >= history.length - 1}
+                disabled={historyIndex >= historyLength - 1}
                 className="p-1.5 text-[#94A3B8] hover:text-white disabled:opacity-30 transition-colors"
                 title="Refazer"
               >
