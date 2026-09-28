@@ -1,45 +1,46 @@
 import React, { useState, useMemo } from 'react';
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Cell, 
-  PieChart as RechartsPieChart, 
-  Pie, 
-  AreaChart, 
-  Area, 
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  PieChart as RechartsPieChart,
+  Pie,
+  AreaChart,
+  Area,
   CartesianGrid,
-  Legend
+  Legend,
+  Sector,
+  Rectangle
 } from 'recharts';
-import { 
-  BarChart3, 
-  PieChart as PieIcon, 
-  TrendingUp, 
-  Sparkles, 
-  Layers, 
-  Palette as PaletteIcon, 
-  Calendar, 
-  ArrowUpRight, 
-  Activity, 
-  Filter, 
-  Download, 
-  Bookmark, 
-  Check, 
-  Copy, 
-  Sliders, 
+import type { BarShapeProps, PieSectorShapeProps, TooltipPayload } from 'recharts';
+import {
+  BarChart3,
+  PieChart as PieIcon,
+  TrendingUp,
+  Sparkles,
+  Layers,
+  Palette as PaletteIcon,
+  Calendar,
+  ArrowUpRight,
+  Activity,
+  Download,
+  Bookmark,
+  Check,
+  Copy,
+  Sliders,
   ExternalLink,
   ShieldCheck
 } from 'lucide-react';
-import { 
-  Palette, 
-  ProjectWorkspace, 
-  CollectionBoard, 
-  FavoriteColor, 
-  VaultPalette, 
-  CommunitySubmission 
+import {
+  Palette,
+  ProjectWorkspace,
+  CollectionBoard,
+  FavoriteColor,
+  VaultPalette,
+  CommunitySubmission
 } from '../types';
 import { hexToRgb, rgbToHsl } from '../utils/colorUtils';
 
@@ -55,30 +56,153 @@ interface UserAnalyticsDashboardProps {
   onNavigateToProfile?: () => void;
 }
 
+interface HueFamily {
+  family: string;
+  color: string;
+  order: number;
+}
+
+const NEUTRAL_HUE_FAMILY: HueFamily = { family: 'Neutros & Grafite', color: '#64748B', order: 8 };
+
+const HUE_FAMILY_RANGES: Array<{ min: number; max: number; family: HueFamily }> = [
+  { min: 345, max: 360, family: { family: 'Vermelhos / Rubis', color: '#EF4444', order: 1 } },
+  { min: 0, max: 15, family: { family: 'Vermelhos / Rubis', color: '#EF4444', order: 1 } },
+  { min: 15, max: 45, family: { family: 'Laranjas / Âmbar', color: '#F97316', order: 2 } },
+  { min: 45, max: 70, family: { family: 'Amarelos / Dourados', color: '#EAB308', order: 3 } },
+  { min: 70, max: 165, family: { family: 'Verdes / Esmeralda', color: '#10B981', order: 4 } },
+  { min: 165, max: 205, family: { family: 'Cianos / Turquesa', color: '#06B6D4', order: 5 } },
+  { min: 205, max: 265, family: { family: 'Azuis / Cobalto', color: '#3B82F6', order: 6 } },
+  { min: 265, max: 315, family: { family: 'Violetas / Púrpuras', color: '#8B5CF6', order: 7 } },
+  { min: 315, max: 345, family: { family: 'Magenta / Rosas', color: '#EC4899', order: 0 } },
+];
+
 // Color Hue classification helper
-function categorizeHue(hex: string): { family: string; color: string; order: number } {
+function categorizeHue(hex: string): HueFamily {
+  let hsl: { h: number; s: number; l: number } | null = null;
   try {
     const rgb = hexToRgb(hex);
-    if (!rgb) return { family: 'Neutros & Grafite', color: '#64748B', order: 8 };
-    const hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
-    
-    // Check for low saturation (grays, whites, blacks)
-    if (hsl.s < 12 || hsl.l < 10 || hsl.l > 92) {
-      return { family: 'Neutros & Grafite', color: '#64748B', order: 8 };
-    }
-    
-    const h = hsl.h;
-    if (h >= 345 || h < 15) return { family: 'Vermelhos / Rubis', color: '#EF4444', order: 1 };
-    if (h >= 15 && h < 45) return { family: 'Laranjas / Âmbar', color: '#F97316', order: 2 };
-    if (h >= 45 && h < 70) return { family: 'Amarelos / Dourados', color: '#EAB308', order: 3 };
-    if (h >= 70 && h < 165) return { family: 'Verdes / Esmeralda', color: '#10B981', order: 4 };
-    if (h >= 165 && h < 205) return { family: 'Cianos / Turquesa', color: '#06B6D4', order: 5 };
-    if (h >= 205 && h < 265) return { family: 'Azuis / Cobalto', color: '#3B82F6', order: 6 };
-    if (h >= 265 && h < 315) return { family: 'Violetas / Púrpuras', color: '#8B5CF6', order: 7 };
-    return { family: 'Magenta / Rosas', color: '#EC4899', order: 0 };
+    hsl = rgbToHsl(rgb.r, rgb.g, rgb.b);
   } catch {
-    return { family: 'Neutros & Grafite', color: '#64748B', order: 8 };
+    return NEUTRAL_HUE_FAMILY;
   }
+
+  if (!hsl) return NEUTRAL_HUE_FAMILY;
+
+  // Check for low saturation (grays, whites, blacks)
+  if (hsl.s < 12 || hsl.l < 10 || hsl.l > 92) {
+    return NEUTRAL_HUE_FAMILY;
+  }
+
+  const match = HUE_FAMILY_RANGES.find(({ min, max }) => hsl.h >= min && hsl.h < max);
+  return match ? match.family : NEUTRAL_HUE_FAMILY;
+}
+
+interface ChartTooltipProps {
+  active?: boolean;
+  payload?: TooltipPayload;
+}
+
+interface TimelineTooltipProps extends ChartTooltipProps {
+  label?: string | number;
+}
+
+const FrequencyTooltip: React.FC<ChartTooltipProps> = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const data = payload[0].payload;
+  return (
+    <div className="bg-[#0B0F17]/95 backdrop-blur-md p-3.5 border border-white/[0.12] rounded-xl shadow-2xl space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: data.fillColor }} />
+        <span className="text-xs font-bold text-white font-mono">{data.name}</span>
+      </div>
+      <div className="text-[11px] text-[#94A3B8] space-y-1 font-mono">
+        <div className="flex justify-between gap-4">
+          <span>Ocorrências:</span>
+          <span className="text-white font-bold">{data.count} tokens</span>
+        </div>
+        <div className="flex justify-between gap-4">
+          <span>Frequência Relativa:</span>
+          <span className="text-[#06B6D4] font-bold">{data.percentage}%</span>
+        </div>
+      </div>
+      {data.sampleHexes?.length > 0 && (
+        <div className="pt-2 border-t border-white/[0.08] flex items-center gap-1.5">
+          <span className="text-[10px] text-[#64748B]">Amostras:</span>
+          <div className="flex items-center gap-1">
+            {data.sampleHexes.map((h: string) => (
+              <span
+                key={h}
+                className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm"
+                style={{ backgroundColor: h }}
+                title={h}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const ColorSpaceTooltip: React.FC<ChartTooltipProps> = ({ active, payload }) => {
+  if (!active || !payload?.length) return null;
+  const data = payload[0].payload;
+  return (
+    <div className="bg-[#0B0F17]/95 backdrop-blur-md p-3 border border-white/[0.12] rounded-xl shadow-2xl font-mono text-xs space-y-1">
+      <div className="flex items-center gap-2">
+        <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }} />
+        <span className="font-bold text-white">{data.name}</span>
+      </div>
+      <div className="text-[11px] text-[#94A3B8]">
+        Participação: <strong className="text-white">{data.percent}%</strong> ({data.value} tokens)
+      </div>
+      <div className="text-[10px] text-[#64748B]">{data.desc}</div>
+    </div>
+  );
+};
+
+const TimelineTooltip: React.FC<TimelineTooltipProps> = ({ active, payload, label }) => {
+  if (!active || !payload?.length) return null;
+  return (
+    <div className="bg-[#0B0F17]/95 backdrop-blur-md p-3.5 border border-white/[0.12] rounded-xl shadow-2xl font-mono text-xs space-y-2">
+      <div className="font-bold text-white border-b border-white/[0.08] pb-1">
+        {label}
+      </div>
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-6 text-[#06B6D4]">
+          <span>Tokens de Cor:</span>
+          <span className="font-bold text-white">{payload[0]?.value}</span>
+        </div>
+        <div className="flex items-center justify-between gap-6 text-[#6366F1]">
+          <span>Paletas:</span>
+          <span className="font-bold text-white">{payload[1]?.value}</span>
+        </div>
+        <div className="flex items-center justify-between gap-6 text-[#EC4899]">
+          <span>Coleções & Boards:</span>
+          <span className="font-bold text-white">{payload[2]?.value}</span>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const renderBarShape = (props: BarShapeProps) => (
+  <Rectangle {...props} radius={[6, 6, 0, 0]} fill={props.payload?.fillColor} />
+);
+
+const renderPieSector = (props: PieSectorShapeProps) => (
+  <Sector {...props} fill={props.payload?.color} stroke="#121622" strokeWidth={2} />
+);
+
+const LEGEND_LABELS: Record<string, string> = {
+  tokens: 'Tokens Salvos',
+  palettes: 'Paletas',
+  collections: 'Coleções',
+};
+
+function formatLegendLabel(value: unknown): React.ReactNode {
+  const key = typeof value === 'string' ? value : String(value);
+  return <span className="text-xs text-[#94A3B8] mr-3">{LEGEND_LABELS[key] ?? 'Coleções'}</span>;
 }
 
 export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
@@ -94,7 +218,6 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
 }) => {
   const [timeRange, setTimeRange] = useState<'30d' | '90d' | '180d' | 'all'>('180d');
   const [activeColorMetric, setActiveColorMetric] = useState<'families' | 'swatches'>('families');
-  const [selectedGamutFilter, setSelectedGamutFilter] = useState<'all' | 'oklch' | 'p3' | 'srgb'>('all');
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const safePalettes = palettes || [];
@@ -216,42 +339,42 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
     const totalCalculated = calculatedOklch + calculatedP3 + calculatedSrgb + calculatedLab + calculatedHsl;
 
     return [
-      { 
-        name: 'OKLCH (Uniforme)', 
+      {
+        name: 'OKLCH (Uniforme)',
         key: 'oklch',
-        value: calculatedOklch, 
+        value: calculatedOklch,
         percent: Math.round((calculatedOklch / totalCalculated) * 100),
         color: '#06B6D4',
         desc: 'Espaço perceptual uniforme de ampla gama'
       },
-      { 
-        name: 'Display P3 (Wide Gamut)', 
+      {
+        name: 'Display P3 (Wide Gamut)',
         key: 'p3',
-        value: calculatedP3, 
+        value: calculatedP3,
         percent: Math.round((calculatedP3 / totalCalculated) * 100),
         color: '#6366F1',
         desc: 'Monitores Apple e telas HDR modernas'
       },
-      { 
-        name: 'sRGB (Web Standard)', 
+      {
+        name: 'sRGB (Web Standard)',
         key: 'srgb',
-        value: calculatedSrgb, 
+        value: calculatedSrgb,
         percent: Math.round((calculatedSrgb / totalCalculated) * 100),
         color: '#10B981',
         desc: 'Padrão clássico CSS e compatibilidade universal'
       },
-      { 
-        name: 'CIE L*a*b* / LCH', 
+      {
+        name: 'CIE L*a*b* / LCH',
         key: 'lab',
-        value: calculatedLab, 
+        value: calculatedLab,
         percent: Math.round((calculatedLab / totalCalculated) * 100),
         color: '#EC4899',
         desc: 'Modelagem espectral e física da luz'
       },
-      { 
-        name: 'HSL / HSV', 
+      {
+        name: 'HSL / HSV',
         key: 'hsl',
-        value: calculatedHsl, 
+        value: calculatedHsl,
         percent: Math.round((calculatedHsl / totalCalculated) * 100),
         color: '#F59E0B',
         desc: 'Coordenadas intuitivas de matiz e saturação'
@@ -412,21 +535,19 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
           <div className="flex items-center gap-1.5 bg-[#0B0F17] p-1 rounded-lg border border-white/[0.08] self-start sm:self-auto">
             <button
               onClick={() => setActiveColorMetric('families')}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all cursor-pointer ${
-                activeColorMetric === 'families'
-                  ? 'bg-[#06B6D4] text-black font-semibold shadow-sm'
-                  : 'text-[#94A3B8] hover:text-white'
-              }`}
+              className={`px-3 py-1.5 rounded text-xs font-medium transition-all cursor-pointer ${activeColorMetric === 'families'
+                ? 'bg-[#06B6D4] text-black font-semibold shadow-sm'
+                : 'text-[#94A3B8] hover:text-white'
+                }`}
             >
               Famílias Cromáticas
             </button>
             <button
               onClick={() => setActiveColorMetric('swatches')}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-all cursor-pointer ${
-                activeColorMetric === 'swatches'
-                  ? 'bg-[#06B6D4] text-black font-semibold shadow-sm'
-                  : 'text-[#94A3B8] hover:text-white'
-              }`}
+              className={`px-3 py-1.5 rounded text-xs font-medium transition-all cursor-pointer ${activeColorMetric === 'swatches'
+                ? 'bg-[#06B6D4] text-black font-semibold shadow-sm'
+                : 'text-[#94A3B8] hover:text-white'
+                }`}
             >
               Ranking de Amostras
             </button>
@@ -439,77 +560,35 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={colorAnalytics.frequencyData} margin={{ top: 10, right: 20, left: -20, bottom: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
-                  <XAxis 
-                    dataKey="name" 
-                    stroke="#64748B" 
-                    fontSize={11} 
-                    tickLine={false} 
+                  <XAxis
+                    dataKey="name"
+                    stroke="#64748B"
+                    fontSize={11}
+                    tickLine={false}
                     interval={0}
                     angle={-18}
                     textAnchor="end"
                     height={45}
                   />
-                  <YAxis 
-                    stroke="#64748B" 
-                    fontSize={11} 
+                  <YAxis
+                    stroke="#64748B"
+                    fontSize={11}
                     tickLine={false}
                     axisLine={false}
                   />
-                  <Tooltip 
+                  <Tooltip
                     cursor={{ fill: 'rgba(255, 255, 255, 0.04)' }}
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-[#0B0F17]/95 backdrop-blur-md p-3.5 border border-white/[0.12] rounded-xl shadow-2xl space-y-2">
-                            <div className="flex items-center gap-2">
-                              <span className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: data.fillColor }} />
-                              <span className="text-xs font-bold text-white font-mono">{data.name}</span>
-                            </div>
-                            <div className="text-[11px] text-[#94A3B8] space-y-1 font-mono">
-                              <div className="flex justify-between gap-4">
-                                <span>Ocorrências:</span>
-                                <span className="text-white font-bold">{data.count} tokens</span>
-                              </div>
-                              <div className="flex justify-between gap-4">
-                                <span>Frequência Relativa:</span>
-                                <span className="text-[#06B6D4] font-bold">{data.percentage}%</span>
-                              </div>
-                            </div>
-                            {data.sampleHexes?.length > 0 && (
-                              <div className="pt-2 border-t border-white/[0.08] flex items-center gap-1.5">
-                                <span className="text-[10px] text-[#64748B]">Amostras:</span>
-                                <div className="flex items-center gap-1">
-                                  {data.sampleHexes.map((h: string, idx: number) => (
-                                    <span 
-                                      key={idx} 
-                                      className="w-3.5 h-3.5 rounded-full border border-white/20 shadow-sm" 
-                                      style={{ backgroundColor: h }} 
-                                      title={h}
-                                    />
-                                  ))}
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
+                    content={<FrequencyTooltip />}
                   />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {colorAnalytics.frequencyData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.fillColor} />
-                    ))}
-                  </Bar>
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]} shape={renderBarShape} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
             {/* Hue chips summary bar */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5 pt-2">
-              {colorAnalytics.frequencyData.slice(0, 5).map((fam, idx) => (
-                <div key={idx} className="p-2.5 bg-[#0B0F17]/60 border border-white/[0.06] rounded-lg flex items-center justify-between">
+              {colorAnalytics.frequencyData.slice(0, 5).map((fam) => (
+                <div key={fam.name} className="p-2.5 bg-[#0B0F17]/60 border border-white/[0.06] rounded-lg flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: fam.fillColor }} />
                     <span className="text-xs text-white truncate max-w-[90px]">{fam.name.split('/')[0]}</span>
@@ -523,12 +602,12 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
           /* Top swatches ranking table */
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {colorAnalytics.topSwatches.map((item, idx) => (
-              <div 
-                key={idx}
+              <div
+                key={item.hex}
                 className="p-3 bg-[#0B0F17] border border-white/[0.08] rounded-xl flex items-center justify-between group hover:border-white/[0.2] transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <div 
+                  <div
                     className="w-10 h-10 rounded-lg shadow-md border border-white/10 shrink-0 flex items-center justify-center text-[10px] font-mono font-bold"
                     style={{ backgroundColor: item.hex }}
                   />
@@ -591,31 +670,9 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
                     outerRadius={80}
                     paddingAngle={4}
                     dataKey="value"
-                  >
-                    {colorSpaceDistribution.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} stroke="#121622" strokeWidth={2} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-[#0B0F17]/95 backdrop-blur-md p-3 border border-white/[0.12] rounded-xl shadow-2xl font-mono text-xs space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }} />
-                              <span className="font-bold text-white">{data.name}</span>
-                            </div>
-                            <div className="text-[11px] text-[#94A3B8]">
-                              Participação: <strong className="text-white">{data.percent}%</strong> ({data.value} tokens)
-                            </div>
-                            <div className="text-[10px] text-[#64748B]">{data.desc}</div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
+                    shape={renderPieSector}
                   />
+                  <Tooltip content={<ColorSpaceTooltip />} />
                 </RechartsPieChart>
               </ResponsiveContainer>
 
@@ -629,8 +686,8 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
 
           {/* Detailed Color Space list */}
           <div className="space-y-2 mt-4 pt-4 border-t border-white/[0.06]">
-            {colorSpaceDistribution.map((cs, idx) => (
-              <div key={idx} className="flex items-center justify-between text-xs">
+            {colorSpaceDistribution.map((cs) => (
+              <div key={cs.key} className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: cs.color }} />
                   <span className="text-[#DFE2EE] font-medium">{cs.name}</span>
@@ -666,33 +723,29 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
               <div className="flex items-center gap-1 bg-[#0B0F17] p-1 rounded-lg border border-white/[0.08] self-start sm:self-auto">
                 <button
                   onClick={() => setTimeRange('30d')}
-                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${
-                    timeRange === '30d' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
-                  }`}
+                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${timeRange === '30d' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
+                    }`}
                 >
                   30d
                 </button>
                 <button
                   onClick={() => setTimeRange('90d')}
-                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${
-                    timeRange === '90d' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
-                  }`}
+                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${timeRange === '90d' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
+                    }`}
                 >
                   90d
                 </button>
                 <button
                   onClick={() => setTimeRange('180d')}
-                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${
-                    timeRange === '180d' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
-                  }`}
+                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${timeRange === '180d' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
+                    }`}
                 >
                   180d
                 </button>
                 <button
                   onClick={() => setTimeRange('all')}
-                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${
-                    timeRange === 'all' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
-                  }`}
+                  className={`px-2 py-1 text-[11px] rounded transition-all cursor-pointer ${timeRange === 'all' ? 'bg-[#6366F1] text-white font-semibold' : 'text-[#94A3B8] hover:text-white'
+                    }`}
                 >
                   Tudo
                 </button>
@@ -705,82 +758,51 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
                 <AreaChart data={timelineGrowthData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="colorTokens" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#06B6D4" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#06B6D4" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#06B6D4" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorPalettes" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#6366F1" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#6366F1" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorCollections" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#EC4899" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#EC4899" stopOpacity={0}/>
+                      <stop offset="5%" stopColor="#EC4899" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#EC4899" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1E293B" vertical={false} />
                   <XAxis dataKey="label" stroke="#64748B" fontSize={11} tickLine={false} />
                   <YAxis stroke="#64748B" fontSize={11} tickLine={false} axisLine={false} />
-                  <Tooltip
-                    content={({ active, payload, label }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-[#0B0F17]/95 backdrop-blur-md p-3.5 border border-white/[0.12] rounded-xl shadow-2xl font-mono text-xs space-y-2">
-                            <div className="font-bold text-white border-b border-white/[0.08] pb-1">
-                              {label}
-                            </div>
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between gap-6 text-[#06B6D4]">
-                                <span>Tokens de Cor:</span>
-                                <span className="font-bold text-white">{payload[0]?.value}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-6 text-[#6366F1]">
-                                <span>Paletas:</span>
-                                <span className="font-bold text-white">{payload[1]?.value}</span>
-                              </div>
-                              <div className="flex items-center justify-between gap-6 text-[#EC4899]">
-                                <span>Coleções & Boards:</span>
-                                <span className="font-bold text-white">{payload[2]?.value}</span>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Legend 
-                    verticalAlign="top" 
-                    height={36} 
+                  <Tooltip content={<TimelineTooltip />} />
+                  <Legend
+                    position="top"
+                    height={36}
                     iconType="circle"
-                    formatter={(value) => (
-                      <span className="text-xs text-[#94A3B8] mr-3">
-                        {value === 'tokens' ? 'Tokens Salvos' : value === 'palettes' ? 'Paletas' : 'Coleções'}
-                      </span>
-                    )}
+                    formatter={formatLegendLabel}
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="tokens" 
-                    stroke="#06B6D4" 
+                  <Area
+                    type="monotone"
+                    dataKey="tokens"
+                    stroke="#06B6D4"
                     strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorTokens)" 
+                    fillOpacity={1}
+                    fill="url(#colorTokens)"
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="palettes" 
-                    stroke="#6366F1" 
+                  <Area
+                    type="monotone"
+                    dataKey="palettes"
+                    stroke="#6366F1"
                     strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorPalettes)" 
+                    fillOpacity={1}
+                    fill="url(#colorPalettes)"
                   />
-                  <Area 
-                    type="monotone" 
-                    dataKey="collections" 
-                    stroke="#EC4899" 
+                  <Area
+                    type="monotone"
+                    dataKey="collections"
+                    stroke="#EC4899"
                     strokeWidth={2}
-                    fillOpacity={1} 
-                    fill="url(#colorCollections)" 
+                    fillOpacity={1}
+                    fill="url(#colorCollections)"
                   />
                 </AreaChart>
               </ResponsiveContainer>

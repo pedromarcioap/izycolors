@@ -8,9 +8,143 @@ export interface WcagTooltipProps {
   nextColorHex?: string;
   colorName?: string;
   position?: { x: number; y: number } | null;
-  alignment?: 'center' | 'left' | 'right';
   className?: string;
 }
+
+interface Badge {
+  className: string;
+  label: string;
+}
+
+interface WcagLevel {
+  badgeClassName: string;
+  badgeLabel: string;
+}
+
+const getTextBadge = (aaa: boolean, aa: boolean): Badge => {
+  if (aaa) {
+    return { className: 'text-emerald-400 font-bold', label: 'AAA' };
+  }
+  if (aa) {
+    return { className: 'text-[#06B6D4]', label: 'AA' };
+  }
+  return { className: 'text-rose-400', label: 'Reprovado' };
+};
+
+const getWcagLevel = (normalAaa: boolean, normalAa: boolean, largeAa: boolean): WcagLevel => {
+  if (normalAaa) {
+    return {
+      badgeClassName: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
+      badgeLabel: 'WCAG AAA',
+    };
+  }
+  if (normalAa) {
+    return {
+      badgeClassName: 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40',
+      badgeLabel: 'WCAG AA',
+    };
+  }
+  if (largeAa) {
+    return {
+      badgeClassName: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+      badgeLabel: 'AA Grande',
+    };
+  }
+  return {
+    badgeClassName: 'bg-rose-500/20 text-rose-300 border-rose-500/40',
+    badgeLabel: 'Falha WCAG',
+  };
+};
+
+const getPositionStyle = (
+  position: { x: number; y: number } | null | undefined
+): React.CSSProperties => {
+  if (!position) {
+    return {};
+  }
+
+  const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+  const tooltipWidth = 280;
+  const tooltipHeight = 250;
+
+  let left = position.x;
+  let top = position.y - 15;
+
+  if (left - tooltipWidth / 2 < 10) {
+    left = tooltipWidth / 2 + 10;
+  } else if (left + tooltipWidth / 2 > screenWidth - 10) {
+    left = screenWidth - tooltipWidth / 2 - 10;
+  }
+
+  if (top - tooltipHeight < 10) {
+    top = position.y + 25; // Flip below cursor if near top
+  }
+
+  return {
+    position: 'fixed',
+    left: `${left}px`,
+    top: `${top}px`,
+    transform: top > position.y ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
+  };
+};
+
+interface ContrastBoxProps {
+  isBest: boolean;
+  dotClassName: string;
+  labelClassName: string;
+  label: string;
+  ratio: number;
+  badge: Badge;
+}
+
+const ContrastBox: React.FC<ContrastBoxProps> = ({
+  isBest,
+  dotClassName,
+  labelClassName,
+  label,
+  ratio,
+  badge,
+}) => (
+  <div
+    className={`p-2 rounded-lg border text-center transition-all ${isBest
+        ? 'bg-white/15 border-white/40 shadow-md ring-1 ring-white/20'
+        : 'bg-[#111827]/60 border-white/5 opacity-75'
+      }`}
+  >
+    <div className={`flex items-center justify-center gap-1 text-[10px] font-medium mb-0.5 ${labelClassName}`}>
+      <span className={`w-2 h-2 rounded-full inline-block shrink-0 ${dotClassName}`} />
+      <span>{label}</span>
+    </div>
+    <div className="font-mono text-sm font-bold text-white">{ratio.toFixed(2)}:1</div>
+    <div className="text-[9px] font-mono mt-0.5 flex justify-center gap-1">
+      <span className={badge.className}>{badge.label}</span>
+    </div>
+  </div>
+);
+
+interface StandardRowProps {
+  label: string;
+  passes: boolean;
+  passText: string;
+  failText: string;
+}
+
+const StandardRow: React.FC<StandardRowProps> = ({ label, passes, passText, failText }) => (
+  <div className="flex items-center justify-between text-[#94A3B8]">
+    <span>{label}</span>
+    <span className="flex items-center gap-1 font-semibold">
+      {passes ? (
+        <span className="text-emerald-400 flex items-center gap-0.5">
+          <Check className="w-3 h-3" /> Passa {passText}
+        </span>
+      ) : (
+        <span className="text-rose-400 flex items-center gap-0.5">
+          <X className="w-3 h-3" /> Falha {failText}
+        </span>
+      )}
+    </span>
+  </div>
+);
 
 export const WcagTooltip: React.FC<WcagTooltipProps> = ({
   colorHex,
@@ -18,7 +152,7 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
   nextColorHex,
   colorName,
   position,
-  className = ''
+  className = '',
 }) => {
   const ratioWhite = getContrastRatio('#FFFFFF', colorHex);
   const ratioBlack = getContrastRatio('#000000', colorHex);
@@ -39,59 +173,19 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
   const blackAa = ratioBlack >= 4.5;
   const blackAaa = ratioBlack >= 7.0;
 
-  // Resolve per-text-color badge styling and label without nested ternaries
-  const getTextBadge = (aaa: boolean, aa: boolean) => {
-    let className = 'text-rose-400';
-    let label = 'Reprovado';
-
-    if (aaa) {
-      className = 'text-emerald-400 font-bold';
-      label = 'AAA';
-    } else if (aa) {
-      className = 'text-[#06B6D4]';
-      label = 'AA';
-    }
-
-    return { className, label };
-  };
-
   const whiteBadge = getTextBadge(whiteAaa, whiteAa);
   const blackBadge = getTextBadge(blackAaa, blackAa);
+  const wcagLevel = getWcagLevel(normalAaa, normalAa, largeAa);
 
   // Adjacent contrasts
   const prevContrast = prevColorHex ? getContrastRatio(prevColorHex, colorHex) : null;
   const nextContrast = nextColorHex ? getContrastRatio(nextColorHex, colorHex) : null;
 
-  // Adjust style position if fixed coordinates provided
-  let positionStyle: React.CSSProperties = {};
-  if (position) {
-    const screenWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
-    const screenHeight = typeof window !== 'undefined' ? window.innerHeight : 800;
+  const positionStyle = getPositionStyle(position);
 
-    // Clamp to screen bounds
-    const tooltipWidth = 280;
-    const tooltipHeight = 250;
-
-    let left = position.x;
-    let top = position.y - 15;
-
-    if (left - tooltipWidth / 2 < 10) {
-      left = tooltipWidth / 2 + 10;
-    } else if (left + tooltipWidth / 2 > screenWidth - 10) {
-      left = screenWidth - tooltipWidth / 2 - 10;
-    }
-
-    if (top - tooltipHeight < 10) {
-      top = position.y + 25; // Flip below cursor if near top
-    }
-
-    positionStyle = {
-      position: 'fixed',
-      left: `${left}px`,
-      top: `${top}px`,
-      transform: top > position.y ? 'translate(-50%, 0)' : 'translate(-50%, -100%)',
-    };
-  }
+  const normalPassText = normalAaa ? 'AAA (7.0)' : 'AA (4.5)';
+  const largePassText = largeAaa ? 'AAA (4.5)' : 'AA (3.0)';
+  const bestTextLabel = bestText === 'white' ? 'Branco (#FFF)' : 'Preto (#000)';
 
   return (
     <div
@@ -115,106 +209,52 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
           )}
         </div>
         <div
-          className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border shadow-sm ${normalAaa
-            ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-            : normalAa
-              ? 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
-              : largeAa
-                ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-            }`}
+          className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border shadow-sm ${wcagLevel.badgeClassName}`}
         >
-          {normalAaa ? 'WCAG AAA' : normalAa ? 'WCAG AA' : largeAa ? 'AA Grande' : 'Falha WCAG'}
+          {wcagLevel.badgeLabel}
         </div>
       </div>
 
       {/* Main Contrast Values: White vs Black Text */}
       <div className="grid grid-cols-2 gap-2 mb-2.5">
-        {/* White Text Box */}
-        <div
-          className={`p-2 rounded-lg border text-center transition-all ${bestText === 'white'
-            ? 'bg-white/15 border-white/40 shadow-md ring-1 ring-white/20'
-            : 'bg-[#111827]/60 border-white/5 opacity-75'
-            }`}
-        >
-          <div className="flex items-center justify-center gap-1 text-[10px] text-white font-medium mb-0.5">
-            <span className="w-2 h-2 rounded-full bg-white border border-black/40 inline-block shrink-0" />
-            <span>Texto Branco</span>
-          </div>
-          <div className="font-mono text-sm font-bold text-white">
-            {ratioWhite.toFixed(2)}:1
-          </div>
-          <div className="text-[9px] font-mono mt-0.5 flex justify-center gap-1">
-            <span className={whiteBadge.className}>{whiteBadge.label}</span>
-          </div>
-        </div>
-
-        {/* Black Text Box */}
-        <div
-          className={`p-2 rounded-lg border text-center transition-all ${bestText === 'black'
-            ? 'bg-white/15 border-white/40 shadow-md ring-1 ring-white/20'
-            : 'bg-[#111827]/60 border-white/5 opacity-75'
-            }`}
-        >
-          <div className="flex items-center justify-center gap-1 text-[10px] text-[#94A3B8] font-medium mb-0.5">
-            <span className="w-2 h-2 rounded-full bg-black border border-white/40 inline-block shrink-0" />
-            <span>Texto Preto</span>
-          </div>
-          <div className="font-mono text-sm font-bold text-white">
-            {ratioBlack.toFixed(2)}:1
-          </div>
-          <div className="text-[9px] font-mono mt-0.5 flex justify-center gap-1">
-            <span className={blackBadge.className}>{blackBadge.label}</span>
-          </div>
-        </div>
+        <ContrastBox
+          isBest={bestText === 'white'}
+          dotClassName="bg-white border border-black/40"
+          labelClassName="text-white"
+          label="Texto Branco"
+          ratio={ratioWhite}
+          badge={whiteBadge}
+        />
+        <ContrastBox
+          isBest={bestText === 'black'}
+          dotClassName="bg-black border border-white/40"
+          labelClassName="text-[#94A3B8]"
+          label="Texto Preto"
+          ratio={ratioBlack}
+          badge={blackBadge}
+        />
       </div>
 
       {/* Detailed Standards Breakdown */}
       <div className="space-y-1.5 bg-[#111827]/80 rounded-lg p-2 border border-white/5 font-mono text-[10px]">
-        <div className="flex items-center justify-between text-[#94A3B8]">
-          <span>Texto Normal (16px)</span>
-          <span className="flex items-center gap-1 font-semibold">
-            {normalAa ? (
-              <span className="text-emerald-400 flex items-center gap-0.5">
-                <Check className="w-3 h-3" /> Passa {normalAaa ? 'AAA (7.0)' : 'AA (4.5)'}
-              </span>
-            ) : (
-              <span className="text-rose-400 flex items-center gap-0.5">
-                <X className="w-3 h-3" /> Falha (&lt;4.5)
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-[#94A3B8]">
-          <span>Texto Grande (18px+)</span>
-          <span className="flex items-center gap-1 font-semibold">
-            {largeAa ? (
-              <span className="text-emerald-400 flex items-center gap-0.5">
-                <Check className="w-3 h-3" /> Passa {largeAaa ? 'AAA (4.5)' : 'AA (3.0)'}
-              </span>
-            ) : (
-              <span className="text-rose-400 flex items-center gap-0.5">
-                <X className="w-3 h-3" /> Falha (&lt;3.0)
-              </span>
-            )}
-          </span>
-        </div>
-
-        <div className="flex items-center justify-between text-[#94A3B8]">
-          <span>Ícones / UI</span>
-          <span className="flex items-center gap-1 font-semibold">
-            {uiAa ? (
-              <span className="text-emerald-400 flex items-center gap-0.5">
-                <Check className="w-3 h-3" /> Passa AA (3.0)
-              </span>
-            ) : (
-              <span className="text-rose-400 flex items-center gap-0.5">
-                <X className="w-3 h-3" /> Falha (&lt;3.0)
-              </span>
-            )}
-          </span>
-        </div>
+        <StandardRow
+          label="Texto Normal (16px)"
+          passes={normalAa}
+          passText={normalPassText}
+          failText="(<4.5)"
+        />
+        <StandardRow
+          label="Texto Grande (18px+)"
+          passes={largeAa}
+          passText={largePassText}
+          failText="(<3.0)"
+        />
+        <StandardRow
+          label="Ícones / UI"
+          passes={uiAa}
+          passText="AA (3.0)"
+          failText="(<3.0)"
+        />
       </div>
 
       {/* Adjacent Swatch Contrast Ratios (if provided) */}
@@ -239,7 +279,7 @@ export const WcagTooltip: React.FC<WcagTooltipProps> = ({
       {/* Text recommendation helper */}
       <div className="mt-2 text-[10px] text-[#06B6D4] flex items-center gap-1 font-medium">
         <Sparkles className="w-3 h-3 shrink-0" />
-        <span>Texto {bestText === 'white' ? 'Branco (#FFF)' : 'Preto (#000)'} oferece melhor contraste</span>
+        <span>Texto {bestTextLabel} oferece melhor contraste</span>
       </div>
     </div>
   );

@@ -1,21 +1,12 @@
 import React, { useState } from 'react';
-import { 
-  FileText, 
-  CheckCircle2, 
-  Clock, 
-  Tag, 
-  BarChart3, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  Sparkles, 
-  Eye, 
-  Award, 
-  X, 
-  Check, 
-  TrendingUp, 
-  Globe,
-  Sliders
+import {
+  FileText,
+  Tag,
+  BarChart3,
+  Plus,
+  Award,
+  X,
+  Check
 } from 'lucide-react';
 import { CmsArticle, CommunitySubmission } from '../types';
 
@@ -53,7 +44,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
   const [newTagName, setNewTagName] = useState('');
   const [newTagCategory, setNewTagCategory] = useState('Estilo');
 
-  const handleCreateArticleSubmit = (e: React.FormEvent) => {
+  const handleCreateArticleSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newTitle.trim()) return;
     const article: CmsArticle = {
@@ -77,7 +68,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
     setNewContent('');
   };
 
-  const handleAddTagSubmit = (e: React.FormEvent) => {
+  const handleAddTagSubmit = (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newTagName.trim()) return;
     onAddTag(newTagName.trim(), newTagCategory);
@@ -91,7 +82,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-            Sistema de Gestão de Conteúdo (CMS)
+            {'Sistema de Gestão de Conteúdo (CMS)'}
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-['Geist'] mt-1">
             Painel Editorial & Curadoria Comunitária
@@ -116,11 +107,10 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
       <div className="flex items-center gap-2 border-b border-white/[0.08] mb-8">
         <button
           onClick={() => setCmsTab('articles')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${
-            cmsTab === 'articles'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${cmsTab === 'articles'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <FileText className="w-4 h-4 text-[#6366F1]" />
           <span>Gestão Editorial ({articles.length})</span>
@@ -128,11 +118,10 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
 
         <button
           onClick={() => setCmsTab('curation')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${
-            cmsTab === 'curation'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${cmsTab === 'curation'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Award className="w-4 h-4 text-[#06B6D4]" />
           <span>Fila de Curadoria ({submissions.filter(s => s.status === 'Pendente').length} Pendentes)</span>
@@ -140,11 +129,10 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
 
         <button
           onClick={() => setCmsTab('taxonomy')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${
-            cmsTab === 'taxonomy'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${cmsTab === 'taxonomy'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Tag className="w-4 h-4 text-[#EC4899]" />
           <span>Taxonomia & Tags ({tags.length})</span>
@@ -152,11 +140,10 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
 
         <button
           onClick={() => setCmsTab('analytics')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${
-            cmsTab === 'analytics'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 transition-all ${cmsTab === 'analytics'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <BarChart3 className="w-4 h-4 text-emerald-400" />
           <span>Analytics do Studio</span>
@@ -229,10 +216,10 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <img 
-                        src={sub.authorAvatar} 
-                        alt={sub.author} 
-                        className="w-6 h-6 rounded-full object-cover" 
+                      <img
+                        src={sub.authorAvatar}
+                        alt={sub.author}
+                        className="w-6 h-6 rounded-full object-cover"
                       />
                       <span className="text-xs font-medium text-white">{sub.author}</span>
                       <span className="text-xs text-[#64748B] font-mono">{sub.authorHandle}</span>
@@ -246,17 +233,19 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                   </h3>
 
                   {/* Swatch stripe */}
-                  <div 
+                  <button
+                    type="button"
                     onClick={() => onOpenInGenerator(sub.colors)}
-                    className="h-16 rounded-lg overflow-hidden flex shadow-inner border border-white/10 cursor-pointer"
+                    className="w-full h-16 rounded-lg overflow-hidden flex shadow-inner border border-white/10 cursor-pointer"
                     title="Testar paleta no Gerador"
+                    aria-label={`Testar paleta ${sub.title} no Gerador`}
                   >
                     {sub.colors.map((c, i) => (
-                      <div key={i} className="flex-1 h-full flex items-end p-1 text-[10px] font-mono text-white/90 bg-black/20" style={{ backgroundColor: c }}>
+                      <div key={`${c}-${i}`} className="flex-1 h-full flex items-end p-1 text-[10px] font-mono text-white/90 bg-black/20" style={{ backgroundColor: c }}>
                         {c}
                       </div>
                     ))}
-                  </div>
+                  </button>
 
                   {/* Meta tags */}
                   <div className="flex items-center gap-2 mt-3 text-[11px] font-mono">
@@ -355,8 +344,9 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
 
             <form onSubmit={handleAddTagSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Nome da Tag:</label>
+                <label htmlFor="new-tag-name" className="text-xs font-mono text-[#94A3B8] block mb-1">Nome da Tag:</label>
                 <input
+                  id="new-tag-name"
                   type="text"
                   required
                   placeholder="Ex: Futurismo Brutalista"
@@ -367,8 +357,9 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Categoria:</label>
+                <label htmlFor="new-tag-category" className="text-xs font-mono text-[#94A3B8] block mb-1">Categoria:</label>
                 <select
+                  id="new-tag-category"
                   value={newTagCategory}
                   onChange={(e) => setNewTagCategory(e.target.value)}
                   className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
@@ -482,8 +473,9 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
             </h3>
             <form onSubmit={handleCreateArticleSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Título do Artigo:</label>
+                <label htmlFor="article-title" className="text-xs font-mono text-[#94A3B8] block mb-1">Título do Artigo:</label>
                 <input
+                  id="article-title"
                   type="text"
                   required
                   placeholder="Ex: Como calibrar matrizes de contraste no Figma"
@@ -494,8 +486,9 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Categoria:</label>
+                <label htmlFor="article-category" className="text-xs font-mono text-[#94A3B8] block mb-1">Categoria:</label>
                 <select
+                  id="article-category"
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
                   className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
@@ -508,8 +501,9 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Resumo Executivo:</label>
+                <label htmlFor="article-summary" className="text-xs font-mono text-[#94A3B8] block mb-1">Resumo Executivo:</label>
                 <textarea
+                  id="article-summary"
                   rows={2}
                   required
                   placeholder="Resumo em 2 a 3 frases para listagens e cartões..."
@@ -520,8 +514,9 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono text-[#94A3B8] block mb-1">Conteúdo Completo (Markdown):</label>
+                <label htmlFor="article-content" className="text-xs font-mono text-[#94A3B8] block mb-1">Conteúdo Completo (Markdown):</label>
                 <textarea
+                  id="article-content"
                   rows={6}
                   placeholder="Escreva a análise técnica completa..."
                   value={newContent}

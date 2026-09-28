@@ -1,17 +1,12 @@
-import React, { useState, useRef } from 'react';
-import { 
-  Upload, 
-  Sparkles, 
-  Bookmark, 
-  Eye, 
-  Plus, 
-  Trash2, 
-  Database, 
-  Check, 
-  Image as ImageIcon,
-  Sliders,
-  ExternalLink,
-  ShieldCheck,
+import React, { useState, useRef, useEffect } from 'react';
+import {
+  Upload,
+  Sparkles,
+  Bookmark,
+  Plus,
+  Trash2,
+  Database,
+  Check,
   RefreshCw
 } from 'lucide-react';
 import { extractPaletteFromImage, getColorDetails } from '../utils/colorUtils';
@@ -19,8 +14,8 @@ import { CuratedDemoImage } from '../types';
 
 interface ImageExtractorViewProps {
   curatedImages: CuratedDemoImage[];
-  onOpenInGenerator: (colors: string[]) => void;
-  onSaveToCollection: (colors: string[]) => void;
+  onApplyToActivePalette: (colors: string[]) => void;
+  onProceedToRefine: () => void;
   onSaveCuratedImage: (img: CuratedDemoImage) => void;
   onDeleteCuratedImage: (id: string) => void;
   onResetCuratedImages: () => void;
@@ -29,8 +24,8 @@ interface ImageExtractorViewProps {
 
 export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
   curatedImages,
-  onOpenInGenerator,
-  onSaveToCollection,
+  onApplyToActivePalette,
+  onProceedToRefine,
   onSaveCuratedImage,
   onDeleteCuratedImage,
   onResetCuratedImages,
@@ -56,6 +51,14 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 3500);
   };
+
+  // Input mode behavior: every extraction is immediately synced into the
+  // centralized active palette (no redundant save/audit actions here).
+  useEffect(() => {
+    if (extractedColors.length > 0) {
+      onApplyToActivePalette(extractedColors);
+    }
+  }, [extractedColors, onApplyToActivePalette]);
 
   const processImage = (imgElement: HTMLImageElement) => {
     setIsProcessing(true);
@@ -89,7 +92,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
     if (!selectedImage) return;
     const name = curatedName.trim() || `Curadoria ${curatedImages.length + 1}`;
     const newCurated: CuratedDemoImage = {
-      id: `curated-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+      id: `curated-${crypto.randomUUID()}`,
       name,
       url: selectedImage,
       tag: curatedTag.trim() || 'Curadoria',
@@ -131,14 +134,13 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
           <div className="flex items-center gap-2">
             <span className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
               <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-              Visão Computacional & K-Means
+              {' '}Visão Computacional & K-Means
             </span>
             <span
-              className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 transition-colors ${
-                isSupabaseConnected 
-                  ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                  : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8]'
-              }`}
+              className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 transition-colors ${isSupabaseConnected
+                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
+                : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8]'
+                }`}
               title="Status do Banco de Dados Supabase"
             >
               <Database className="w-3 h-3" />
@@ -182,11 +184,11 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
           </button>
 
           <button
-            onClick={() => onOpenInGenerator(extractedColors)}
+            onClick={onProceedToRefine}
             className="h-9 px-4 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-colors cursor-pointer"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Abrir no Gerador</span>
+            <span>Continuar para Refinar</span>
           </button>
         </div>
       </div>
@@ -216,7 +218,8 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
           {curatedImages.map((preset) => {
             const isSelected = selectedImage === preset.url;
             return (
-              <div
+              <button
+                type="button"
                 key={preset.id}
                 onClick={() => {
                   setSelectedImage(preset.url);
@@ -224,17 +227,16 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
                     setExtractedColors(preset.colors);
                   }
                 }}
-                className={`p-2 rounded-xl border text-left transition-all overflow-hidden group relative cursor-pointer ${
-                  isSelected
-                    ? 'border-[#06B6D4] bg-[#181C24] ring-1 ring-[#06B6D4]'
-                    : 'border-white/[0.08] bg-[#111827] hover:border-white/20'
-                }`}
+                className={`p-2 rounded-xl border text-left transition-all overflow-hidden group relative cursor-pointer ${isSelected
+                  ? 'border-[#06B6D4] bg-[#181C24] ring-1 ring-[#06B6D4]'
+                  : 'border-white/[0.08] bg-[#111827] hover:border-white/20'
+                  }`}
               >
                 <div className="h-20 w-full rounded-lg overflow-hidden mb-2 bg-black relative">
-                  <img 
-                    src={preset.url} 
+                  <img
+                    src={preset.url}
                     alt={preset.name}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform" 
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                   />
                   {preset.isCustom && (
                     <button
@@ -247,8 +249,8 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
                   )}
                   {preset.colors && preset.colors.length > 0 && (
                     <div className="absolute bottom-0 left-0 right-0 h-1.5 flex">
-                      {preset.colors.map((c, i) => (
-                        <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
+                      {preset.colors.map((c) => (
+                        <div key={c} className="flex-1 h-full" style={{ backgroundColor: c }} />
                       ))}
                     </div>
                   )}
@@ -262,7 +264,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
                   )}
                 </div>
                 <span className="text-[10px] font-mono text-[#64748B] block truncate">{preset.tag}</span>
-              </div>
+              </button>
             );
           })}
 
@@ -308,7 +310,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
           <div className="mt-4 flex items-center justify-between w-full max-w-xl text-xs font-mono text-[#94A3B8] pt-2 border-t border-white/[0.04]">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              Amostragem: Alta Resolução Perceptual
+              {' '}Amostragem: Alta Resolução Perceptual
             </span>
             <span>Espaço: CIE-Lab / sRGB & Oklch</span>
           </div>
@@ -336,11 +338,10 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
                       setColorsCount(n);
                       if (imgRef.current) processImage(imgRef.current);
                     }}
-                    className={`w-6 h-6 rounded text-[11px] font-mono cursor-pointer transition-colors ${
-                      colorsCount === n 
-                        ? 'bg-[#6366F1] text-white font-bold shadow-sm' 
-                        : 'bg-[#111827] text-[#94A3B8] hover:text-white'
-                    }`}
+                    className={`w-6 h-6 rounded text-[11px] font-mono cursor-pointer transition-colors ${colorsCount === n
+                      ? 'bg-[#6366F1] text-white font-bold shadow-sm'
+                      : 'bg-[#111827] text-[#94A3B8] hover:text-white'
+                      }`}
                   >
                     {n}
                   </button>
@@ -350,11 +351,11 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
 
             {/* Extracted Swatches List */}
             <div className="space-y-2.5">
-              {extractedColors.map((hex, i) => {
+              {extractedColors.map((hex) => {
                 const details = getColorDetails(hex);
                 return (
                   <div
-                    key={i}
+                    key={hex}
                     className="p-2.5 rounded-lg border border-white/[0.06] bg-[#111827] flex items-center justify-between group hover:border-white/20 transition-all"
                   >
                     <div className="flex items-center gap-3">
@@ -385,20 +386,15 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
 
           <div className="mt-6 pt-4 border-t border-white/[0.06] space-y-2">
             <button
-              onClick={() => onSaveToCollection(extractedColors)}
-              className="w-full h-10 rounded-lg bg-[#262A33] hover:bg-[#31353E] border border-white/[0.08] text-white text-xs font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
-            >
-              <Bookmark className="w-3.5 h-3.5 text-[#06B6D4]" />
-              <span>Salvar no Cofre de Paletas</span>
-            </button>
-
-            <button
-              onClick={() => onOpenInGenerator(extractedColors)}
+              onClick={onProceedToRefine}
               className="w-full h-10 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Editar no Gerador Procedural</span>
+              <span>Aplicar & Continuar na Esteira de Edição</span>
             </button>
+            <p className="text-[11px] font-mono text-[#64748B] text-center">
+              Paleta extraída sincronizada com a Paleta Ativa
+            </p>
           </div>
         </div>
       </div>
@@ -417,8 +413,9 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
 
             <div className="space-y-3 mb-5">
               <div>
-                <label className="block text-[#94A3B8] font-mono text-[11px] mb-1">Nome da Imagem</label>
+                <label htmlFor="curated-name" className="block text-[#94A3B8] font-mono text-[11px] mb-1">Nome da Imagem</label>
                 <input
+                  id="curated-name"
                   type="text"
                   placeholder="Ex: Pôr do Sol em Kyoto"
                   value={curatedName}
@@ -428,8 +425,9 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-[#94A3B8] font-mono text-[11px] mb-1">Categoria / Tag</label>
+                <label htmlFor="curated-tag" className="block text-[#94A3B8] font-mono text-[11px] mb-1">Categoria / Tag</label>
                 <input
+                  id="curated-tag"
                   type="text"
                   placeholder="Ex: Arquitetura, Cyberpunk, Natureza..."
                   value={curatedTag}
@@ -441,8 +439,8 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
               <div className="p-2.5 bg-[#0B0F17] rounded-lg border border-white/[0.06] flex items-center gap-2">
                 <span className="text-[11px] text-[#64748B] font-mono">Paleta:</span>
                 <div className="flex-1 h-4 rounded overflow-hidden flex">
-                  {extractedColors.map((c, i) => (
-                    <div key={i} className="flex-1 h-full" style={{ backgroundColor: c }} />
+                  {extractedColors.map((c) => (
+                    <div key={c} className="flex-1 h-full" style={{ backgroundColor: c }} />
                   ))}
                 </div>
               </div>

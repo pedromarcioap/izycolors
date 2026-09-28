@@ -553,7 +553,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
               {/* Status Filter */}
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as any)}
+                onChange={(e) => setStatusFilter(e.target.value as 'all' | 'active' | 'suspended')}
                 className="h-8 px-2.5 bg-[#10141D] border border-white/[0.08] rounded-lg text-xs font-mono text-[#94A3B8] focus:outline-none focus:border-purple-500"
               >
                 <option value="all">Status: Todos</option>
@@ -1022,7 +1022,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                 <select
                   id="admin-new-article-category"
                   value={newArticleCategory}
-                  onChange={(e) => setNewArticleCategory(e.target.value as any)}
+                  onChange={(e) => setNewArticleCategory(e.target.value as CmsArticle['category'])}
                   className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
                 >
                   <option value="Teoria da Cor">Teoria da Cor</option>

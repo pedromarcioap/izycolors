@@ -3,14 +3,10 @@ import {
   Sparkles,
   Layers,
   Compass,
-  SlidersHorizontal,
   Download,
-  CheckCircle2,
   User,
   FileText,
   Command,
-  Eye,
-  Disc3,
   PanelLeftClose,
   Search,
   ShieldCheck,
@@ -69,12 +65,18 @@ interface NavItem {
   count?: number | string;
 }
 
-const getNavItems = (
+interface NavSection {
+  id: string;
+  label: string;
+  items: NavItem[];
+}
+
+const getNavSections = (
   authUser: AuthUser,
   projectsCount: number,
   favoritesCount: number,
   forksCount: number
-): NavItem[] => {
+): NavSection[] => {
   const canAccessCms =
     authUser.role === 'admin' ||
     authUser.role === 'moderator' ||
@@ -89,97 +91,83 @@ const getNavItems = (
 
   return [
     {
-      id: 'generator',
-      label: 'Gerador Procedural',
-      shortLabel: 'Gerador',
-      icon: Sparkles,
-      badge: 'Espaço',
-      description: 'Geração procedural Oklch'
+      id: 'creation',
+      label: 'Criação & Edição',
+      items: [
+        {
+          id: 'generator',
+          label: 'Estúdio de Cores',
+          shortLabel: 'Estúdio',
+          icon: Sparkles,
+          badge: 'WIP',
+          description: 'Paleta Ativa em produção'
+        }
+      ]
     },
     {
-      id: 'projects',
-      label: 'Projetos & Cofre',
-      shortLabel: 'Cofre',
-      icon: Layers,
-      count: projectsCount + favoritesCount,
-      description: 'Workspaces e tokens salvos'
+      id: 'library',
+      label: 'Biblioteca & Comunidade',
+      items: [
+        {
+          id: 'explorer',
+          label: 'Explorar & Forks',
+          shortLabel: 'Explorar',
+          icon: Compass,
+          count: forksCount > 0 ? `${forksCount} forks` : undefined,
+          badge: 'Comunidade',
+          description: 'Feed e derivações de paletas'
+        },
+        {
+          id: 'projects',
+          label: 'Projetos & Cofre',
+          shortLabel: 'Cofre',
+          icon: Layers,
+          count: projectsCount + favoritesCount,
+          description: 'Workspaces e tokens salvos'
+        }
+      ]
     },
     {
-      id: 'explorer',
-      label: 'Explorar & Forks',
-      shortLabel: 'Explorar',
-      icon: Compass,
-      count: forksCount > 0 ? `${forksCount} forks` : undefined,
-      badge: 'Comunidade',
-      description: 'Feed e derivações de paletas'
-    },
-    {
-      id: 'wheel',
-      label: 'Roda Harmônica',
-      shortLabel: 'Harmonia',
-      icon: Disc3,
-      badge: 'Cromática',
-      description: 'Regras de harmonia cromática'
-    },
-    {
-      id: 'extractor',
-      label: 'Extrator de Imagem',
-      shortLabel: 'Extrator',
-      icon: Eye,
-      badge: 'K-Means',
-      description: 'Imagens curadas e upload'
-    },
-    {
-      id: 'lab',
-      label: 'Color Space Lab',
-      shortLabel: 'Lab',
-      icon: SlidersHorizontal,
-      badge: 'OKLCH',
-      description: 'Gamuts P3 & Rec.2020'
-    },
-    {
-      id: 'accessibility',
-      label: 'Auditoria WCAG / APCA',
-      shortLabel: 'Acessibilidade',
-      icon: CheckCircle2,
-      badge: 'AAA',
-      description: 'Simulador de daltonismo'
-    },
-    ...(authUser.role === 'admin' ? [
-      {
-        id: 'admin' as NavigationTab,
-        label: 'Painel Admin',
-        shortLabel: 'Admin',
-        icon: ShieldCheck,
-        badge: 'Admin',
-        description: 'Gestão de usuários e auditoria'
-      }
-    ] : []),
-    ...(canAccessCms ? [
-      {
-        id: 'cms' as NavigationTab,
-        label: 'CMS Editorial',
-        shortLabel: 'CMS',
-        icon: FileText,
-        badge: cmsBadgeLabel,
-        description: authUser.role === 'moderator' ? 'Moderação & curadoria' : 'Artigos e curadoria'
-      }
-    ] : []),
-    {
-      id: 'user_dashboard',
-      label: 'Dashboard de Cores',
-      shortLabel: 'Dashboard',
-      icon: BarChart3,
-      badge: 'Analytics',
-      description: 'Frequência, gamuts & evolução'
-    },
-    {
-      id: 'profile',
-      label: 'Meu Perfil & Espaço',
-      shortLabel: 'Perfil',
-      icon: User,
-      badge: authUser.role.toUpperCase(),
-      description: authUser.handle || authUser.name
+      id: 'governance',
+      label: 'Sistema & Governança',
+      items: [
+        {
+          id: 'profile',
+          label: 'Meu Perfil & Espaço',
+          shortLabel: 'Perfil',
+          icon: User,
+          badge: authUser.role.toUpperCase(),
+          description: authUser.handle || authUser.name
+        },
+        {
+          id: 'user_dashboard',
+          label: 'Dashboard de Cores',
+          shortLabel: 'Dashboard',
+          icon: BarChart3,
+          badge: 'Analytics',
+          description: 'Frequência, gamuts & evolução'
+        },
+        ...(authUser.role === 'admin' ? [
+          {
+            id: 'admin' as NavigationTab,
+            label: 'Painel Admin',
+            shortLabel: 'Admin',
+            icon: ShieldCheck,
+            badge: 'Admin',
+            description: 'Gestão de usuários e auditoria'
+          }
+        ] : []),
+        ...(canAccessCms ? [
+          {
+            id: 'cms' as NavigationTab,
+            label: 'CMS Editorial',
+            shortLabel: 'CMS',
+            icon: FileText,
+            badge: cmsBadgeLabel,
+            description: authUser.role === 'moderator' ? 'Moderação & curadoria' : 'Artigos e curadoria'
+          }
+        ] : [])
+      ]
     }
   ];
 };
@@ -200,7 +188,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isExpanded,
   onToggleExpanded
 }) => {
-  const navItems = getNavItems(authUser, projectsCount, favoritesCount, forksCount);
+  const navSections = getNavSections(authUser, projectsCount, favoritesCount, forksCount);
 
   return (
     <aside
@@ -273,65 +261,78 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Nav Items List */}
-        <nav className="p-2 space-y-1 overflow-y-auto max-h-[calc(100vh-290px)] scrollbar-none">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = currentTab === item.id;
-            return (
-              <div key={item.id} className="relative group">
-                <button
-                  onClick={() => onTabChange(item.id)}
-                  className={`w-full flex items-center rounded-lg transition-all duration-150 cursor-pointer ${isExpanded ? 'px-3 py-2.5 gap-3' : 'h-10 w-10 mx-auto justify-center'
-                    } ${isActive
-                      ? 'bg-[#6366F1] text-white shadow-md shadow-indigo-600/30 font-semibold'
-                      : 'text-[#94A3B8] hover:text-white hover:bg-[#181C24]'
-                    }`}
-                  aria-label={item.label}
-                >
-                  <Icon className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'scale-110 text-white' : 'text-[#94A3B8] group-hover:text-[#06B6D4]'
-                    }`} />
+        {/* Nav Items List grouped by the three product pillars */}
+        <nav className="p-2 space-y-4 overflow-y-auto max-h-[calc(100vh-290px)] scrollbar-none">
+          {navSections.map((section) => (
+            <div key={section.id}>
+              {isExpanded && (
+                <div className="px-3 pb-1.5">
+                  <span className="text-[9px] font-mono uppercase tracking-widest text-[#64748B]">
+                    {section.label}
+                  </span>
+                </div>
+              )}
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = currentTab === item.id;
+                  return (
+                    <div key={item.id} className="relative group">
+                      <button
+                        onClick={() => onTabChange(item.id)}
+                        className={`w-full flex items-center rounded-lg transition-all duration-150 cursor-pointer ${isExpanded ? 'px-3 py-2.5 gap-3' : 'h-10 w-10 mx-auto justify-center'
+                          } ${isActive
+                            ? 'bg-[#6366F1] text-white shadow-md shadow-indigo-600/30 font-semibold'
+                            : 'text-[#94A3B8] hover:text-white hover:bg-[#181C24]'
+                          }`}
+                        aria-label={item.label}
+                      >
+                        <Icon className={`w-4 h-4 shrink-0 transition-transform ${isActive ? 'scale-110 text-white' : 'text-[#94A3B8] group-hover:text-[#06B6D4]'
+                          }`} />
 
-                  {isExpanded && (
-                    <div className="flex-1 flex items-center justify-between min-w-0 text-left">
-                      <span className="text-xs font-medium truncate">{item.label}</span>
-                      <div className="flex items-center gap-1 shrink-0 ml-1.5">
-                        {item.count !== undefined && (
-                          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isActive ? 'bg-white/25 text-white' : 'bg-[#262A33] text-[#06B6D4]'
-                            }`}>
-                            {item.count}
-                          </span>
+                        {isExpanded && (
+                          <div className="flex-1 flex items-center justify-between min-w-0 text-left">
+                            <span className="text-xs font-medium truncate">{item.label}</span>
+                            <div className="flex items-center gap-1 shrink-0 ml-1.5">
+                              {item.count !== undefined && (
+                                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isActive ? 'bg-white/25 text-white' : 'bg-[#262A33] text-[#06B6D4]'
+                                  }`}>
+                                  {item.count}
+                                </span>
+                              )}
+                              {item.badge && (
+                                <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isActive ? 'bg-white/20 text-white' : 'bg-[#181C24] text-[#94A3B8] border border-white/[0.06]'
+                                  }`}>
+                                  {item.badge}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         )}
-                        {item.badge && (
-                          <span className={`px-1.5 py-0.2 rounded text-[10px] font-mono ${isActive ? 'bg-white/20 text-white' : 'bg-[#181C24] text-[#94A3B8] border border-white/[0.06]'
-                            }`}>
-                            {item.badge}
-                          </span>
-                        )}
-                      </div>
+                      </button>
+
+                      {/* Floating Tooltip when collapsed */}
+                      {!isExpanded && (
+                        <div className="absolute left-full ml-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#181C24] border border-white/[0.12] rounded-md shadow-2xl text-xs text-[#DFE2EE] whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 flex items-center gap-2">
+                          <span className="font-semibold">{item.label}</span>
+                          {item.badge && (
+                            <span className="px-1 py-0.2 bg-[#06B6D4]/10 text-[#06B6D4] border border-[#06B6D4]/30 rounded text-[9px] font-mono">
+                              {item.badge}
+                            </span>
+                          )}
+                          {item.count !== undefined && (
+                            <span className="px-1.5 py-0.2 bg-[#262A33] text-[#DFE2EE] rounded-full text-[10px] font-mono">
+                              {item.count}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  )}
-                </button>
-
-                {/* Floating Tooltip when collapsed */}
-                {!isExpanded && (
-                  <div className="absolute left-full ml-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#181C24] border border-white/[0.12] rounded-md shadow-2xl text-xs text-[#DFE2EE] whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 flex items-center gap-2">
-                    <span className="font-semibold">{item.label}</span>
-                    {item.badge && (
-                      <span className="px-1 py-0.2 bg-[#06B6D4]/10 text-[#06B6D4] border border-[#06B6D4]/30 rounded text-[9px] font-mono">
-                        {item.badge}
-                      </span>
-                    )}
-                    {item.count !== undefined && (
-                      <span className="px-1.5 py-0.2 bg-[#262A33] text-[#DFE2EE] rounded-full text-[10px] font-mono">
-                        {item.count}
-                      </span>
-                    )}
-                  </div>
-                )}
+                  );
+                })}
               </div>
-            );
-          })}
+            </div>
+          ))}
         </nav>
       </div>
 

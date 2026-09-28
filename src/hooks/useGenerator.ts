@@ -53,16 +53,21 @@ export function useGenerator(options: UseGeneratorOptions = {}) {
     setTimeout(() => setToastMessage(null), 2500);
   }, []);
 
-  // Sync initial colors if passed from outside (e.g., when opening a saved palette)
+  // Sync initial colors if passed from outside (e.g., when opening a saved palette).
+  // The value guard prevents both render loops and reverting in-progress internal edits:
+  // we only reset when the incoming palette actually differs from the current columns.
   useEffect(() => {
-    if (initialColors && initialColors.length > 0) {
-      setColors(initialColors.map((hex, i) => ({
-        id: `col-${i}-${Date.now()}`,
-        hex: hex.toUpperCase(),
-        name: `Color ${i + 1}`,
-        locked: false
-      })));
-    }
+    if (!initialColors || initialColors.length === 0) return;
+    const incomingKey = initialColors.join('|').toUpperCase();
+    const currentKey = colors.map(c => c.hex).join('|').toUpperCase();
+    if (incomingKey === currentKey) return;
+
+    setColors(initialColors.map((hex, i) => ({
+      id: `col-${i}-${Date.now()}`,
+      hex: hex.toUpperCase(),
+      name: `Color ${i + 1}`,
+      locked: false
+    })));
   }, [initialColors]);
 
   // Compute currently locked colors

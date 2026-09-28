@@ -1,26 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Sparkles, 
-  Layers, 
-  Compass, 
-  Eye, 
-  SlidersHorizontal, 
-  Check, 
-  FileText, 
-  User, 
-  Download, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Search,
+  Sparkles,
+  Layers,
+  Compass,
+  Eye,
+  SlidersHorizontal,
+  Check,
+  FileText,
+  User,
+  Download,
   X,
   Palette as PaletteIcon,
-  ShieldCheck,
-  LayoutDashboard
+  ShieldCheck
 } from 'lucide-react';
-import { NavigationTab, ColorGamut, AuthUser } from '../types';
+import { NavigationTab, ColorGamut, AuthUser, StudioStage } from '../types';
 
 interface CommandPaletteProps {
   isOpen: boolean;
   onClose: () => void;
   onNavigate: (tab: NavigationTab) => void;
+  onNavigateStage: (stage: StudioStage) => void;
+  onOpenImageExtractor: () => void;
   onQuickGenerate: () => void;
   onGamutChange: (gamut: ColorGamut) => void;
   onOpenExport: () => void;
@@ -44,12 +45,16 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   isOpen,
   onClose,
   onNavigate,
+  onNavigateStage,
+  onOpenImageExtractor,
   onQuickGenerate,
   onGamutChange,
   onOpenExport,
   authUser
 }) => {
   const [query, setQuery] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -57,12 +62,36 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         e.preventDefault();
         isOpen ? onClose() : void 0;
       }
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (isOpen) {
+      inputRef.current?.focus();
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) {
+      dialog.showModal();
+    }
+    const handleCancel = (e: Event) => {
+      e.preventDefault();
+      onClose();
+    };
+    const handleClose = () => {
+      onClose();
+    };
+    dialog?.addEventListener('cancel', handleCancel);
+    dialog?.addEventListener('close', handleClose);
+    return () => {
+      dialog?.removeEventListener('cancel', handleCancel);
+      dialog?.removeEventListener('close', handleClose);
+    };
   }, [isOpen, onClose]);
 
   if (!isOpen) return null;
@@ -78,12 +107,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     {
       category: 'Módulos do Studio',
       items: [
-        { id: 'tab-gen', label: 'Gerador Procedural com Locks', icon: Sparkles, action: () => { onNavigate('generator'); onClose(); } },
+        { id: 'tab-gen', label: 'Estúdio de Cores — Criar (Procedural & Mood)', icon: Sparkles, action: () => { onNavigate('generator'); onNavigateStage('generate'); onClose(); } },
         { id: 'tab-exp', label: 'Explorar Paletas da Comunidade', icon: Compass, action: () => { onNavigate('explorer'); onClose(); } },
-        { id: 'tab-wheel', label: 'Roda Cromática Harmônica', icon: PaletteIcon, action: () => { onNavigate('wheel'); onClose(); } },
-        { id: 'tab-extr', label: 'Extrator de Paleta de Imagem (K-Means)', icon: Eye, action: () => { onNavigate('extractor'); onClose(); } },
-        { id: 'tab-lab', label: 'Color Space Lab & Gradientes Perceptuais', icon: SlidersHorizontal, action: () => { onNavigate('lab'); onClose(); } },
-        { id: 'tab-acc', label: 'Auditoria de Acessibilidade & Daltonismo', icon: Check, action: () => { onNavigate('accessibility'); onClose(); } },
+        { id: 'tab-wheel', label: 'Roda Cromática Harmônica (Refinar)', icon: PaletteIcon, action: () => { onNavigate('generator'); onNavigateStage('refine'); onClose(); } },
+        { id: 'tab-extr', label: 'Extrator de Paleta de Imagem (K-Means)', icon: Eye, action: () => { onOpenImageExtractor(); onClose(); } },
+        { id: 'tab-lab', label: 'Color Space Lab & Gradientes Perceptuais (Refinar)', icon: SlidersHorizontal, action: () => { onNavigate('generator'); onNavigateStage('refine'); onClose(); } },
+        { id: 'tab-acc', label: 'Auditoria de Acessibilidade & Daltonismo', icon: Check, action: () => { onNavigate('generator'); onNavigateStage('audit'); onClose(); } },
         { id: 'tab-proj', label: 'Projetos, Coleções & Cofre de Cores', icon: Layers, action: () => { onNavigate('projects'); onClose(); } },
         ...(authUser?.role === 'admin' ? [
           { id: 'tab-admin', label: 'Painel Administrativo & Governança de Usuários', icon: ShieldCheck, hint: 'Admin', action: () => { onNavigate('admin'); onClose(); } },
@@ -108,22 +137,30 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   })).filter(cat => cat.items.length > 0);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-start justify-center pt-20 px-4">
-      <div 
-        className="w-full max-w-2xl bg-[#111827] border border-white/[0.12] rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <dialog
+      ref={dialogRef}
+      aria-label="Paleta de comandos"
+      className="fixed inset-0 z-50 m-0 flex h-full w-full max-h-none max-w-none items-start justify-center bg-transparent p-0 px-4 pt-20 border-0"
+    >
+      <button
+        type="button"
+        tabIndex={-1}
+        aria-label="Fechar paleta de comandos"
+        onClick={onClose}
+        className="fixed inset-0 z-0 h-full w-full cursor-default bg-black/70 backdrop-blur-sm"
+      />
+      <div className="relative z-10 w-full max-w-2xl bg-[#111827] border border-white/[0.12] rounded-xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95">
         <div className="relative border-b border-white/[0.08] flex items-center px-4 h-14">
           <Search className="w-5 h-5 text-[#64748B] shrink-0" />
           <input
+            ref={inputRef}
             type="text"
             placeholder="Digite um comando, ferramenta ou espaço de cor..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            autoFocus
             className="w-full bg-transparent px-3 text-sm text-white placeholder-[#64748B] focus:outline-none font-['Geist']"
           />
-          <button 
+          <button
             onClick={onClose}
             className="p-1 rounded text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors"
           >
@@ -137,8 +174,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
               Nenhum comando encontrado para "{query}".
             </div>
           ) : (
-            filtered.map((cat, idx) => (
-              <div key={idx} className="py-2 first:pt-0 last:pb-0">
+            filtered.map((cat) => (
+              <div key={cat.category} className="py-2 first:pt-0 last:pb-0">
                 <div className="px-3 py-1 text-[11px] font-semibold text-[#64748B] uppercase tracking-wider font-mono">
                   {cat.category}
                 </div>
@@ -178,6 +215,6 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           <span className="text-[#06B6D4]">Izy Colors Fast Jump</span>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 };

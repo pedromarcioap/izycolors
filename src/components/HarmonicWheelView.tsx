@@ -1,8 +1,6 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import {
-  Sparkles,
   RefreshCw,
-  Bookmark,
   Check,
   RotateCcw,
   RotateCw,
@@ -36,19 +34,22 @@ const COLOR_REGION_BOUNDARIES: ReadonlyArray<{ maxAngle: number; name: string }>
 ];
 
 interface HarmonicWheelViewProps {
-  onOpenInGenerator: (colors: string[]) => void;
-  onSaveToCollection: (colors: string[]) => void;
+  colors: string[];
+  onColorsChange: (colors: string[]) => void;
 }
 
 export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
-  onOpenInGenerator,
-  onSaveToCollection
+  colors: activePalette,
+  onColorsChange
 }) => {
-  // Harmonic parameters
-  const [baseHue, setBaseHue] = useState<number>(210); // initial cyan/blue
+  // Harmonic parameters — seeded from the first color of the active palette so the
+  // wheel continues (consumes) the centralized WIP instead of starting from scratch.
+  const seedHex = activePalette.length > 0 ? activePalette[0] : '#08BBD9';
+  const seedDetails = getColorDetails(seedHex);
+  const [baseHue, setBaseHue] = useState<number>(seedDetails.hsl.h);
   const [harmonyRule, setHarmonyRule] = useState<HarmonyRule>('analogous');
-  const [baseLightness, setBaseLightness] = useState<number>(50);
-  const [baseSaturation, setBaseSaturation] = useState<number>(85);
+  const [baseLightness, setBaseLightness] = useState<number>(seedDetails.hsl.l);
+  const [baseSaturation, setBaseSaturation] = useState<number>(seedDetails.hsl.s);
 
   // Mouse interaction options
   const [adjustSaturationWithRadius, setAdjustSaturationWithRadius] = useState<boolean>(true);
@@ -73,6 +74,13 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   const generatedColors = useMemo(() => {
     return generateHarmonies(baseHue, 5, harmonyRule, baseSaturation, baseLightness);
   }, [baseHue, harmonyRule, baseSaturation, baseLightness]);
+
+  // Refine tool behavior: keep the centralized active palette in sync with the wheel.
+  useEffect(() => {
+    if (generatedColors.length > 0) {
+      onColorsChange(generatedColors);
+    }
+  }, [generatedColors, onColorsChange]);
 
   // Relative offsets for current harmony rule
   const offsets = useMemo(() => {
@@ -267,25 +275,6 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => onSaveToCollection(generatedColors)}
-            className="h-9 px-3.5 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded-lg text-xs text-[#DFE2EE] flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Salvar esta paleta no Cofre"
-          >
-            <Bookmark className="w-3.5 h-3.5 text-[#06B6D4]" />
-            <span>Salvar Coleção</span>
-          </button>
-
-          <button
-            onClick={() => onOpenInGenerator(generatedColors)}
-            className="h-9 px-4 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-colors cursor-pointer"
-            title="Transferir esquema para o Gerador Procedural"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Abrir no Gerador</span>
-          </button>
-        </div>
       </div>
 
       {/* Main Studio Layout: Controls + Interactive Wheel + Swatches */}
@@ -308,8 +297,8 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                 key={rule.id}
                 onClick={() => setHarmonyRule(rule.id)}
                 className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer ${harmonyRule === rule.id
-                    ? 'bg-[#262A33] border-[#6366F1] text-white shadow-md'
-                    : 'bg-[#111827] border-white/[0.04] text-[#94A3B8] hover:text-white hover:border-white/[0.1]'
+                  ? 'bg-[#262A33] border-[#6366F1] text-white shadow-md'
+                  : 'bg-[#111827] border-white/[0.04] text-[#94A3B8] hover:text-white hover:border-white/[0.1]'
                   }`}
               >
                 <div className="flex items-center justify-between text-xs font-medium">
@@ -574,8 +563,8 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                       key={node.index}
                       onPointerDown={(e) => handlePointerDown(e, node.index)}
                       className={`absolute -ml-4 -mt-4 rounded-full flex items-center justify-center transition-transform cursor-grab active:cursor-grabbing select-none z-20 ${node.isBase
-                          ? 'w-8 h-8 border-2 border-white ring-4 ring-[#06B6D4]/50 shadow-[0_0_15px_rgba(6,182,212,0.6)]'
-                          : 'w-7 h-7 border-2 border-white shadow-xl'
+                        ? 'w-8 h-8 border-2 border-white ring-4 ring-[#06B6D4]/50 shadow-[0_0_15px_rgba(6,182,212,0.6)]'
+                        : 'w-7 h-7 border-2 border-white shadow-xl'
                         } ${isNodeActive ? 'scale-125 ring-4 ring-indigo-400' : 'hover:scale-115'}`}
                       style={{
                         left: `${node.x}px`,

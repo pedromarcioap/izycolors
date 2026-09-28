@@ -385,7 +385,7 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
       {/* Color preview stripes (75% of card visual impact) */}
       <div
         className="h-44 sm:h-48 w-full flex cursor-pointer relative overflow-hidden"
-        title="Clique para abrir no Gerador | Shift+clique para Auditar Contraste"
+        title="Clique para Editar no Estúdio | Shift+clique para Auditar Contraste"
       >
         {palette.colors.map((c) => (
           <button
@@ -412,8 +412,8 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
             }}
             className="flex-1 h-full transition-transform hover:scale-105 duration-150 relative group/stripe cursor-pointer border-0 p-0 appearance-none"
             style={{ backgroundColor: c }}
-            title={`${c} - Clique para abrir no Gerador (Shift+clique para auditar apenas esta cor)`}
-            aria-label={`${c} - Abrir no Gerador (Shift+clique para auditar apenas esta cor)`}
+            title={`${c} - Clique para Editar no Estúdio (Shift+clique para auditar apenas esta cor)`}
+            aria-label={`${c} - Editar no Estúdio (Shift+clique para auditar apenas esta cor)`}
           >
             <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono opacity-0 group-hover/stripe:opacity-100 bg-black/60 text-white px-1 py-0.5 rounded transition-opacity pointer-events-none">
               {c}
@@ -503,7 +503,7 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
               className="h-8 px-3 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
             >
               <Sliders className="w-3.5 h-3.5" />
-              <span>Gerador</span>
+              <span>Editar</span>
             </button>
 
             <button

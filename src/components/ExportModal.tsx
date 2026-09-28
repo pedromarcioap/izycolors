@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { X, Check, Copy, Download, Code, FileCode, Sliders, Palette as PaletteIcon, Sparkles } from 'lucide-react';
-import { 
-  exportCssTokens, 
-  exportTailwindConfig, 
-  exportJsonTokens, 
+import { X, Check, Copy, Download, Code, Palette as PaletteIcon, Sparkles } from 'lucide-react';
+import {
+  exportCssTokens,
+  exportTailwindConfig,
+  exportJsonTokens,
   exportSvgSwatches,
   exportIllustratorScript,
   generateAseBlob
 } from '../utils/colorUtils';
+
+type ExportFormat = 'illustrator' | 'ase' | 'css' | 'tailwind' | 'json' | 'svg' | 'scss';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -22,7 +24,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
   colors,
   paletteTitle = 'Izy Colors System Palette'
 }) => {
-  const [format, setFormat] = useState<'illustrator' | 'ase' | 'css' | 'tailwind' | 'json' | 'svg' | 'scss'>('illustrator');
+  const [format, setFormat] = useState<ExportFormat>('illustrator');
   const [copied, setCopied] = useState(false);
   const [prefix, setPrefix] = useState(() => {
     try {
@@ -30,7 +32,7 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       if (prefs) return JSON.parse(prefs).variablePrefix || 'color';
       const user = localStorage.getItem('chromatica_user_profile');
       if (user) return JSON.parse(user).exportPreferences?.variablePrefix || 'color';
-    } catch {}
+    } catch { }
     return 'color';
   });
 
@@ -114,12 +116,15 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
     URL.revokeObjectURL(url);
   };
 
+  const downloadLabel = format === 'ase'
+    ? 'Baixar Amostras .ASE'
+    : format === 'illustrator'
+      ? 'Baixar Script .JSX'
+      : `Baixar (${format.toUpperCase()})`;
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div 
-        className="w-full max-w-4xl bg-[#111827] border border-white/[0.12] rounded-xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="w-full max-w-4xl bg-[#111827] border border-white/[0.12] rounded-xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden animate-in fade-in zoom-in-95">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-white/[0.08] flex items-center justify-between bg-[#141A24]">
           <div>
@@ -137,7 +142,7 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
               Amostras (.ase / .jsx), Design Systems, Tailwind, CSS nativo e Figma.
             </p>
           </div>
-          <button 
+          <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
             title="Fechar Modal"
@@ -154,9 +159,9 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
           </div>
           <div className="w-48 sm:w-64 h-6 rounded overflow-hidden flex shadow-inner border border-white/10">
             {colors.map((c, i) => (
-              <div 
-                key={i} 
-                className="flex-1 h-full relative group cursor-pointer transition-transform hover:scale-105" 
+              <div
+                key={`${c}-${i}`}
+                className="flex-1 h-full relative group cursor-pointer transition-transform hover:scale-105"
                 style={{ backgroundColor: c }}
                 title={`${c}`}
               />
@@ -178,12 +183,11 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
             ].map(tab => (
               <button
                 key={tab.id}
-                onClick={() => setFormat(tab.id as any)}
-                className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
-                  format === tab.id
-                    ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
-                    : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-                }`}
+                onClick={() => setFormat(tab.id as ExportFormat)}
+                className={`px-3 py-1.5 text-xs rounded-md font-medium transition-all cursor-pointer flex items-center gap-1.5 ${format === tab.id
+                  ? 'bg-[#6366F1] text-white shadow-sm font-semibold'
+                  : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+                  }`}
               >
                 {tab.highlight && <Sparkles className="w-3 h-3 text-[#06B6D4]" />}
                 <span>{tab.label}</span>
@@ -250,9 +254,7 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
               className="h-9 px-4 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-sm shadow-indigo-600/20 cursor-pointer"
             >
               <Download className="w-4 h-4" />
-              <span>
-                {format === 'ase' ? 'Baixar Amostras .ASE' : format === 'illustrator' ? 'Baixar Script .JSX' : `Baixar (${format.toUpperCase()})`}
-              </span>
+              <span>{downloadLabel}</span>
             </button>
           </div>
         </div>

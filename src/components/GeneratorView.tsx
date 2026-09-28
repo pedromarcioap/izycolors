@@ -33,7 +33,8 @@ import { useGenerator } from '../hooks/useGenerator';
 import { SmartGeneratorInput } from './SmartGeneratorInput';
 
 interface GeneratorViewProps {
-  initialColors?: string[];
+  colors: string[];
+  onColorsChange: (colors: string[]) => void;
   onSaveToFavorites: (hex: string, name: string) => void;
   onSaveToCollection: (colors: string[]) => void;
   onOpenExport: (colors: string[]) => void;
@@ -225,8 +226,8 @@ const GeneratorColorColumn: React.FC<GeneratorColorColumnProps> = ({
         <button
           onClick={() => toggleLock(idx)}
           className={`p-3 rounded-full transition-all duration-200 shadow-md cursor-pointer ${col.locked
-              ? 'scale-110 ring-2 ring-white/50'
-              : 'opacity-70 group-hover:opacity-100 hover:scale-105'
+            ? 'scale-110 ring-2 ring-white/50'
+            : 'opacity-70 group-hover:opacity-100 hover:scale-105'
             }`}
           style={lockStyle}
           title={col.locked ? 'Cor bloqueada (não mudará ao apertar Espaço nem permitir edição)' : 'Cor desbloqueada'}
@@ -392,7 +393,8 @@ const GeneratorColorColumn: React.FC<GeneratorColorColumnProps> = ({
 };
 
 export const GeneratorView: React.FC<GeneratorViewProps> = ({
-  initialColors,
+  colors: activePalette,
+  onColorsChange,
   onSaveToFavorites,
   onSaveToCollection,
   onOpenExport
@@ -426,7 +428,7 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
     copyColor,
     handleUndo,
     handleRedo
-  } = useGenerator({ initialColors });
+  } = useGenerator({ initialColors: activePalette });
 
   const [isSmartInputOpen, setIsSmartInputOpen] = useState(false);
   const [hoveredSwatch, setHoveredSwatch] = useState<{
@@ -463,6 +465,15 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [generatePalette, isFocusMode, isSmartInputOpen]);
+
+  // Propagate the working columns up to the centralized active palette. The value
+  // guard mirrors useGenerator's own guard and prevents redundant state churn.
+  useEffect(() => {
+    const nextHexes = colors.map(c => c.hex);
+    if (nextHexes.join('|') !== activePalette.join('|')) {
+      onColorsChange(nextHexes);
+    }
+  }, [colors, activePalette, onColorsChange]);
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -580,11 +591,10 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
             {/* Smart Text-to-Palette Mood Generator Button */}
             <button
               onClick={() => setIsSmartInputOpen(prev => !prev)}
-              className={`h-8 px-3 rounded text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-                isSmartInputOpen || moodKeyword
-                  ? 'bg-gradient-to-r from-[#6366F1] to-[#06B6D4] text-white shadow-md'
-                  : 'bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] text-[#DFE2EE]'
-              }`}
+              className={`h-8 px-3 rounded text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${isSmartInputOpen || moodKeyword
+                ? 'bg-gradient-to-r from-[#6366F1] to-[#06B6D4] text-white shadow-md'
+                : 'bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] text-[#DFE2EE]'
+                }`}
               title="Geração Inteligente e Semântica por Prompt & Mood (Ctrl+K)"
             >
               <Wand2 className="w-3.5 h-3.5 text-[#06B6D4]" />
@@ -615,8 +625,8 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                   key={m.id}
                   onClick={() => setHarmonyMode(m.id)}
                   className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${harmonyMode === m.id
-                      ? 'bg-[#262A33] text-white'
-                      : 'text-[#94A3B8] hover:text-white'
+                    ? 'bg-[#262A33] text-white'
+                    : 'text-[#94A3B8] hover:text-white'
                     }`}
                 >
                   {m.label}
@@ -634,8 +644,8 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
                   key={fmt}
                   onClick={() => setActiveFormat(fmt)}
                   className={`px-2 py-0.5 rounded text-[10px] transition-colors ${activeFormat === fmt
-                      ? 'bg-[#6366F1] text-white font-semibold'
-                      : 'text-[#94A3B8] hover:text-white'
+                    ? 'bg-[#6366F1] text-white font-semibold'
+                    : 'text-[#94A3B8] hover:text-white'
                     }`}
                 >
                   {fmt}

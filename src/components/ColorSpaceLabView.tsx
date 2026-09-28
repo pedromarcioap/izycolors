@@ -1,41 +1,38 @@
-import React, { useState } from 'react';
-import { SlidersHorizontal, Copy, Check, Sparkles, Layers, ArrowRight, RefreshCw, Bookmark } from 'lucide-react';
-import { getColorDetails, hexToRgb, rgbToHex } from '../utils/colorUtils';
+import React, { useState, useEffect } from 'react';
+import { Copy, Check } from 'lucide-react';
+import { getColorDetails } from '../utils/colorUtils';
 
 interface ColorSpaceLabViewProps {
-  onOpenInGenerator: (colors: string[]) => void;
-  onSaveToCollection: (colors: string[]) => void;
+  colors: string[];
+  onColorsChange: (colors: string[]) => void;
 }
 
 export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
-  onOpenInGenerator,
-  onSaveToCollection
+  colors: activePalette,
+  onColorsChange
 }) => {
-  const [activeHex, setActiveHex] = useState('#08BBD9');
-  const [gradientEndHex, setGradientEndHex] = useState('#9354F5');
+  const [activeHex, setActiveHex] = useState(activePalette[0] || '#08BBD9');
+  const [gradientEndHex, setGradientEndHex] = useState(activePalette[1] || '#9354F5');
   const [gradientType, setGradientType] = useState<'linear' | 'radial' | 'conic'>('linear');
   const [gradientAngle, setGradientAngle] = useState(90);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   const details = getColorDetails(activeHex);
 
+  // Refine tool behavior: write the two inspected colors back into the active
+  // palette while preserving any remaining swatches from the WIP.
+  useEffect(() => {
+    const next = activePalette.length > 0 ? [...activePalette] : [activeHex, gradientEndHex];
+    if (next.length > 0) next[0] = activeHex;
+    if (next.length > 1) next[1] = gradientEndHex;
+    onColorsChange(next);
+  }, [activeHex, gradientEndHex]);
+
   const copyText = (key: string, val: string) => {
     navigator.clipboard.writeText(val);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 1500);
   };
-
-  // Generate 10-step tonal scale (50 to 900)
-  const tonalScale = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900].map((step, idx) => {
-    // vary lightness
-    const factor = (idx + 1) / 11;
-    const l = Math.max(10, Math.min(95, Math.round(96 - factor * 84)));
-    return {
-      step,
-      hex: activeHex, // approximated for visual preview
-      l
-    };
-  });
 
   // Gradient CSS
   let cssGradient = '';
@@ -75,15 +72,6 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={() => onOpenInGenerator([activeHex, gradientEndHex, '#0E1726', '#3B82F6', '#9354F5'])}
-            className="h-9 px-4 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Abrir no Gerador</span>
-          </button>
-        </div>
       </div>
 
       {/* Main Conversion Cards Grid */}
@@ -101,7 +89,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
             </div>
 
             {/* Giant Swatch Card */}
-            <div 
+            <div
               className="h-36 sm:h-44 rounded-xl shadow-2xl flex flex-col justify-between p-4 border border-white/20 transition-all mb-4"
               style={{ backgroundColor: activeHex }}
             >
@@ -286,7 +274,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
           </div>
 
           {/* Big Gradient Canvas */}
-          <div 
+          <div
             className="lg:col-span-8 min-h-[220px] rounded-xl shadow-2xl border border-white/20 relative overflow-hidden flex items-end p-6"
             style={{ background: cssGradient }}
           >

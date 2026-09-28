@@ -63,17 +63,17 @@ export function hslToRgb(h: number, s: number, l: number): { r: number; g: numbe
   const hue2rgb = (p: number, q: number, t: number) => {
     if (t < 0) t += 1;
     if (t > 1) t -= 1;
-    if (t < 1/6) return p + (q - p) * 6 * t;
-    if (t < 1/2) return q;
-    if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+    if (t < 1 / 6) return p + (q - p) * 6 * t;
+    if (t < 1 / 2) return q;
+    if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
     return p;
   };
 
   const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
   const p = 2 * l - q;
-  const r = hue2rgb(p, q, h + 1/3);
+  const r = hue2rgb(p, q, h + 1 / 3);
   const g = hue2rgb(p, q, h);
-  const b = hue2rgb(p, q, h - 1/3);
+  const b = hue2rgb(p, q, h - 1 / 3);
 
   return {
     r: Math.round(r * 255),
@@ -277,8 +277,8 @@ export function getHarmonyOffsets(harmonyType: string, count: number = 5): numbe
 
 // Generate color harmonies from a base hue with customizable saturation and lightness
 export function generateHarmonies(
-  baseHue: number, 
-  count: number = 5, 
+  baseHue: number,
+  count: number = 5,
   harmonyType: string = 'analogous',
   baseSaturation: number = 75,
   baseLightness: number = 50
@@ -336,7 +336,7 @@ export function generateRandomHarmoniousPalette(count: number = 5): string[] {
       // Soft tint or dark plum
       rgbToHex(...Object.values(hslToRgb((baseH + 280) % 360, 55, 85)) as [number, number, number])
     ];
-    
+
     return colors.slice(0, count);
   }
 
@@ -966,4 +966,61 @@ export function generateAseBlob(colors: string[], paletteTitle: string = 'Izy Co
 
   const fullData = new Uint8Array([...headerBytes, ...bodyBytes]);
   return new Blob([fullData], { type: 'application/octet-stream' });
+}
+
+// WCAG quick summary statuses used by the WorkflowDock accessibility badge
+export type WcagSummaryStatus = 'pass' | 'warning' | 'fail';
+
+export interface WcagSummary {
+  status: WcagSummaryStatus;
+  label: string;
+  detail: string;
+}
+
+// Compute a quick WCAG 2.1 compliance signal for a palette without running the full audit.
+// Green ("pass") when every color is text-safe against white or black (>= 4.5:1) and the
+// worst adjacent pair reaches the 3.0:1 UI threshold. Otherwise amber ("warning") for a
+// pending contrast check, or red ("fail") when adjacent pairs drop below 2.0:1.
+export function computeWcagSummary(colors: string[]): WcagSummary {
+  if (!colors || colors.length < 2) {
+    return {
+      status: 'warning',
+      label: 'Contraste pendente',
+      detail: 'Adicione ao menos 2 cores para auditar'
+    };
+  }
+
+  let minAdjacent = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < colors.length - 1; i++) {
+    const ratio = getContrastRatio(colors[i], colors[i + 1]);
+    if (ratio < minAdjacent) minAdjacent = ratio;
+  }
+
+  let allTextSafe = true;
+  for (const hex of colors) {
+    const best = Math.max(getContrastRatio(hex, '#FFFFFF'), getContrastRatio(hex, '#000000'));
+    if (best < 4.5) allTextSafe = false;
+  }
+
+  if (allTextSafe && minAdjacent >= 3.0) {
+    return {
+      status: 'pass',
+      label: 'WCAG AA Aprovado',
+      detail: `Menor contraste adjacente ${minAdjacent.toFixed(1)}:1`
+    };
+  }
+
+  if (minAdjacent >= 2.0) {
+    return {
+      status: 'warning',
+      label: 'Contraste pendente',
+      detail: `Menor contraste adjacente ${minAdjacent.toFixed(1)}:1 — ajuste pares para AA`
+    };
+  }
+
+  return {
+    status: 'fail',
+    label: 'Contraste insuficiente',
+    detail: `Menor contraste adjacente ${minAdjacent.toFixed(1)}:1`
+  };
 }

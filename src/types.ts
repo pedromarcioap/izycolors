@@ -7,15 +7,13 @@ export type UserRole = 'admin' | 'moderator' | 'editor' | 'pro' | 'user';
 export type NavigationTab =
   | 'generator'
   | 'explorer'
-  | 'wheel'
-  | 'extractor'
-  | 'lab'
-  | 'accessibility'
   | 'projects'
   | 'cms'
   | 'profile'
   | 'admin'
   | 'user_dashboard';
+
+export type StudioStage = 'generate' | 'refine' | 'audit' | 'export';
 
 export interface AuthUser {
   id: string;

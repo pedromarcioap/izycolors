@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { FooterBar } from './components/FooterBar';
 import { GeneratorView } from './components/GeneratorView';
 import { ExplorerView } from './components/ExplorerView';
 import { HarmonicWheelView } from './components/HarmonicWheelView';
@@ -17,9 +16,11 @@ import { CommandPalette } from './components/CommandPalette';
 import { ExportModal } from './components/ExportModal';
 import { SubmitPaletteModal } from './components/SubmitPaletteModal';
 import { SavePaletteModal } from './components/SavePaletteModal';
+import { WorkflowDock } from './components/WorkflowDock';
 
 import {
   NavigationTab,
+  StudioStage,
   ColorGamut,
   Palette,
   ProjectWorkspace,
@@ -67,11 +68,171 @@ import {
   initAuthListener
 } from './services/authService';
 
-import { Menu, Download, Check, ShieldAlert } from 'lucide-react';
+import {
+  Menu,
+  Download,
+  Check,
+  ShieldAlert,
+  Sparkles,
+  Eye,
+  Disc3,
+  SlidersHorizontal,
+  Bookmark
+} from 'lucide-react';
+
+const DEFAULT_PALETTE = ['#1A1A1A', '#2563EB', '#38BDF8', '#F1F5F9', '#FFFFFF'];
+
+const STUDIO_STAGE_LABELS: Record<StudioStage, string> = {
+  generate: 'Estúdio de Cores — Criar',
+  refine: 'Estúdio de Cores — Refinar (Roda & Lab)',
+  audit: 'Estúdio de Cores — Auditar WCAG',
+  export: 'Estúdio de Cores — Salvar/Exportar'
+};
+
+const TAB_TITLES: Record<Exclude<NavigationTab, 'generator'>, string> = {
+  projects: 'Cofre de Projetos & Coleções',
+  explorer: 'Comunidade & Forks',
+  admin: 'Painel Administrativo & Governança',
+  user_dashboard: 'Área do Usuário & Criador',
+  cms: 'CMS Editorial & Curadoria',
+  profile: 'Perfil de Criador'
+};
+
+type GenerateInputMode = 'procedural' | 'image';
+type RefineTool = 'wheel' | 'lab';
+
+const readStoredPalette = (): string[] => {
+  try {
+    const raw = localStorage.getItem('izycolors_active_palette');
+    if (raw) {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(c => typeof c === 'string')) {
+        return parsed as string[];
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao ler izycolors_active_palette:', err);
+  }
+  return DEFAULT_PALETTE;
+};
+
+const readStoredStage = (): StudioStage => {
+  const raw = localStorage.getItem('izycolors_active_stage');
+  if (raw === 'refine' || raw === 'audit' || raw === 'export') {
+    return raw;
+  }
+  return 'generate';
+};
+
+const GenerateInputModeBar: React.FC<{
+  mode: GenerateInputMode;
+  onChange: (mode: GenerateInputMode) => void;
+}> = ({ mode, onChange }) => (
+  <div className="shrink-0 bg-[#111827] border-b border-white/[0.08] px-4 sm:px-6 py-2 flex items-center justify-center gap-2">
+    <span className="text-[10px] font-mono uppercase tracking-wider text-[#64748B] mr-1">Entrada:</span>
+    <button
+      onClick={() => onChange('procedural')}
+      className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${mode === 'procedural'
+        ? 'bg-[#6366F1] text-white shadow-sm'
+        : 'bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] text-[#DFE2EE]'
+        }`}
+    >
+      <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" />
+      <span>Geração Procedural & Mood</span>
+    </button>
+    <button
+      onClick={() => onChange('image')}
+      className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${mode === 'image'
+        ? 'bg-[#6366F1] text-white shadow-sm'
+        : 'bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] text-[#DFE2EE]'
+        }`}
+    >
+      <Eye className="w-3.5 h-3.5 text-[#06B6D4]" />
+      <span>Extrair de Imagem</span>
+    </button>
+  </div>
+);
+
+const RefineToolTabs: React.FC<{
+  tool: RefineTool;
+  onChange: (tool: RefineTool) => void;
+}> = ({ tool, onChange }) => (
+  <div className="shrink-0 bg-[#111827] border-b border-white/[0.08] px-4 sm:px-6 py-2 flex items-center justify-center gap-2">
+    <span className="text-[10px] font-mono uppercase tracking-wider text-[#64748B] mr-1">Refinar com:</span>
+    <button
+      onClick={() => onChange('wheel')}
+      className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${tool === 'wheel'
+        ? 'bg-[#6366F1] text-white shadow-sm'
+        : 'bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] text-[#DFE2EE]'
+        }`}
+    >
+      <Disc3 className="w-3.5 h-3.5 text-[#06B6D4]" />
+      <span>Roda Harmônica</span>
+    </button>
+    <button
+      onClick={() => onChange('lab')}
+      className={`h-8 px-3 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer ${tool === 'lab'
+        ? 'bg-[#6366F1] text-white shadow-sm'
+        : 'bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] text-[#DFE2EE]'
+        }`}
+    >
+      <SlidersHorizontal className="w-3.5 h-3.5 text-[#06B6D4]" />
+      <span>Color Space Lab</span>
+    </button>
+  </div>
+);
+
+const ExportStagePanel: React.FC<{
+  colors: string[];
+  onSave: () => void;
+  onExport: () => void;
+}> = ({ colors, onSave, onExport }) => (
+  <div className="flex-1 flex items-center justify-center p-6 sm:p-8 pb-24">
+    <div className="w-full max-w-lg bg-[#181C24] border border-white/[0.08] rounded-2xl p-8 text-center shadow-2xl">
+      <div className="w-12 h-12 rounded-xl bg-[#6366F1]/20 border border-[#6366F1]/40 text-[#6366F1] flex items-center justify-center mx-auto mb-4">
+        <Download className="w-6 h-6" />
+      </div>
+      <h2 className="text-xl font-bold text-white font-['Geist'] tracking-tight">
+        Salvar & Exportar
+      </h2>
+      <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">
+        Sua Paleta Ativa está pronta. Salve no Cofre, Projeto ou Coleção — ou exporte os design tokens
+        para Illustrator, ASE, CSS, Tailwind, JSON e SVG.
+      </p>
+
+      <div className="h-14 rounded-xl overflow-hidden flex border border-white/10 shadow-inner mb-6">
+        {colors.map((hex, i) => (
+          <div key={`${hex}-${i}`} className="flex-1 h-full" style={{ backgroundColor: hex }} title={hex} />
+        ))}
+      </div>
+
+      <div className="flex items-center justify-center gap-3">
+        <button
+          onClick={onSave}
+          className="h-10 px-5 rounded-lg bg-[#262A33] hover:bg-[#31353E] border border-white/[0.08] text-white text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer"
+        >
+          <Bookmark className="w-4 h-4 text-[#06B6D4]" />
+          <span>Salvar Paleta</span>
+        </button>
+        <button
+          onClick={onExport}
+          className="h-10 px-5 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-colors cursor-pointer"
+        >
+          <Download className="w-4 h-4" />
+          <span>Exportar Tokens</span>
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 export function App() {
-  // Navigation & Gamut State
+  // Navigation & Studio state
   const [currentTab, setCurrentTab] = useState<NavigationTab>('generator');
+  const [activePalette, setActivePalette] = useState<string[]>(readStoredPalette);
+  const [activeStage, setActiveStage] = useState<StudioStage>(readStoredStage);
+  const [generateInputMode, setGenerateInputMode] = useState<GenerateInputMode>('procedural');
+  const [refineTool, setRefineTool] = useState<RefineTool>('wheel');
   const [gamut, setGamut] = useState<ColorGamut>('Display P3');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
 
@@ -145,18 +306,12 @@ export function App() {
     };
   });
 
-  // Generator Seed & Audit State
-  const [generatorSeed, setGeneratorSeed] = useState<string[]>(['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85']);
-  const [auditColors, setAuditColors] = useState<string[]>([]);
-
   // Modals state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [exportColors, setExportColors] = useState<string[]>(['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85']);
   const [exportPaletteTitle, setExportPaletteTitle] = useState<string>('Izy Colors System Palette');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [isSavePaletteModalOpen, setIsSavePaletteModalOpen] = useState(false);
-  const [savePaletteModalColors, setSavePaletteModalColors] = useState<string[]>(['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85']);
   const [savePaletteModalTitle, setSavePaletteModalTitle] = useState<string>('Nova Paleta Harmônica');
   const [notificationToast, setNotificationToast] = useState<string | null>(null);
 
@@ -230,10 +385,15 @@ export function App() {
     }
   }, [authUser.role, currentTab]);
 
-  // Check Supabase connection
-
-
   // Persistence to local storage
+  useEffect(() => {
+    localStorage.setItem('izycolors_active_palette', JSON.stringify(activePalette));
+  }, [activePalette]);
+
+  useEffect(() => {
+    localStorage.setItem('izycolors_active_stage', activeStage);
+  }, [activeStage]);
+
   useEffect(() => {
     localStorage.setItem('chromatica_palettes', JSON.stringify(palettes));
   }, [palettes]);
@@ -274,21 +434,24 @@ export function App() {
     saveStoredUsers(usersList);
   }, [usersList]);
 
-  // Open any palette into the Generator
+  // Load a palette into the centralized active palette and open the Studio at the
+  // creation/editing stage.
   const handleOpenInGenerator = (colors: string[]) => {
-    setGeneratorSeed(colors);
+    if (colors && colors.length > 0) setActivePalette(colors);
+    setActiveStage('generate');
     setCurrentTab('generator');
   };
 
-  // Send palette or swatches to Accessibility Audit View
+  // Load a palette into the active palette and open the Studio directly at the audit stage.
   const handleSendToAudit = (colors: string[]) => {
-    setAuditColors(colors);
-    setCurrentTab('accessibility');
+    if (colors && colors.length > 0) setActivePalette(colors);
+    setActiveStage('audit');
+    setCurrentTab('generator');
   };
 
-  // Open Export Modal with given or default colors
+  // Open Export Modal with given or default (active palette) colors
   const handleOpenExport = (colors?: string[], title?: string) => {
-    setExportColors(colors || generatorSeed);
+    if (colors && colors.length > 0) setActivePalette(colors);
     if (title) setExportPaletteTitle(title);
     setIsExportModalOpen(true);
   };
@@ -313,8 +476,8 @@ export function App() {
   };
 
   // Open Save Palette Modal for saving entire palette to Vault, Project, or Collection
-  const handleOpenSavePaletteModal = (colors: string[], title?: string) => {
-    setSavePaletteModalColors(colors && colors.length > 0 ? colors : generatorSeed);
+  const handleOpenSavePaletteModal = (colors?: string[], title?: string) => {
+    if (colors && colors.length > 0) setActivePalette(colors);
     setSavePaletteModalTitle(title || 'Nova Paleta Harmônica');
     setIsSavePaletteModalOpen(true);
   };
@@ -390,7 +553,7 @@ export function App() {
     setPalettes(prev => prev.map(p => p.id === paletteId ? { ...p, likes: p.likes + 1 } : p));
   };
 
-  // Forks & Clones Handler
+  // Forks & Clones Handler — also loads the fork into the active palette Studio
   const handleForkPalette = async (palette: Palette) => {
     // 1. Increment fork counter on original palette
     setPalettes(prev => prev.map(p => p.id === palette.id ? { ...p, forks: (p.forks || 0) + 1 } : p));
@@ -412,7 +575,12 @@ export function App() {
       return updated;
     });
 
-    showToast(`Fork criado com sucesso! "${forkedPalette.title}" está disponível no seu Cofre e Explorar.`);
+    // 5. Load the forked palette into the Studio
+    setActivePalette(forkedPalette.colors);
+    setActiveStage('generate');
+    setCurrentTab('generator');
+
+    showToast(`Fork criado com sucesso! "${forkedPalette.title}" está carregado no Estúdio.`);
   };
 
   // Curated Images persistence handlers
@@ -540,17 +708,9 @@ export function App() {
             <div className="h-4 w-px bg-white/10 hidden sm:block" />
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-white capitalize">
-                {currentTab === 'generator' && 'Gerador Procedural Oklch'}
-                {currentTab === 'projects' && 'Cofre de Projetos & Coleções'}
-                {currentTab === 'explorer' && 'Comunidade & Forks'}
-                {currentTab === 'wheel' && 'Roda Harmônica'}
-                {currentTab === 'extractor' && 'Extrator de Imagens & Curador'}
-                {currentTab === 'lab' && 'Color Space Lab (P3 / Rec.2020)'}
-                {currentTab === 'accessibility' && 'Auditoria Acessibilidade WCAG / APCA'}
-                {currentTab === 'admin' && 'Painel Administrativo & Governança'}
-                {currentTab === 'user_dashboard' && 'Área do Usuário & Criador'}
-                {currentTab === 'cms' && 'CMS Editorial & Curadoria'}
-                {currentTab === 'profile' && 'Perfil de Criador'}
+                {currentTab === 'generator'
+                  ? STUDIO_STAGE_LABELS[activeStage]
+                  : TAB_TITLES[currentTab as Exclude<NavigationTab, 'generator'>]}
               </span>
               <span className="text-[10px] font-mono text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/20 px-1.5 py-0.5 rounded uppercase hidden md:inline-block">
                 {gamut}
@@ -603,12 +763,55 @@ export function App() {
         {/* Main Studio Views Router */}
         <main className="flex-1 flex flex-col min-w-0">
           {currentTab === 'generator' && (
-            <GeneratorView
-              initialColors={generatorSeed}
-              onSaveToFavorites={handleSaveToFavorites}
-              onSaveToCollection={handleSaveToCollection}
-              onOpenExport={handleOpenExport}
-            />
+            <div className="flex-1 flex flex-col min-h-0">
+              {activeStage === 'generate' && (
+                <>
+                  <GenerateInputModeBar mode={generateInputMode} onChange={setGenerateInputMode} />
+                  {generateInputMode === 'procedural' ? (
+                    <GeneratorView
+                      colors={activePalette}
+                      onColorsChange={setActivePalette}
+                      onSaveToFavorites={handleSaveToFavorites}
+                      onSaveToCollection={handleSaveToCollection}
+                      onOpenExport={handleOpenExport}
+                    />
+                  ) : (
+                    <ImageExtractorView
+                      curatedImages={curatedImages}
+                      onApplyToActivePalette={setActivePalette}
+                      onProceedToRefine={() => setActiveStage('refine')}
+                      onSaveCuratedImage={handleSaveCuratedImage}
+                      onDeleteCuratedImage={handleDeleteCuratedImage}
+                      onResetCuratedImages={handleResetCuratedImages}
+                      isSupabaseConnected={isSupabaseConnected}
+                    />
+                  )}
+                </>
+              )}
+
+              {activeStage === 'refine' && (
+                <>
+                  <RefineToolTabs tool={refineTool} onChange={setRefineTool} />
+                  {refineTool === 'wheel' ? (
+                    <HarmonicWheelView colors={activePalette} onColorsChange={setActivePalette} />
+                  ) : (
+                    <ColorSpaceLabView colors={activePalette} onColorsChange={setActivePalette} />
+                  )}
+                </>
+              )}
+
+              {activeStage === 'audit' && (
+                <AccessibilityView colors={activePalette} onColorsChange={setActivePalette} />
+              )}
+
+              {activeStage === 'export' && (
+                <ExportStagePanel
+                  colors={activePalette}
+                  onSave={() => handleOpenSavePaletteModal()}
+                  onExport={() => handleOpenExport()}
+                />
+              )}
+            </div>
           )}
 
           {currentTab === 'explorer' && (
@@ -620,39 +823,6 @@ export function App() {
               onForkPalette={handleForkPalette}
               onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
               onSendToAudit={handleSendToAudit}
-            />
-          )}
-
-          {currentTab === 'wheel' && (
-            <HarmonicWheelView
-              onOpenInGenerator={handleOpenInGenerator}
-              onSaveToCollection={handleSaveToCollection}
-            />
-          )}
-
-          {currentTab === 'extractor' && (
-            <ImageExtractorView
-              curatedImages={curatedImages}
-              onOpenInGenerator={handleOpenInGenerator}
-              onSaveToCollection={handleSaveToCollection}
-              onSaveCuratedImage={handleSaveCuratedImage}
-              onDeleteCuratedImage={handleDeleteCuratedImage}
-              onResetCuratedImages={handleResetCuratedImages}
-              isSupabaseConnected={isSupabaseConnected}
-            />
-          )}
-
-          {currentTab === 'lab' && (
-            <ColorSpaceLabView
-              onOpenInGenerator={handleOpenInGenerator}
-              onSaveToCollection={handleSaveToCollection}
-            />
-          )}
-
-          {currentTab === 'accessibility' && (
-            <AccessibilityView
-              initialColors={auditColors.length > 0 ? auditColors : generatorSeed}
-              onOpenInGenerator={handleOpenInGenerator}
             />
           )}
 
@@ -820,21 +990,24 @@ export function App() {
             />
           )}
         </main>
-
-        {/* Floating telemetry footer bar */}
-        <FooterBar
-          gamut={gamut}
-          onQuickGenerate={() => {
-            setCurrentTab('generator');
-            setGeneratorSeed(prev => [...prev].reverse());
-          }}
-        />
       </div>
+
+      {/* Contextual Workflow Dock (only inside the Studio) */}
+      {currentTab === 'generator' && (
+        <WorkflowDock
+          colors={activePalette}
+          activeStage={activeStage}
+          onStageChange={setActiveStage}
+          onSave={() => handleOpenSavePaletteModal()}
+          onExport={() => handleOpenExport()}
+          isSidebarExpanded={isSidebarExpanded}
+        />
+      )}
 
       {/* Save Palette to Projects, Vault or Collections Modal */}
       <SavePaletteModal
         isOpen={isSavePaletteModalOpen}
-        colors={savePaletteModalColors}
+        colors={activePalette}
         initialTitle={savePaletteModalTitle}
         projects={projects}
         collections={collections}
@@ -851,9 +1024,15 @@ export function App() {
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
         onNavigate={setCurrentTab}
+        onNavigateStage={setActiveStage}
+        onOpenImageExtractor={() => {
+          setCurrentTab('generator');
+          setActiveStage('generate');
+          setGenerateInputMode('image');
+        }}
         onQuickGenerate={() => {
           setCurrentTab('generator');
-          setGeneratorSeed(prev => [...prev].reverse());
+          setActiveStage('generate');
         }}
         onGamutChange={setGamut}
         onOpenExport={() => handleOpenExport()}
@@ -864,7 +1043,7 @@ export function App() {
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
-        colors={exportColors}
+        colors={activePalette}
         paletteTitle={exportPaletteTitle}
       />
 
@@ -873,7 +1052,7 @@ export function App() {
         isOpen={isSubmitModalOpen}
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleNewSubmission}
-        defaultColors={generatorSeed}
+        defaultColors={activePalette}
       />
 
       {/* Role-Based Authentication & Account Management Modal */}

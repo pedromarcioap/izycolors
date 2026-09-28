@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { ProjectWorkspace, ProjectPalette, CollectionBoard, FavoriteColor, VaultPalette } from '../types';
 
+type PaletteRole = 'Primária' | 'Secundária' | 'Acentos' | 'UI / Superfícies' | 'Semântica' | 'Dark Mode';
+
 interface ProjectsVaultViewProps {
   projects: ProjectWorkspace[];
   collections: CollectionBoard[];
@@ -76,7 +78,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
   const [showAddPaletteToProjectModal, setShowAddPaletteToProjectModal] = useState(false);
   const [targetProjectId, setTargetProjectId] = useState<string>(projects[0]?.id || '');
   const [newPaletteName, setNewPaletteName] = useState('');
-  const [newPaletteRole, setNewPaletteRole] = useState<'Primária' | 'Secundária' | 'Acentos' | 'UI / Superfícies' | 'Semântica' | 'Dark Mode'>('Primária');
+  const [newPaletteRole, setNewPaletteRole] = useState<PaletteRole>('Primária');
   const [newPaletteColorsInput, setNewPaletteColorsInput] = useState('#08BBD9, #3B82F6, #9354F5, #FF2A85, #10B981');
   const [newPaletteDesc, setNewPaletteDesc] = useState('');
 
@@ -440,9 +442,9 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                               <button
                                 onClick={() => onOpenInGenerator(pal.colors)}
                                 className="px-2 py-1 rounded bg-[#6366F1]/20 hover:bg-[#6366F1]/40 text-[#6366F1] text-[11px] font-semibold transition-colors cursor-pointer"
-                                title="Abrir no Gerador"
+                                title="Carregar no Estúdio"
                               >
-                                Abrir
+                                Carregar no Estúdio
                               </button>
                               <button
                                 onClick={() => onOpenExport(pal.colors, `${proj.name} - ${pal.name}`)}
@@ -574,8 +576,8 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                 type="button"
                 onClick={() => onOpenInGenerator(col.coverColors)}
                 className="h-32 w-full flex cursor-pointer border-0 p-0 bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4] focus-visible:ring-inset"
-                title="Clique para abrir no Gerador"
-                aria-label={`Abrir a coleção ${col.title} no Gerador`}
+                title="Clique para carregar no Estúdio"
+                aria-label={`Carregar a coleção ${col.title} no Estúdio`}
               >
                 {col.coverColors.map((c, i) => (
                   <div key={`${col.id}-cover-${c}-${i}`} className="flex-1 h-full transition-transform hover:scale-105" style={{ backgroundColor: c }} />
@@ -589,7 +591,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                       type="button"
                       onClick={() => onOpenInGenerator(col.coverColors)}
                       className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] font-['Geist'] bg-transparent border-0 p-0 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4] rounded"
-                      aria-label={`Abrir a coleção ${col.title} no Gerador`}
+                      aria-label={`Carregar a coleção ${col.title} no Estúdio`}
                     >
                       {col.title}
                     </button>
@@ -626,7 +628,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                       onClick={() => onOpenInGenerator(col.coverColors)}
                       className="h-7 px-2.5 rounded bg-[#6366F1] hover:bg-[#5254E0] text-white text-[11px] font-medium transition-colors cursor-pointer"
                     >
-                      Abrir
+                      Carregar no Estúdio
                     </button>
                     <button
                       onClick={() => onSendToAudit(col.coverColors)}
@@ -848,7 +850,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                               onClick={() => onOpenInGenerator(pal.colors)}
                               className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-black text-[11px] font-bold transition-colors cursor-pointer"
                             >
-                              Abrir no Gerador
+                              Carregar no Estúdio
                             </button>
                           </div>
                         </div>
@@ -975,7 +977,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                   <select
                     id="add-palette-role"
                     value={newPaletteRole}
-                    onChange={(e) => setNewPaletteRole(e.target.value as any)}
+                    onChange={(e) => setNewPaletteRole(e.target.value as PaletteRole)}
                     className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
                   >
                     <option value="Primária">Paleta Primária</option>

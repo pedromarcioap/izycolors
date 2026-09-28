@@ -1,1 +1,5 @@
 @import "tailwindcss";
+
+dialog::backdrop {
+    background: transparent;
+}

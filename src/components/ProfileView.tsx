@@ -1,20 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  User, 
-  Award, 
-  Heart, 
-  Layers, 
-  Code, 
-  Bookmark, 
-  Lock, 
-  Globe, 
-  Sliders, 
-  Check, 
-  Copy, 
-  Download, 
-  Share2, 
-  ExternalLink, 
-  FileText, 
+import {
+  User,
+  Award,
+  Heart,
+  Bookmark,
+  Lock,
+  Globe,
+  Sliders,
+  Check,
+  Copy,
+  Download,
+  FileText,
   Sparkles,
   CheckCircle2,
   Settings,
@@ -22,23 +18,21 @@ import {
   Plus,
   Palette as PaletteIcon,
   Trash2,
-  SlidersHorizontal,
   Cloud,
   LogOut,
-  ShieldCheck,
   Send,
   Eye,
   BarChart3
 } from 'lucide-react';
-import { 
-  UserProfile, 
-  Palette, 
-  ProjectWorkspace, 
-  CollectionBoard, 
-  FavoriteColor, 
+import {
+  UserProfile,
+  Palette,
+  ProjectWorkspace,
+  CollectionBoard,
+  FavoriteColor,
   VaultPalette,
-  CommunitySubmission, 
-  AuthUser 
+  CommunitySubmission,
+  AuthUser
 } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
 import { UserAnalyticsDashboard } from './UserAnalyticsDashboard';
@@ -54,7 +48,7 @@ interface ProfileViewProps {
   submissions?: CommunitySubmission[];
   initialSubTab?: 'analytics' | 'palettes' | 'submissions' | 'swatches' | 'showcase' | 'collections' | 'vault' | 'settings';
   onOpenInGenerator: (colors: string[]) => void;
-  onSaveToCollection: (colors: string[]) => void;
+  onSaveToCollection?: (colors: string[]) => void;
   onOpenExport: (colors: string[], title?: string) => void;
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   onDeleteFavoriteColor?: (hex: string) => void;
@@ -63,6 +57,10 @@ interface ProfileViewProps {
   onLogout?: () => void;
   onOpenSubmissionModal?: () => void;
   isSupabaseConnected?: boolean;
+}
+
+function toArray<T>(value: T[] | undefined): T[] {
+  return value ?? [];
 }
 
 export const ProfileView: React.FC<ProfileViewProps> = ({
@@ -90,20 +88,20 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
 
-  const safePalettes = palettes || [];
-  const safeProjects = projects || [];
-  const safeCollections = collections || [];
-  const safeFavoriteColors = favoriteColors || [];
-  const safeVaultPalettes = vaultPalettes || [];
-  const safeSubmissions = submissions || [];
-  
+  const safePalettes = toArray(palettes);
+  const safeProjects = toArray(projects);
+  const safeCollections = toArray(collections);
+  const safeFavoriteColors = toArray(favoriteColors);
+  const safeVaultPalettes = toArray(vaultPalettes);
+  const safeSubmissions = toArray(submissions);
+
   // Sync if initialSubTab prop changes
   useEffect(() => {
     if (initialSubTab) {
       setActiveSubTab(initialSubTab);
     }
   }, [initialSubTab]);
-  
+
   // Edit Profile Form State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState(authUser?.name || userProfile?.name || '');
@@ -143,7 +141,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     }
   }, [authUser, userProfile]);
 
-  const handleSaveTokenPreferences = (e?: React.FormEvent) => {
+  const handleSaveTokenPreferences = (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
     const updatedPreferences = {
       defaultFormat: tokenFormat,
@@ -176,7 +174,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setTimeout(() => setCopiedColor(null), 1800);
   };
 
-  const handleEditProfileSubmit = (e: React.FormEvent) => {
+  const handleEditProfileSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     onUpdateProfile({
       name: editName.trim(),
@@ -191,14 +189,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   // Submissions filtered for current user safely
-  const mySubmissions = safeSubmissions.filter(s => 
-    (s.authorHandle && authUser?.handle && s.authorHandle.toLowerCase() === authUser.handle.toLowerCase()) ||
-    (s.author && authUser?.name && s.author.toLowerCase() === authUser.name.toLowerCase())
+  const mySubmissions = safeSubmissions.filter(s =>
+    (s.authorHandle?.toLowerCase() === authUser?.handle?.toLowerCase()) ||
+    (s.author?.toLowerCase() === authUser?.name?.toLowerCase())
   );
 
   return (
     <div className="flex-1 bg-[#0B0F17] text-[#DFE2EE] p-4 sm:p-8 max-w-[1720px] mx-auto w-full pb-24">
-      
+
       {/* Top Banner: Synchronized Identity Header */}
       <div className="bg-[#181C24] border border-white/[0.08] rounded-2xl p-6 sm:p-8 shadow-2xl mb-8 relative overflow-hidden">
         {/* Ambient lighting */}
@@ -209,10 +207,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {/* Avatar + Identity */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
             <div className="relative">
-              <img 
-                src={authUser.avatar || userProfile.avatar} 
+              <img
+                src={authUser.avatar || userProfile.avatar}
                 alt={authUser.name}
-                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-2 border-white/20 shadow-2xl" 
+                className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-2 border-white/20 shadow-2xl"
               />
               <span className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-3 border-[#181C24] rounded-full shadow-lg" title="Usuário Ativo" />
             </div>
@@ -222,11 +220,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-['Geist']">
                   {authUser.name}
                 </h1>
-                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider font-mono ${
-                  authUser.role === 'admin' 
-                    ? 'bg-purple-600 text-white' 
-                    : 'bg-[#6366F1] text-white'
-                }`}>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider font-mono ${authUser.role === 'admin'
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-[#6366F1] text-white'
+                  }`}>
                   {authUser.role === 'admin' ? 'ADMIN' : 'PRO'}
                 </span>
                 <span className="text-xs font-mono text-[#94A3B8]">
@@ -247,9 +244,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
               {/* Status and External Links */}
               <div className="flex flex-wrap items-center gap-4 mt-3 text-xs font-mono text-[#94A3B8]">
-                <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] ${
-                  isSupabaseConnected ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
-                }`}>
+                <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] ${isSupabaseConnected ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
+                  }`}>
                   <Cloud className="w-3.5 h-3.5" />
                   {isSupabaseConnected ? 'Nuvem Supabase Ativa' : 'Armazenamento Local'}
                 </span>
@@ -297,9 +293,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         {/* Badges Strip */}
         <div className="mt-6 pt-6 border-t border-white/[0.08] flex flex-wrap items-center gap-2">
-          {(userProfile.badges || ['Curador Ativo', 'WCAG AAA Master', 'OKLCH Pioneer']).map((badge, idx) => (
+          {(userProfile.badges || ['Curador Ativo', 'WCAG AAA Master', 'OKLCH Pioneer']).map((badge) => (
             <span
-              key={idx}
+              key={badge}
               className="px-3 py-1 rounded-full bg-[#111827] border border-white/[0.08] text-xs font-mono text-[#DFE2EE] flex items-center gap-1.5 shadow-inner"
             >
               <Award className="w-3.5 h-3.5 text-[#06B6D4]" />
@@ -356,11 +352,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       <div className="flex items-center gap-2 border-b border-white/[0.08] mb-8 overflow-x-auto scrollbar-none">
         <button
           onClick={() => setActiveSubTab('analytics')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'analytics'
-              ? 'border-[#06B6D4] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'analytics'
+            ? 'border-[#06B6D4] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <BarChart3 className="w-4 h-4 text-[#06B6D4]" />
           <span>Dashboard de Métricas & Recharts</span>
@@ -371,11 +366,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <button
           onClick={() => setActiveSubTab('palettes')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'palettes'
-              ? 'border-[#06B6D4] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'palettes'
+            ? 'border-[#06B6D4] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <PaletteIcon className="w-4 h-4 text-[#06B6D4]" />
           <span>Minhas Paletas & Forks ({safePalettes.length})</span>
@@ -383,11 +377,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <button
           onClick={() => setActiveSubTab('submissions')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'submissions'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'submissions'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Send className="w-4 h-4 text-[#6366F1]" />
           <span>Submissões & Curadoria ({mySubmissions.length || safeSubmissions.length})</span>
@@ -395,11 +388,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <button
           onClick={() => setActiveSubTab('swatches')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'swatches'
-              ? 'border-[#EC4899] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'swatches'
+            ? 'border-[#EC4899] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Heart className="w-4 h-4 text-[#EC4899]" />
           <span>Cores Favoritas ({safeFavoriteColors.length})</span>
@@ -407,11 +399,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <button
           onClick={() => setActiveSubTab('showcase')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'showcase'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'showcase'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Eye className="w-4 h-4 text-purple-400" />
           <span>Vitrine Pública & Badges</span>
@@ -419,11 +410,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <button
           onClick={() => setActiveSubTab('collections')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'collections'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'collections'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Bookmark className="w-4 h-4 text-[#06B6D4]" />
           <span>Coleções & Boards ({safeCollections.length})</span>
@@ -431,11 +421,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <button
           onClick={() => setActiveSubTab('vault')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'vault'
-              ? 'border-amber-400 text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'vault'
+            ? 'border-amber-400 text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Lock className="w-4 h-4 text-amber-400" />
           <span>Cofre Privado</span>
@@ -443,11 +432,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
         <button
           onClick={() => setActiveSubTab('settings')}
-          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${
-            activeSubTab === 'settings'
-              ? 'border-[#6366F1] text-white font-semibold'
-              : 'border-transparent text-[#94A3B8] hover:text-white'
-          }`}
+          className={`pb-3 px-3 text-xs sm:text-sm font-medium flex items-center gap-2 border-b-2 whitespace-nowrap transition-all cursor-pointer ${activeSubTab === 'settings'
+            ? 'border-[#6366F1] text-white font-semibold'
+            : 'border-transparent text-[#94A3B8] hover:text-white'
+            }`}
         >
           <Settings className="w-4 h-4 text-[#94A3B8]" />
           <span>Configurações & Exportação</span>
@@ -506,84 +494,97 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {safePalettes.map((p) => (
-              <div
-                key={p.id}
-                className="bg-[#181C24] border border-white/[0.08] rounded-xl overflow-hidden shadow-xl hover:border-white/[0.18] transition-all flex flex-col justify-between group"
-              >
-                {/* Color Stripes Header */}
-                <div 
-                  onClick={() => onOpenInGenerator(p.colors)}
-                  className="h-40 sm:h-44 w-full flex cursor-pointer relative overflow-hidden"
-                  title="Abrir no Gerador"
+                <div
+                  key={p.id}
+                  className="bg-[#181C24] border border-white/[0.08] rounded-xl overflow-hidden shadow-xl hover:border-white/[0.18] transition-all flex flex-col justify-between group"
                 >
-                  {p.colors.map((c, i) => (
-                    <div key={i} className="flex-1 h-full transition-transform hover:scale-105 duration-150 relative group/stripe" style={{ backgroundColor: c }}>
-                      <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono opacity-0 group-hover/stripe:opacity-100 bg-black/60 text-white px-1 py-0.5 rounded transition-opacity">
-                        {c}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                  {/* Color Stripes Header */}
+                  <button
+                    type="button"
+                    onClick={() => onOpenInGenerator(p.colors)}
+                    className="h-40 sm:h-44 w-full flex cursor-pointer relative overflow-hidden border-0 p-0 appearance-none"
+                    title="Abrir no Gerador"
+                    aria-label="Abrir paleta no Gerador"
+                  >
+                    {p.colors.map((c) => (
+                      <div key={c} className="flex-1 h-full transition-transform hover:scale-105 duration-150 relative group/stripe" style={{ backgroundColor: c }}>
+                        <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-[10px] font-mono opacity-0 group-hover/stripe:opacity-100 bg-black/60 text-white px-1 py-0.5 rounded transition-opacity pointer-events-none">
+                          {c}
+                        </span>
+                      </div>
+                    ))}
+                  </button>
 
-                {/* Card Body */}
-                <div className="p-5 flex-1 flex flex-col justify-between">
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <h3 
-                        onClick={() => onOpenInGenerator(p.colors)}
-                        className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] transition-colors font-['Geist']"
-                      >
-                        {p.title}
-                      </h3>
-                      <div className="flex items-center gap-1 text-xs font-mono text-[#94A3B8]">
-                        <Heart className="w-3.5 h-3.5 text-[#EC4899] fill-[#EC4899]" />
-                        <span>{p.likes ? p.likes.toLocaleString() : '12'}</span>
+                  {/* Card Body */}
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <h3 className="text-base font-semibold text-white tracking-tight font-['Geist']">
+                          <button
+                            type="button"
+                            onClick={() => onOpenInGenerator(p.colors)}
+                            className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] transition-colors font-['Geist'] bg-transparent border-0 p-0 text-left"
+                          >
+                            {p.title}
+                          </button>
+                        </h3>
+                        <div className="flex items-center gap-1 text-xs font-mono text-[#94A3B8]">
+                          <Heart className="w-3.5 h-3.5 text-[#EC4899] fill-[#EC4899]" />
+                          <span>{p.likes ? p.likes.toLocaleString() : '12'}</span>
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-[#94A3B8] line-clamp-2 mb-3">
+                        {p.description || 'Paleta harmônica calibrada com uniformidade perceptual.'}
+                      </p>
+
+                      <div className="flex flex-wrap items-center gap-1.5 mb-4">
+                        <span className="px-2 py-0.5 rounded bg-[#10141D] border border-white/[0.06] text-[10px] font-mono text-[#06B6D4]">
+                          {p.gamut || 'Display P3'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/20 text-[10px] font-mono text-emerald-400">
+                          {p.wcagLevel || 'WCAG AAA'}
+                        </span>
                       </div>
                     </div>
 
-                    <p className="text-xs text-[#94A3B8] line-clamp-2 mb-3">
-                      {p.description || 'Paleta harmônica calibrada com uniformidade perceptual.'}
-                    </p>
+                    {/* Actions footer */}
+                    <div className="flex items-center gap-2 pt-4 border-t border-white/[0.06]">
+                      <button
+                        onClick={() => onOpenInGenerator(p.colors)}
+                        className="flex-1 h-8 bg-[#202532] hover:bg-[#2C3345] text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <Sliders className="w-3 h-3" />
+                        <span>Gerador</span>
+                      </button>
 
-                    <div className="flex flex-wrap items-center gap-1.5 mb-4">
-                      <span className="px-2 py-0.5 rounded bg-[#10141D] border border-white/[0.06] text-[10px] font-mono text-[#06B6D4]">
-                        {p.gamut || 'Display P3'}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-emerald-950/40 border border-emerald-500/20 text-[10px] font-mono text-emerald-400">
-                        {p.wcagLevel || 'WCAG AAA'}
-                      </span>
+                      <button
+                        onClick={() => onSaveToCollection?.(p.colors)}
+                        className="h-8 px-2.5 bg-[#202532] hover:bg-[#2C3345] text-[#94A3B8] hover:text-white rounded-lg text-xs transition-colors cursor-pointer"
+                        title="Salvar em Coleção"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleCopyTokens(p)}
+                        className="h-8 px-2.5 bg-[#202532] hover:bg-[#2C3345] text-[#94A3B8] hover:text-white rounded-lg text-xs transition-colors cursor-pointer"
+                        title="Copiar CSS Tokens"
+                      >
+                        {copiedId === p.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+
+                      <button
+                        onClick={() => onOpenExport(p.colors, p.title)}
+                        className="h-8 px-2.5 bg-[#202532] hover:bg-[#2C3345] text-[#94A3B8] hover:text-white rounded-lg text-xs transition-colors cursor-pointer"
+                        title="Exportar Amostras Illustrator (.jsx/.ase)"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
-
-                  {/* Actions footer */}
-                  <div className="flex items-center gap-2 pt-4 border-t border-white/[0.06]">
-                    <button
-                      onClick={() => onOpenInGenerator(p.colors)}
-                      className="flex-1 h-8 bg-[#202532] hover:bg-[#2C3345] text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <Sliders className="w-3 h-3" />
-                      <span>Gerador</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleCopyTokens(p)}
-                      className="h-8 px-2.5 bg-[#202532] hover:bg-[#2C3345] text-[#94A3B8] hover:text-white rounded-lg text-xs transition-colors cursor-pointer"
-                      title="Copiar CSS Tokens"
-                    >
-                      {copiedId === p.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                    </button>
-
-                    <button
-                      onClick={() => onOpenExport(p.colors, p.title)}
-                      className="h-8 px-2.5 bg-[#202532] hover:bg-[#2C3345] text-[#94A3B8] hover:text-white rounded-lg text-xs transition-colors cursor-pointer"
-                      title="Exportar Amostras Illustrator (.jsx/.ase)"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
             </div>
           )}
         </div>
@@ -612,20 +613,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
           <div className="space-y-3 pt-2">
             {(mySubmissions.length > 0 ? mySubmissions : safeSubmissions).map((sub) => (
-              <div 
-                key={sub.id} 
+              <div
+                key={sub.id}
                 className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
               >
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-bold text-white">{sub.title}</span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
-                      sub.status === 'Aprovado' 
-                        ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30'
-                        : sub.status === 'Rejeitado'
-                        ? 'bg-red-950/50 text-red-400 border-red-500/30'
-                        : 'bg-amber-950/50 text-amber-400 border-amber-500/30'
-                    }`}>
+                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${(() => {
+                      if (sub.status === 'Aprovado') return 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30';
+                      if (sub.status === 'Rejeitado') return 'bg-red-950/50 text-red-400 border-red-500/30';
+                      return 'bg-amber-950/50 text-amber-400 border-amber-500/30';
+                    })()}`}>
                       {sub.status}
                     </span>
                     {sub.contrastScore && (
@@ -637,9 +636,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   </div>
 
                   <div className="flex items-center gap-1.5 mt-2.5">
-                    {sub.colors.map((hex, i) => (
-                      <div 
-                        key={i} 
+                    {sub.colors.map((hex) => (
+                      <div
+                        key={hex}
                         className="w-8 h-6 rounded border border-white/10"
                         style={{ backgroundColor: hex }}
                         title={hex}
@@ -682,42 +681,51 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-              {safeFavoriteColors.map((fav, idx) => {
+              {safeFavoriteColors.map((fav) => {
                 const hexVal = typeof fav === 'string' ? fav : fav.hex;
                 const nameVal = typeof fav === 'string' ? fav : fav.name;
                 return (
                   <div
-                    key={idx}
-                    onClick={() => handleCopyColorHex(hexVal)}
-                    className="bg-[#181C26] border border-white/[0.08] hover:border-[#06B6D4]/40 rounded-xl p-3 flex flex-col items-center gap-2 cursor-pointer transition-all hover:scale-105 group relative"
+                    key={hexVal}
+                    className="bg-[#181C26] border border-white/[0.08] hover:border-[#06B6D4]/40 rounded-xl p-3 transition-all hover:scale-105 group relative"
                   >
-                    <div 
-                      className="w-full h-16 rounded-lg border border-white/10 shadow-inner flex items-center justify-center"
-                      style={{ backgroundColor: hexVal }}
+                    <button
+                      type="button"
+                      onClick={() => handleCopyColorHex(hexVal)}
+                      className="w-full flex flex-col items-center gap-2 cursor-pointer bg-transparent border-0 p-0 text-left"
+                      title={`Copiar ${hexVal}`}
+                      aria-label={`Copiar cor ${hexVal}`}
                     >
-                      {copiedColor === hexVal && (
-                        <span className="bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">
-                          Copiado!
+                      <div
+                        className="w-full h-16 rounded-lg border border-white/10 shadow-inner flex items-center justify-center"
+                        style={{ backgroundColor: hexVal }}
+                      >
+                        {copiedColor === hexVal && (
+                          <span className="bg-black/80 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">
+                            Copiado!
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-xs font-mono text-white group-hover:text-[#06B6D4] font-semibold">
+                        {hexVal}
+                      </span>
+                      {nameVal && nameVal !== hexVal && (
+                        <span className="text-[10px] text-[#94A3B8] truncate max-w-full">
+                          {nameVal}
                         </span>
                       )}
-                    </div>
-                    <span className="text-xs font-mono text-white group-hover:text-[#06B6D4] font-semibold">
-                      {hexVal}
-                    </span>
-                    {nameVal && nameVal !== hexVal && (
-                      <span className="text-[10px] text-[#94A3B8] truncate max-w-full">
-                        {nameVal}
-                      </span>
-                    )}
+                    </button>
 
                     {onDeleteFavoriteColor && (
                       <button
+                        type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteFavoriteColor(hexVal);
                         }}
                         className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/60 hover:bg-red-500 text-white/70 hover:text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                         title="Remover dos favoritos"
+                        aria-label={`Remover ${hexVal} dos favoritos`}
                       >
                         <Trash2 className="w-2.5 h-2.5" />
                       </button>
@@ -776,8 +784,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <p className="text-xs text-[#94A3B8] mb-4">{col.description || 'Board temático de design system.'}</p>
 
               <div className="flex items-center gap-1.5 p-3 bg-[#10141D] rounded-lg border border-white/[0.04]">
-                {(col.coverColors || ['#0E1726', '#08BBD9', '#3B82F6']).map((c, i) => (
-                  <div key={i} className="h-6 flex-1 rounded border border-white/10" style={{ backgroundColor: c }} title={c} />
+                {(col.coverColors || ['#0E1726', '#08BBD9', '#3B82F6']).map((c) => (
+                  <div key={c} className="h-6 flex-1 rounded border border-white/10" style={{ backgroundColor: c }} title={c} />
                 ))}
               </div>
             </div>
@@ -859,17 +867,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                       {/* Color strip */}
                       <div className="h-10 rounded-lg overflow-hidden flex border border-white/10 shadow-inner">
                         {pal.colors.map((hex, i) => (
-                          <div
-                            key={i}
+                          <button
+                            key={`${hex}-${i}`}
+                            type="button"
                             onClick={() => handleCopyColorHex(hex)}
-                            className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/c"
+                            className="flex-1 h-full cursor-pointer transition-transform hover:scale-105 relative group/c border-none p-0"
                             style={{ backgroundColor: hex }}
                             title={`${hex} - Clique para copiar`}
                           >
                             <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono font-bold opacity-0 group-hover/c:opacity-100 bg-black/60 text-white transition-opacity">
                               {copiedColor === hex ? '✓' : hex}
                             </span>
-                          </div>
+                          </button>
                         ))}
                       </div>
 
@@ -882,8 +891,8 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
                       {pal.tags && pal.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {pal.tags.map((t, idx) => (
-                            <span key={idx} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] text-[#94A3B8] font-mono">
+                          {pal.tags.map((t) => (
+                            <span key={t} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[10px] text-[#94A3B8] font-mono">
                               #{t}
                             </span>
                           ))}
@@ -938,8 +947,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
             <form onSubmit={handleSaveTokenPreferences} className="space-y-4 text-xs font-mono">
               <div>
-                <label className="text-[#94A3B8] block mb-1">Formato Padrão de Representação:</label>
-                <select 
+                <label htmlFor="tokenFormatSelect" className="text-[#94A3B8] block mb-1">Formato Padrão de Representação:</label>
+                <select
+                  id="tokenFormatSelect"
                   value={tokenFormat}
                   onChange={(e) => {
                     const newFmt = e.target.value as 'OKLCH' | 'HEX' | 'RGB' | 'HSL';
@@ -963,8 +973,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div>
-                <label className="text-[#94A3B8] block mb-1">Prefixo de Variável CSS:</label>
+                <label htmlFor="tokenPrefixInput" className="text-[#94A3B8] block mb-1">Prefixo de Variável CSS:</label>
                 <input
+                  id="tokenPrefixInput"
                   type="text"
                   value={tokenPrefix}
                   onChange={(e) => setTokenPrefix(e.target.value)}
@@ -984,8 +995,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div>
-                <label className="text-[#94A3B8] block mb-1">Convenção de Nomes:</label>
-                <select 
+                <label htmlFor="tokenNamingSelect" className="text-[#94A3B8] block mb-1">Convenção de Nomes:</label>
+                <select
+                  id="tokenNamingSelect"
                   value={tokenNaming}
                   onChange={(e) => {
                     const newNaming = e.target.value as 'kebab-case' | 'camelCase' | 'snake_case';
@@ -1037,21 +1049,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   Pré-visualização do Token em Tempo Real:
                 </span>
                 <code className="text-[#06B6D4] text-xs">
-                  {tokenNaming === 'kebab-case' && `--${tokenPrefix || 'sys-color'}-primary-500: ${
-                    tokenFormat === 'OKLCH' ? 'oklch(0.68 0.19 235);' :
-                    tokenFormat === 'HEX' ? '#06B6D4;' :
-                    tokenFormat === 'RGB' ? 'rgb(6, 182, 212);' : 'hsl(189, 94%, 43%);'
-                  }`}
-                  {tokenNaming === 'camelCase' && `${tokenPrefix || 'sysColor'}Primary500 = "${
-                    tokenFormat === 'OKLCH' ? 'oklch(0.68 0.19 235)' :
-                    tokenFormat === 'HEX' ? '#06B6D4' :
-                    tokenFormat === 'RGB' ? 'rgb(6, 182, 212)' : 'hsl(189, 94%, 43%)'
-                  }";`}
-                  {tokenNaming === 'snake_case' && `${tokenPrefix || 'sys_color'}_primary_500 = "${
-                    tokenFormat === 'OKLCH' ? 'oklch(0.68 0.19 235)' :
-                    tokenFormat === 'HEX' ? '#06B6D4' :
-                    tokenFormat === 'RGB' ? 'rgb(6, 182, 212)' : 'hsl(189, 94%, 43%)'
-                  }";`}
+                  {(() => {
+                    const formatValue = (fmt: string) => {
+                      switch (fmt) {
+                        case 'OKLCH': return 'oklch(0.68 0.19 235)';
+                        case 'HEX': return '#06B6D4';
+                        case 'RGB': return 'rgb(6, 182, 212)';
+                        case 'HSL': default: return 'hsl(189, 94%, 43%)';
+                      }
+                    };
+                    const val = formatValue(tokenFormat);
+
+                    if (tokenNaming === 'kebab-case') {
+                      return `--${tokenPrefix || 'sys-color'}-primary-500: ${val};`;
+                    }
+                    if (tokenNaming === 'camelCase') {
+                      return `${tokenPrefix || 'sysColor'}Primary500 = "${val}";`;
+                    }
+                    return `${tokenPrefix || 'sys_color'}_primary_500 = "${val}";`;
+                  })()}
                 </code>
               </div>
 
@@ -1094,8 +1110,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </h3>
             <form onSubmit={handleEditProfileSubmit} className="space-y-4">
               <div>
-                <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Nome Completo:</label>
+                <label htmlFor="editNameInput" className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Nome Completo:</label>
                 <input
+                  id="editNameInput"
                   type="text"
                   required
                   value={editName}
@@ -1105,8 +1122,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Handle / Usuário (@):</label>
+                <label htmlFor="editHandleInput" className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Handle / Usuário (@):</label>
                 <input
+                  id="editHandleInput"
                   type="text"
                   required
                   value={editHandle}
@@ -1116,8 +1134,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Especialidade / Título:</label>
+                <label htmlFor="editTitleInput" className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Especialidade / Título:</label>
                 <input
+                  id="editTitleInput"
                   type="text"
                   required
                   value={editTitle}
@@ -1127,8 +1146,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Biografia:</label>
+                <label htmlFor="editBioTextarea" className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Biografia:</label>
                 <textarea
+                  id="editBioTextarea"
                   rows={3}
                   value={editBio}
                   onChange={(e) => setEditBio(e.target.value)}
@@ -1137,8 +1157,9 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Website / Link:</label>
+                <label htmlFor="editWebsiteInput" className="text-xs font-mono uppercase text-[#94A3B8] block mb-1">Website / Link:</label>
                 <input
+                  id="editWebsiteInput"
                   type="text"
                   placeholder="https://meusite.design"
                   value={editWebsite}
