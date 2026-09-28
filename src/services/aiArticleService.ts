@@ -17,6 +17,13 @@ export type ArticleTone =
   | 'Manifesto Minimalista'
   | 'Personalizado';
 
+export type ArticleLanguage =
+  | 'Português (Brasil)'
+  | 'Inglês (US)'
+  | 'Espanhol'
+  | 'Francês'
+  | 'Alemão';
+
 export type ArticleLength = 'Curto' | 'Médio' | 'Longo';
 
 export type AiProvider = 'gemini' | 'openrouter' | 'openai' | 'claude';
@@ -87,6 +94,7 @@ export interface AiArticlePayload {
   images: AiArticleImage[];
   tone: ArticleTone;
   customTone?: string;
+  language: ArticleLanguage;
   length: ArticleLength;
 }
 
@@ -99,7 +107,7 @@ export interface AiArticleResponse {
 }
 
 // - ---------------------------------------------------------------------------
-// - Configuração do modelo e orientações de tom e sintaxe
+// - Configuração do modelo e orientações de tom, idioma e sintaxe
 // - ---------------------------------------------------------------------------
 
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -118,6 +126,14 @@ const TONE_GUIDANCE: Record<ArticleTone, string> = {
     'tom de manifesto direto, conciso e minimalista, priorizando frases curtas, declarações de alto impacto e eliminação de redundâncias ou rodeios verbais',
   'Personalizado':
     'tom de voz estritamente personalizado conforme as diretrizes do autor'
+};
+
+const LANGUAGE_GUIDANCE: Record<ArticleLanguage, string> = {
+  'Português (Brasil)': 'português do Brasil (pt-BR)',
+  'Inglês (US)': 'inglês americano (en-US)',
+  'Espanhol': 'espanhol (es)',
+  'Francês': 'francês (fr)',
+  'Alemão': 'alemão (de)'
 };
 
 const LENGTH_GUIDANCE: Record<ArticleLength, string> = {
@@ -144,13 +160,19 @@ function resolveToneGuidance(payload: AiArticlePayload): string {
 
 function buildSystemPrompt(payload: AiArticlePayload): string {
   const toneGuidanceText = resolveToneGuidance(payload);
+  const targetLanguageText = LANGUAGE_GUIDANCE[payload.language || 'Português (Brasil)'];
 
   return [
     'Você é um editor sênior de conteúdo técnico do blog IzyColors, especializado em teoria da cor, design systems, acessibilidade (WCAG) e engenharia de software.',
     'Sua missão é transformar as diretrizes, referências e imagens fornecidas pelo autor em um artigo original, estruturado e pronto para publicação.',
     '',
+    'REGRAS DE IDIOMA E REDAÇÃO UNIFORME:',
+    `- O artigo INTEIRO (título, slug, metaDescription, excerpt e todo o conteúdo em Markdown) DEVE ser escrito EXCLUSIVAMENTE em ${targetLanguageText}.`,
+    '- É ESTRITAMENTE PROIBIDO misturar idiomas no mesmo artigo ou gerar respostas bilíngues.',
+    '- Mantenha nomes de propriedades CSS, termos técnicos de código (como oklch, hex, WCAG, TypeScript) intactos, mas todo o texto explicativo, títulos e introduções DEVEM seguir 100% o idioma selecionado.',
+    '',
     'REGRAS DE ANÁLISE:',
-    '- Analise profundamente todas as imagens fornecidas (capturas de tela, gráficos, diagramas, tabelas). Extraia dados visuais, valores, tendências e correlações e cite-os organicamente no texto (ex.: "como mostra o gráfico de contraste na imagem de referência").',
+    '- Analise profundamente todas as imagens fornecidas (capturas de tela, gráficos, diagramas, tabelas). Extraia dados visuais, valores, tendências e correlações e cite-os organicamente no texto.',
     '- Sintetize as ideias dos links e transcrições fornecidos sem copiar trechos literais. Evite clichês corporativos vazios e jargão genérico.',
     '- Produza conteúdo original, com argumentação própria e dados concretos.',
     '',
@@ -165,7 +187,7 @@ function buildSystemPrompt(payload: AiArticlePayload): string {
     '  - Usar títulos H2 (##) e H3 (###) para estruturar as seções.',
     '  - Incluir pelo menos uma tabela Markdown quando houver dados comparáveis.',
     '  - Usar APENAS hifens (-) para itens de lista, nunca asteriscos ou números.',
-    '  - Ser escrito em português do Brasil.',
+    '  - Respeitar 100% o idioma configurado.',
     '',
     'REGRAS DE ESTILO E TOM DE VOZ:',
     `- Tom de voz: ${toneGuidanceText}.`,
@@ -191,6 +213,7 @@ function buildUserPrompt(payload: AiArticlePayload): string {
     'DIRETRIZES DO AUTOR',
     `Tema central: ${payload.theme || 'Não informado'}`,
     `Tese e ideias principais: ${payload.thesis || 'Não informado'}`,
+    `Idioma de saída obrigatório: ${payload.language || 'Português (Brasil)'}`,
     `Preset de Tom de Voz: ${payload.tone}`,
     customToneBlock,
     '',

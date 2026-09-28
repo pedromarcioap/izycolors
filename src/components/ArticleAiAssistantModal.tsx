@@ -15,13 +15,15 @@ import {
     BookOpen,
     Briefcase,
     Zap,
-    Sliders
+    Sliders,
+    Globe
 } from 'lucide-react';
 import {
     generateAiArticle,
     AiArticleResponse,
     AiArticleReference,
     ArticleTone,
+    ArticleLanguage,
     ArticleLength
 } from '../services/aiArticleService';
 
@@ -84,6 +86,14 @@ const TONE_PRESETS: TonePresetOption[] = [
         desc: 'Escreva suas próprias diretrizes de tom',
         icon: Sliders
     }
+];
+
+const LANGUAGE_OPTIONS: ArticleLanguage[] = [
+    'Português (Brasil)',
+    'Inglês (US)',
+    'Espanhol',
+    'Francês',
+    'Alemão'
 ];
 
 const LENGTH_OPTIONS: ArticleLength[] = ['Curto', 'Médio', 'Longo'];
@@ -154,6 +164,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
     const [images, setImages] = useState<PendingImage[]>([]);
     const [tone, setTone] = useState<ArticleTone>('Técnico & Engenharia');
     const [customTone, setCustomTone] = useState('');
+    const [language, setLanguage] = useState<ArticleLanguage>('Português (Brasil)');
     const [length, setLength] = useState<ArticleLength>('Médio');
 
     const [phase, setPhase] = useState<GenerationPhase>('idle');
@@ -172,6 +183,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
             setImages([]);
             setTone('Técnico & Engenharia');
             setCustomTone('');
+            setLanguage('Português (Brasil)');
             setLength('Médio');
             setPhase('idle');
             setError(null);
@@ -296,6 +308,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                 images,
                 tone,
                 customTone: tone === 'Personalizado' ? customTone.trim() : undefined,
+                language,
                 length
             });
 
@@ -366,7 +379,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                             <p className="text-xs text-[#94A3B8] mt-1 max-w-sm leading-relaxed">
                                 {phase === 'analyzing'
                                     ? 'Extraindo dados visuais, gráficos e insights dos insumos fornecidos.'
-                                    : 'Estruturando título, SEO e conteúdo em Markdown para publicação.'}
+                                    : 'Estruturando título, SEO e conteúdo em Markdown no idioma selecionado.'}
                             </p>
                         </div>
 
@@ -515,6 +528,46 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                             </div>
                         </div>
 
+                        {/* - Idioma do Artigo e Extensão do Conteúdo */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label htmlFor="ai-language" className="text-xs font-mono text-[#94A3B8] flex items-center gap-1.5 mb-1 font-medium">
+                                    <Globe className="w-3.5 h-3.5 text-[#06B6D4]" />
+                                    <span>Idioma do Artigo</span>
+                                </label>
+                                <select
+                                    id="ai-language"
+                                    value={language}
+                                    onChange={e => setLanguage(e.target.value as ArticleLanguage)}
+                                    className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                                >
+                                    {LANGUAGE_OPTIONS.map(option => (
+                                        <option key={option} value={option}>
+                                            {option}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label htmlFor="ai-length" className="text-xs font-mono text-[#94A3B8] block mb-1 font-medium">
+                                    Extensão do Conteúdo
+                                </label>
+                                <select
+                                    id="ai-length"
+                                    value={length}
+                                    onChange={e => setLength(e.target.value as ArticleLength)}
+                                    className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                                >
+                                    {LENGTH_OPTIONS.map(option => (
+                                        <option key={option} value={option}>
+                                            {option}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
                         {/* - Links e referências */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
@@ -614,25 +667,6 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                                     ))}
                                 </div>
                             )}
-                        </div>
-
-                        {/* - Extensão do Conteúdo */}
-                        <div>
-                            <label htmlFor="ai-length" className="text-xs font-mono text-[#94A3B8] block mb-1">
-                                Extensão do Conteúdo
-                            </label>
-                            <select
-                                id="ai-length"
-                                value={length}
-                                onChange={e => setLength(e.target.value as ArticleLength)}
-                                className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
-                            >
-                                {LENGTH_OPTIONS.map(option => (
-                                    <option key={option} value={option}>
-                                        {option}
-                                    </option>
-                                ))}
-                            </select>
                         </div>
 
                         {/* - Rodapé com ações */}
