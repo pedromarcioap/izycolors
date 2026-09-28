@@ -67,7 +67,7 @@ import {
   initAuthListener
 } from './services/authService';
 
-import { Menu, Database, Download, Check, ShieldAlert } from 'lucide-react';
+import { Menu, Download, Check, ShieldAlert } from 'lucide-react';
 
 export function App() {
   // Navigation & Gamut State
@@ -508,7 +508,6 @@ export function App() {
         onLogout={handleLogout}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenExportModal={() => handleOpenExport()}
-        isSupabaseConnected={isSupabaseConnected}
         favoritesCount={favoriteColors.length}
         projectsCount={projects.length}
         forksCount={forksCount}
@@ -574,19 +573,6 @@ export function App() {
                 {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
               </span>
             </button>
-
-            <span
-              className={`h-8 px-2.5 rounded-lg text-xs font-mono border flex items-center gap-1.5 transition-colors ${isSupabaseConnected
-                ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8]'
-                }`}
-              title="Status do Banco de Dados / Supabase"
-            >
-              <Database className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">
-                {isSupabaseConnected ? 'Supabase Conectado' : 'Supabase Sync'}
-              </span>
-            </span>
 
             <button
               onClick={() => handleOpenExport()}

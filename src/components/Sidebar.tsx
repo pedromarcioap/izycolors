@@ -13,7 +13,6 @@ import {
   Disc3,
   PanelLeftClose,
   PanelLeftOpen,
-  Database,
   Search,
   ShieldCheck,
   LogOut,
@@ -32,7 +31,6 @@ interface SidebarProps {
   onLogout?: () => void;
   onOpenCommandPalette: () => void;
   onOpenExportModal: () => void;
-  isSupabaseConnected: boolean;
   favoritesCount: number;
   projectsCount: number;
   forksCount: number;
@@ -197,7 +195,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onOpenCommandPalette,
   onOpenExportModal,
-  isSupabaseConnected,
   favoritesCount,
   projectsCount,
   forksCount,
@@ -372,25 +369,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           )}
         </button>
-
-        {/* Supabase Persistence Read-Only Indicator */}
-        <div
-          className={`w-full rounded-lg bg-[#141822] border border-white/[0.08] text-xs flex items-center ${isExpanded ? 'px-3 py-2 justify-between' : 'h-10 w-10 mx-auto justify-center'
-            }`}
-          title="Status de Conexão com Supabase"
-        >
-          <div className="flex items-center gap-2">
-            <Database className={`w-3.5 h-3.5 shrink-0 ${isSupabaseConnected ? 'text-emerald-400' : 'text-[#06B6D4]'}`} />
-            {isExpanded && (
-              <span className="text-white text-[11px] font-mono truncate">
-                {isSupabaseConnected ? 'Supabase Conectado' : 'Supabase Sync'}
-              </span>
-            )}
-          </div>
-          {isExpanded && (
-            <span className={`w-2 h-2 rounded-full shrink-0 ${isSupabaseConnected ? 'bg-emerald-400' : 'bg-[#06B6D4]'}`} />
-          )}
-        </div>
 
         {/* User Account / Role Badge & Auth Switcher */}
         <div
