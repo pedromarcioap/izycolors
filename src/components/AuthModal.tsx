@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  X, LogIn, UserPlus, ShieldCheck, User, Mail, Lock, AtSign,
+  X, LogIn, UserPlus, User, Mail, Lock, AtSign,
   Cloud, AlertCircle, CheckCircle2, LogOut, KeyRound,
   Eye, EyeOff
 } from 'lucide-react';
@@ -12,8 +12,6 @@ import {
   resetPasswordForEmail
 } from '../services/authService';
 import { getSupabaseCredentials } from '../services/supabase';
-
-import { LogoIcon } from './Logo';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -371,13 +369,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {/* Register New Account Tab */}
           {tab === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              <div className="p-3 bg-[#06B6D4]/10 border border-[#06B6D4]/20 rounded-xl flex items-start gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-[#06B6D4] shrink-0 mt-0.5" />
-                <p className="text-[11px] text-[#A5F3FC] leading-relaxed">
-                  Todas as novas contas são criadas como <strong>Usuário Comum</strong>. Perfis de administrador são concedidos apenas por um administrador autenticado.
-                </p>
-              </div>
-
               <div>
                 <label htmlFor="register-name" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                   Nome Completo *
