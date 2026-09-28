@@ -39,6 +39,7 @@ import {
 } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
 import { UserAnalyticsDashboard } from './UserAnalyticsDashboard';
+import { AdminAiSettings } from './AdminAiSettings';
 
 interface ProfileViewProps {
   authUser: AuthUser;
@@ -681,6 +682,9 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onLogout
 }) => (
   <div className="max-w-3xl space-y-6">
+    {authUser.role === 'admin' && (
+      <AdminAiSettings isAdmin={true} />
+    )}
     <div className="bg-[#181C24] border border-white/[0.08] rounded-xl p-6 shadow-xl">
       <div className="flex items-center justify-between gap-4 mb-1">
         <h3 className="text-base font-bold text-white font-['Geist']">

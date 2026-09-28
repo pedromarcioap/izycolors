@@ -16,9 +16,11 @@ import {
   Database,
   Eye,
   ChevronRight,
-  BarChart2
+  BarChart2,
+  Settings
 } from 'lucide-react';
 import { AuthUser, CommunitySubmission, CmsArticle, AuditLogItem, UserRole } from '../types';
+import { AdminAiSettings } from './AdminAiSettings';
 import {
   updateUserRole,
   toggleUserStatus,
@@ -380,6 +382,17 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
         >
           <Activity className="w-3.5 h-3.5" />
           <span>Logs de Auditoria</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('settings')}
+          className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors cursor-pointer ${activeTab === 'settings'
+            ? 'bg-purple-600/20 text-purple-300 border border-purple-500/30'
+            : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
+            }`}
+        >
+          <Settings className="w-3.5 h-3.5 text-purple-400" />
+          <span>Configurações & IA</span>
         </button>
       </div>
 
@@ -898,6 +911,11 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
             ))}
           </div>
         </div>
+      )}
+
+      {/* TAB 6: CONFIGURAÇÕES DE IA */}
+      {activeTab === 'settings' && (
+        <AdminAiSettings isAdmin={currentUser.role === 'admin'} />
       )}
 
       {/* MODAL: CADASTRAR NOVO USUÁRIO */}
