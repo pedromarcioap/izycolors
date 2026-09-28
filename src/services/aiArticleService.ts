@@ -1,15 +1,21 @@
-// ---------------------------------------------------------------------------
-// aiArticleService.ts
-// Serviço de geração semiautomatizada de artigos com IA multimodal.
-//
-// Suporta múltiplos provedores configuráveis pelo administrador:
-// - Google Gemini (nativo)
-// - OpenRouter (roteador multi-modelo)
-// - OpenAI (GPT-4o / GPT-4o-mini)
-// - Anthropic Claude (Claude 3.5 Sonnet / Haiku)
-// ---------------------------------------------------------------------------
+// - ---------------------------------------------------------------------------
+// - aiArticleService.ts
+// - Serviço de geração semiautomatizada de artigos com IA multimodal.
+// -
+// - Suporta múltiplos provedores configuráveis pelo administrador:
+// - - Google Gemini (nativo)
+// - - OpenRouter (roteador multi-modelo)
+// - - OpenAI (GPT-4o / GPT-4o-mini)
+// - - Anthropic Claude (Claude 3.5 Sonnet / Haiku)
+// - ---------------------------------------------------------------------------
 
-export type ArticleTone = 'Técnico' | 'Analítico' | 'Didático';
+export type ArticleTone =
+  | 'Técnico & Engenharia'
+  | 'Crítica de Design & Editorial'
+  | 'Didático & Passo a Passo'
+  | 'Estudo de Caso de Produto'
+  | 'Manifesto Minimalista'
+  | 'Personalizado';
 
 export type ArticleLength = 'Curto' | 'Médio' | 'Longo';
 
@@ -41,7 +47,7 @@ export const DEFAULT_AI_CONFIG: AiApiConfig = {
 
 const STORAGE_KEY = 'izycolors_ai_api_config';
 
-/** Carrega as configurações de IA salvas ou retorna os padrões. */
+/** - Carrega as configurações de IA salvas ou retorna os padrões. */
 export function getAiConfig(): AiApiConfig {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -50,19 +56,19 @@ export function getAiConfig(): AiApiConfig {
       return { ...DEFAULT_AI_CONFIG, ...parsed };
     }
   } catch {
-    // Fallback silencioso
+    // - Fallback silencioso em caso de erro no parse do localStorage
   }
   return DEFAULT_AI_CONFIG;
 }
 
-/** Salva as configurações de IA no localStorage. */
+/** - Salva as configurações de IA no localStorage. */
 export function saveAiConfig(config: AiApiConfig): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
 }
 
 export interface AiArticleReference {
   id: string;
-  /** URL de referência ou transcrição/trecho colado pelo autor. */
+  /** - URL de referência ou transcrição/trecho colado pelo autor. */
   value: string;
 }
 
@@ -70,7 +76,7 @@ export interface AiArticleImage {
   id: string;
   name: string;
   mimeType: string;
-  /** Conteúdo da imagem codificado em Base64 (sem o prefixo "data:...;base64,"). */
+  /** - Conteúdo da imagem codificado em Base64 (sem o prefixo "data:...;base64,"). */
   base64: string;
 }
 
@@ -80,6 +86,7 @@ export interface AiArticlePayload {
   references: AiArticleReference[];
   images: AiArticleImage[];
   tone: ArticleTone;
+  customTone?: string;
   length: ArticleLength;
 }
 
@@ -91,16 +98,26 @@ export interface AiArticleResponse {
   content: string;
 }
 
-// ---------------------------------------------------------------------------
-// Configuração do modelo e orientações
-// ---------------------------------------------------------------------------
+// - ---------------------------------------------------------------------------
+// - Configuração do modelo e orientações de tom e sintaxe
+// - ---------------------------------------------------------------------------
 
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+/** - Tabela de parâmetros mapeando cada preset para diretrizes estritas de estilo e sintaxe. */
 const TONE_GUIDANCE: Record<ArticleTone, string> = {
-  'Técnico': 'tom técnico e preciso, com vocabulário especializado em cor, design e acessibilidade',
-  'Analítico': 'tom analítico e crítico, comparando abordagens, evidenciando trade-offs e extraindo conclusões próprias',
-  'Didático': 'tom didático e acessível, explicando conceitos passo a passo para quem está começando'
+  'Técnico & Engenharia':
+    'tom técnico, rigoroso e de engenharia de software, com vocabulário especializado em teoria e sintaxe de cor (oklch, hex, p3), arquitetura de design systems, performance e normas WCAG',
+  'Crítica de Design & Editorial':
+    'tom analítico, provocativo e editorial de crítica de design, discutindo escolhas estéticas, harmonia cromática, hierarquia visual e trade-offs de experiência do usuário',
+  'Didático & Passo a Passo':
+    'tom didático, estruturado e instrutivo, explicando conceitos complexos passo a passo com analogias claras, roteiros práticos e foco no aprendizado',
+  'Estudo de Caso de Produto':
+    'tom de estudo de caso corporativo e de produto, focando em resolução de problemas reais, métricas de impacto, decisões de design centradas no usuário e resultados mensuráveis',
+  'Manifesto Minimalista':
+    'tom de manifesto direto, conciso e minimalista, priorizando frases curtas, declarações de alto impacto e eliminação de redundâncias ou rodeios verbais',
+  'Personalizado':
+    'tom de voz estritamente personalizado conforme as diretrizes do autor'
 };
 
 const LENGTH_GUIDANCE: Record<ArticleLength, string> = {
@@ -109,11 +126,25 @@ const LENGTH_GUIDANCE: Record<ArticleLength, string> = {
   'Longo': 'artigo longo e aprofundado, entre 1.800 e 2.600 palavras'
 };
 
-// ---------------------------------------------------------------------------
-// Construção dos prompts
-// ---------------------------------------------------------------------------
+/** - Resolve a orientação de tom final, injetando instruções personalizadas caso selecionado. */
+function resolveToneGuidance(payload: AiArticlePayload): string {
+  if (payload.tone === 'Personalizado') {
+    const customText = payload.customTone?.trim();
+    if (customText) {
+      return `tom personalizado (siga rigorosamente esta instrução do autor): "${customText}"`;
+    }
+    return 'tom personalizado (redija com originalidade, clareza e tom provocativo/direto)';
+  }
+  return TONE_GUIDANCE[payload.tone] || TONE_GUIDANCE['Técnico & Engenharia'];
+}
+
+// - ---------------------------------------------------------------------------
+// - Construção dos prompts
+// - ---------------------------------------------------------------------------
 
 function buildSystemPrompt(payload: AiArticlePayload): string {
+  const toneGuidanceText = resolveToneGuidance(payload);
+
   return [
     'Você é um editor sênior de conteúdo técnico do blog IzyColors, especializado em teoria da cor, design systems, acessibilidade (WCAG) e engenharia de software.',
     'Sua missão é transformar as diretrizes, referências e imagens fornecidas pelo autor em um artigo original, estruturado e pronto para publicação.',
@@ -136,10 +167,10 @@ function buildSystemPrompt(payload: AiArticlePayload): string {
     '  - Usar APENAS hifens (-) para itens de lista, nunca asteriscos ou números.',
     '  - Ser escrito em português do Brasil.',
     '',
-    'REGRAS DE ESTILO:',
-    `- Tom de voz: ${TONE_GUIDANCE[payload.tone]}.`,
+    'REGRAS DE ESTILO E TOM DE VOZ:',
+    `- Tom de voz: ${toneGuidanceText}.`,
     `- Extensão: ${LENGTH_GUIDANCE[payload.length]}.`,
-    '- Título, slug, metaDescription, excerpt e content devem ser coerentes entre si.'
+    '- Título, slug, metaDescription, excerpt e content devem ser totalmente coerentes entre si.'
   ].join('\n');
 }
 
@@ -152,22 +183,28 @@ function buildUserPrompt(payload: AiArticlePayload): string {
     ? `Foram anexadas ${payload.images.length} imagem(ns). Analise os dados visuais presentes e incorpore-os naturalmente ao artigo.`
     : 'Nenhuma imagem anexada.';
 
+  const customToneBlock = payload.tone === 'Personalizado' && payload.customTone?.trim()
+    ? `\nDIRETRIZ DE TOM CUSTOMIZADO DO AUTOR:\n"${payload.customTone.trim()}"`
+    : '';
+
   return [
     'DIRETRIZES DO AUTOR',
     `Tema central: ${payload.theme || 'Não informado'}`,
     `Tese e ideias principais: ${payload.thesis || 'Não informado'}`,
+    `Preset de Tom de Voz: ${payload.tone}`,
+    customToneBlock,
     '',
     'REFERÊNCIAS FORNECIDAS',
     referencesBlock,
     '',
     'OBSERVAÇÕES',
     imageNote
-  ].join('\n');
+  ].filter(Boolean).join('\n');
 }
 
-// ---------------------------------------------------------------------------
-// Extração e validação da resposta JSON
-// ---------------------------------------------------------------------------
+// - ---------------------------------------------------------------------------
+// - Extração e validação da resposta JSON
+// - ---------------------------------------------------------------------------
 
 const FENCED_JSON_PATTERN = /```(?:json)?([\s\S]*?)```/i;
 
@@ -210,9 +247,9 @@ function normalizeResponse(value: unknown): AiArticleResponse {
   };
 }
 
-// ---------------------------------------------------------------------------
-// Chamadas aos Provedores de IA
-// ---------------------------------------------------------------------------
+// - ---------------------------------------------------------------------------
+// - Chamadas aos Provedores de IA
+// - ---------------------------------------------------------------------------
 
 interface GeminiPart {
   text?: string;
@@ -261,7 +298,7 @@ async function callGeminiApi(payload: AiArticlePayload, apiKey: string, model: s
         apiMessage = errorBody.error.message;
       }
     } catch {
-      // Ignora falha de parse
+      // - Ignora falha no parse do corpo de erro
     }
     throw new Error(`Erro na API Gemini (${apiMessage}).`);
   }
@@ -314,7 +351,7 @@ async function callOpenRouterApi(payload: AiArticlePayload, apiKey: string, mode
       const err = await response.json();
       if (err.error?.message) msg = err.error.message;
     } catch {
-      // ignore
+      // - Ignora falha de parse
     }
     throw new Error(`Erro na API OpenRouter (${msg}).`);
   }
@@ -364,7 +401,7 @@ async function callOpenAiApi(payload: AiArticlePayload, apiKey: string, model: s
       const err = await response.json();
       if (err.error?.message) msg = err.error.message;
     } catch {
-      // ignore
+      // - Ignora falha de parse
     }
     throw new Error(`Erro na API OpenAI (${msg}).`);
   }
@@ -418,7 +455,7 @@ async function callClaudeApi(payload: AiArticlePayload, apiKey: string, model: s
       const err = await response.json();
       if (err.error?.message) msg = err.error.message;
     } catch {
-      // ignore
+      // - Ignora falha de parse
     }
     throw new Error(`Erro na API Anthropic Claude (${msg}).`);
   }
@@ -433,9 +470,9 @@ async function callClaudeApi(payload: AiArticlePayload, apiKey: string, model: s
   return normalizeResponse(parsed);
 }
 
-// ---------------------------------------------------------------------------
-// Teste de Conexão com os Provedores
-// ---------------------------------------------------------------------------
+// - ---------------------------------------------------------------------------
+// - Teste de Conexão com os Provedores
+// - ---------------------------------------------------------------------------
 
 export async function testAiConnection(
   provider: AiProvider,
@@ -526,9 +563,9 @@ export async function testAiConnection(
   }
 }
 
-// ---------------------------------------------------------------------------
-// API pública de geração
-// ---------------------------------------------------------------------------
+// - ---------------------------------------------------------------------------
+// - API pública de geração
+// - ---------------------------------------------------------------------------
 
 export async function generateAiArticle(payload: AiArticlePayload): Promise<AiArticleResponse> {
   if (!payload.theme.trim() && !payload.thesis.trim() && payload.references.length === 0) {
@@ -562,7 +599,7 @@ export async function generateAiArticle(payload: AiArticlePayload): Promise<AiAr
     return callClaudeApi(payload, key, config.claudeModel.trim());
   }
 
-  // Padrão: Gemini
+  // - Padrão: Gemini
   const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || (import.meta.env.GEMINI_API_KEY as string) || '';
   const key = (config.geminiApiKey || envKey).trim();
   if (!key) {
@@ -575,7 +612,7 @@ export async function generateAiArticle(payload: AiArticlePayload): Promise<AiAr
   return callGeminiApi(payload, key, model);
 }
 
-/** Converte um título em slug amigável (minúsculas, sem acentos, hifens). */
+/** - Converte um título em slug amigável (minúsculas, sem acentos, hifens). */
 export function slugifyArticle(value: string): string {
   const slug = value
     .normalize('NFD')

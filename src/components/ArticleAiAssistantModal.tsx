@@ -9,7 +9,13 @@ import {
     UploadCloud,
     Loader2,
     Check,
-    AlertTriangle
+    AlertTriangle,
+    Cpu,
+    Palette,
+    BookOpen,
+    Briefcase,
+    Zap,
+    Sliders
 } from 'lucide-react';
 import {
     generateAiArticle,
@@ -34,7 +40,52 @@ interface PendingImage {
 
 type GenerationPhase = 'idle' | 'analyzing' | 'writing' | 'success';
 
-const TONE_OPTIONS: ArticleTone[] = ['Técnico', 'Analítico', 'Didático'];
+interface TonePresetOption {
+    id: ArticleTone;
+    label: string;
+    desc: string;
+    icon: React.ComponentType<{ className?: string }>;
+}
+
+const TONE_PRESETS: TonePresetOption[] = [
+    {
+        id: 'Técnico & Engenharia',
+        label: 'Técnico & Engenharia',
+        desc: 'Rigor técnico, sintaxe de cor & arquitetura',
+        icon: Cpu
+    },
+    {
+        id: 'Crítica de Design & Editorial',
+        label: 'Crítica de Design & Editorial',
+        desc: 'Análise estética, provocativa & narrativa visual',
+        icon: Palette
+    },
+    {
+        id: 'Didático & Passo a Passo',
+        label: 'Didático & Passo a Passo',
+        desc: 'Explicação clara, sequencial & acessível',
+        icon: BookOpen
+    },
+    {
+        id: 'Estudo de Caso de Produto',
+        label: 'Estudo de Caso de Produto',
+        desc: 'Resolução de problemas, métricas & impacto UX',
+        icon: Briefcase
+    },
+    {
+        id: 'Manifesto Minimalista',
+        label: 'Manifesto Minimalista',
+        desc: 'Frases curtas, diretas & declarações de impacto',
+        icon: Zap
+    },
+    {
+        id: 'Personalizado',
+        label: 'Personalizado (Custom)',
+        desc: 'Escreva suas próprias diretrizes de tom',
+        icon: Sliders
+    }
+];
+
 const LENGTH_OPTIONS: ArticleLength[] = ['Curto', 'Médio', 'Longo'];
 
 const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
@@ -101,7 +152,8 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
         { id: newId('ref'), value: '' }
     ]);
     const [images, setImages] = useState<PendingImage[]>([]);
-    const [tone, setTone] = useState<ArticleTone>('Técnico');
+    const [tone, setTone] = useState<ArticleTone>('Técnico & Engenharia');
+    const [customTone, setCustomTone] = useState('');
     const [length, setLength] = useState<ArticleLength>('Médio');
 
     const [phase, setPhase] = useState<GenerationPhase>('idle');
@@ -111,14 +163,15 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Reset the form whenever the modal is closed.
+    // - Reseta o formulário sempre que o modal for fechado
     useEffect(() => {
         if (!isOpen) {
             setTheme('');
             setThesis('');
             setReferences([{ id: newId('ref'), value: '' }]);
             setImages([]);
-            setTone('Técnico');
+            setTone('Técnico & Engenharia');
+            setCustomTone('');
             setLength('Médio');
             setPhase('idle');
             setError(null);
@@ -127,7 +180,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
         }
     }, [isOpen]);
 
-    // Close on Escape (only when not busy generating).
+    // - Fecha ao pressionar Esc (apenas se não estiver no meio da geração)
     useEffect(() => {
         if (!isOpen) return;
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -212,8 +265,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
     };
 
     const handleDragLeave = (e: React.DragEvent<HTMLLabelElement>) => {
-        // Only clear the dragging state when the pointer actually leaves the
-        // dropzone, not when it crosses over child elements.
+        // - Limpa o estado de arrasto apenas quando o ponteiro sai da área de soltura
         if (!e.currentTarget.contains(e.relatedTarget as Node)) {
             setIsDragging(false);
         }
@@ -243,6 +295,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                 references: references.filter(ref => ref.value.trim().length > 0),
                 images,
                 tone,
+                customTone: tone === 'Personalizado' ? customTone.trim() : undefined,
                 length
             });
 
@@ -267,10 +320,10 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
     return (
         <div className="fixed inset-0 z-[70] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="w-full max-w-2xl bg-[#181C24] border border-white/[0.12] rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto relative">
-                {/* Subtle top glow */}
+                {/* - Brilho superior sutil */}
                 <div className="absolute top-0 left-1/4 right-1/4 h-[1px] bg-gradient-to-r from-transparent via-[#6366F1] to-transparent opacity-70" />
 
-                {/* Header */}
+                {/* - Cabeçalho do modal */}
                 <div className="sticky top-0 bg-[#181C24]/95 backdrop-blur-md border-b border-white/[0.08] px-6 py-4 flex items-center justify-between z-10">
                     <div className="flex items-center gap-3">
                         <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-[#6366F1]/20 to-[#06B6D4]/20 border border-[#6366F1]/30 flex items-center justify-center">
@@ -297,7 +350,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                 </div>
 
                 {isBusy && (
-                    /* ------------------------- LOADING STATE ------------------------- */
+                    /* - Estado de Carregamento (Loading) */
                     <div className="px-6 py-12 flex flex-col items-center justify-center gap-6">
                         <div className="relative">
                             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-[#6366F1]/20 to-[#06B6D4]/20 border border-[#6366F1]/30 flex items-center justify-center">
@@ -336,7 +389,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                     </div>
                 )}
                 {!isBusy && phase === 'success' && (
-                    /* ------------------------- SUCCESS STATE ------------------------- */
+                    /* - Estado de Sucesso */
                     <div className="px-6 py-14 flex flex-col items-center justify-center gap-4 text-center">
                         <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/40 flex items-center justify-center">
                             <Check className="w-6 h-6 text-emerald-400" />
@@ -353,7 +406,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                     </div>
                 )}
                 {!isBusy && phase !== 'success' && (
-                    /* ------------------------- FORM STATE ------------------------- */
+                    /* - Formulário Principal */
                     <form onSubmit={handleGenerate} className="px-6 py-5 space-y-5">
                         {error && (
                             <div className="flex items-start gap-2 p-3 rounded-lg bg-rose-950/30 border border-rose-500/40 text-rose-300 text-xs leading-relaxed">
@@ -362,7 +415,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                             </div>
                         )}
 
-                        {/* Tema central e tese */}
+                        {/* - Tema central e tese */}
                         <div className="space-y-3">
                             <div>
                                 <label htmlFor="ai-theme" className="text-xs font-mono text-[#94A3B8] block mb-1">
@@ -393,7 +446,76 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                             </div>
                         </div>
 
-                        {/* Links e referências */}
+                        {/* - Seleção Rápida de Presets de Tom de Voz */}
+                        <div>
+                            <label className="text-xs font-mono text-[#94A3B8] block mb-2 font-medium">
+                                Seleção de Tom de Voz & Estilo
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                {TONE_PRESETS.map((preset) => {
+                                    const Icon = preset.icon;
+                                    const isSelected = tone === preset.id;
+                                    return (
+                                        <button
+                                            key={preset.id}
+                                            type="button"
+                                            onClick={() => setTone(preset.id)}
+                                            className={`p-3 rounded-xl text-left border transition-all duration-200 flex flex-col justify-between group ${
+                                                isSelected
+                                                    ? 'bg-[#6366F1]/15 border-[#6366F1] text-white shadow-lg shadow-indigo-600/10'
+                                                    : 'bg-[#111827] border-white/[0.08] text-[#94A3B8] hover:border-white/20 hover:text-white'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between w-full mb-1.5">
+                                                <div className={`p-1.5 rounded-lg transition-colors ${
+                                                    isSelected ? 'bg-[#6366F1] text-white' : 'bg-white/5 text-[#94A3B8] group-hover:text-white'
+                                                }`}>
+                                                    <Icon className="w-3.5 h-3.5" />
+                                                </div>
+                                                {isSelected && (
+                                                    <span className="w-2 h-2 rounded-full bg-[#06B6D4] shadow-sm shadow-[#06B6D4]" />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <div className={`text-xs font-semibold font-['Geist'] ${isSelected ? 'text-white' : 'text-[#DFE2EE]'}`}>
+                                                    {preset.label}
+                                                </div>
+                                                <div className="text-[10px] text-[#64748B] leading-tight mt-0.5">
+                                                    {preset.desc}
+                                                </div>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* - Campo de Instrução Customizada (Exibido com animação quando 'Personalizado' for selecionado) */}
+                            <div
+                                className={`transition-all duration-300 ease-in-out overflow-hidden ${
+                                    tone === 'Personalizado' ? 'max-h-44 opacity-100 mt-3' : 'max-h-0 opacity-0 mt-0 pointer-events-none'
+                                }`}
+                            >
+                                <div className="p-3.5 rounded-xl bg-[#111827] border border-[#6366F1]/40 shadow-xl space-y-2">
+                                    <div className="flex items-center justify-between">
+                                        <label htmlFor="custom-tone-instructions" className="text-xs font-mono font-semibold text-[#06B6D4] flex items-center gap-1.5">
+                                            <Sliders className="w-3.5 h-3.5" />
+                                            <span>Instrução de Tom Personalizado</span>
+                                        </label>
+                                        <span className="text-[10px] font-mono text-[#64748B]">Sintaxe estrita no prompt</span>
+                                    </div>
+                                    <textarea
+                                        id="custom-tone-instructions"
+                                        rows={2}
+                                        value={customTone}
+                                        onChange={(e) => setCustomTone(e.target.value)}
+                                        placeholder="Ex.: Redija como um Diretor de Arte provocativo, priorizando frases curtas e sem rodeios."
+                                        className="w-full bg-[#181C24] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#6366F1] resize-y"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* - Links e referências */}
                         <div>
                             <div className="flex items-center justify-between mb-2">
                                 <label className="text-xs font-mono text-[#94A3B8] flex items-center gap-1.5">
@@ -433,7 +555,7 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                             </div>
                         </div>
 
-                        {/* Upload de imagens */}
+                        {/* - Upload de imagens */}
                         <div>
                             <label className="text-xs font-mono text-[#94A3B8] flex items-center gap-1.5 mb-2">
                                 <ImagePlus className="w-3.5 h-3.5 text-[#06B6D4]" />
@@ -494,46 +616,26 @@ export const ArticleAiAssistantModal: React.FC<ArticleAiAssistantModalProps> = (
                             )}
                         </div>
 
-                        {/* Estilo e formato */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div>
-                                <label htmlFor="ai-tone" className="text-xs font-mono text-[#94A3B8] block mb-1">
-                                    Tom de Voz
-                                </label>
-                                <select
-                                    id="ai-tone"
-                                    value={tone}
-                                    onChange={e => setTone(e.target.value as ArticleTone)}
-                                    className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
-                                >
-                                    {TONE_OPTIONS.map(option => (
-                                        <option key={option} value={option}>
-                                            {option}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label htmlFor="ai-length" className="text-xs font-mono text-[#94A3B8] block mb-1">
-                                    Extensão do Conteúdo
-                                </label>
-                                <select
-                                    id="ai-length"
-                                    value={length}
-                                    onChange={e => setLength(e.target.value as ArticleLength)}
-                                    className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
-                                >
-                                    {LENGTH_OPTIONS.map(option => (
-                                        <option key={option} value={option}>
-                                            {option}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
+                        {/* - Extensão do Conteúdo */}
+                        <div>
+                            <label htmlFor="ai-length" className="text-xs font-mono text-[#94A3B8] block mb-1">
+                                Extensão do Conteúdo
+                            </label>
+                            <select
+                                id="ai-length"
+                                value={length}
+                                onChange={e => setLength(e.target.value as ArticleLength)}
+                                className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                            >
+                                {LENGTH_OPTIONS.map(option => (
+                                    <option key={option} value={option}>
+                                        {option}
+                                    </option>
+                                ))}
+                            </select>
                         </div>
 
-                        {/* Footer */}
+                        {/* - Rodapé com ações */}
                         <div className="flex justify-end gap-2 pt-1 pb-1">
                             <button
                                 type="button"

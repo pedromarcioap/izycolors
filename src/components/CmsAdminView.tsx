@@ -36,7 +36,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
 }) => {
   const [cmsTab, setCmsTab] = useState<'articles' | 'curation' | 'taxonomy' | 'analytics'>('articles');
 
-  // Article Modal State
+  // - Estado dos Modais de Artigo
   const [showArticleModal, setShowArticleModal] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newCategory, setNewCategory] = useState('Teoria da Cor');
@@ -46,7 +46,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
   const [newMetaDescription, setNewMetaDescription] = useState('');
   const [showAiAssistant, setShowAiAssistant] = useState(false);
 
-  // New Tag State
+  // - Estado de Cadastro de Nova Tag
   const [newTagName, setNewTagName] = useState('');
   const [newTagCategory, setNewTagCategory] = useState('Estilo');
 
@@ -77,7 +77,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
     setNewMetaDescription('');
   };
 
-  // Preenche o formulário do CMS com o artigo gerado pelo assistente de IA.
+  // - Preenche o formulário do CMS com o artigo gerado pelo assistente de IA
   const handleApplyAiResult = (result: AiArticleResponse) => {
     setNewTitle(result.title);
     setNewSlug(result.slug || slugifyArticle(result.title));
@@ -95,7 +95,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
 
   return (
     <div className="flex-1 bg-[#0B0F17] text-[#DFE2EE] p-4 sm:p-8 max-w-[1500px] mx-auto w-full pb-24">
-      {/* CMS Header */}
+      {/* - Cabeçalho do CMS */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-white/[0.08] pb-6">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
@@ -121,7 +121,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         )}
       </div>
 
-      {/* CMS Subtabs */}
+      {/* - Abas Navegáveis do CMS */}
       <div className="flex items-center gap-2 border-b border-white/[0.08] mb-8">
         <button
           onClick={() => setCmsTab('articles')}
@@ -168,7 +168,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         </button>
       </div>
 
-      {/* Tab 1: Editorial Articles */}
+      {/* - Aba 1: Gestão Editorial de Artigos */}
       {cmsTab === 'articles' && (
         <div className="space-y-4">
           <div className="grid grid-cols-1 gap-4">
@@ -216,7 +216,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         </div>
       )}
 
-      {/* Tab 2: Community Submissions Curation Queue */}
+      {/* - Aba 2: Fila de Curadoria da Comunidade */}
       {cmsTab === 'curation' && (
         <div className="space-y-4">
           <div className="p-4 bg-[#181C24] rounded-xl border border-white/[0.08] mb-4 text-xs text-[#94A3B8] flex items-center justify-between">
@@ -230,7 +230,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                 key={sub.id}
                 className="bg-[#181C24] border border-white/[0.08] rounded-xl p-5 shadow-xl flex flex-col lg:flex-row lg:items-center justify-between gap-6"
               >
-                {/* Author & Palette Visual */}
+                {/* - Autor & Visualização da Paleta */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
@@ -250,7 +250,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                     {sub.title}
                   </h3>
 
-                  {/* Swatch stripe */}
+                  {/* - Tira de Amostras de Cores */}
                   <button
                     type="button"
                     onClick={() => onOpenInGenerator(sub.colors)}
@@ -265,7 +265,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                     ))}
                   </button>
 
-                  {/* Meta tags */}
+                  {/* - Meta tags da paleta */}
                   <div className="flex items-center gap-2 mt-3 text-[11px] font-mono">
                     <span className="text-[#06B6D4] bg-[#06B6D4]/10 px-2 py-0.5 rounded border border-[#06B6D4]/20">
                       Gamut {sub.suggestedGamut}
@@ -276,7 +276,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
                   </div>
                 </div>
 
-                {/* Moderation Actions */}
+                {/* - Ações de Moderação */}
                 <div className="flex items-center gap-2 shrink-0 self-end lg:self-center">
                   <button
                     onClick={() => onOpenInGenerator(sub.colors)}
@@ -323,10 +323,10 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         </div>
       )}
 
-      {/* Tab 3: Dynamic Taxonomy & Tags */}
+      {/* - Aba 3: Taxonomia & Tags */}
       {cmsTab === 'taxonomy' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Tag List */}
+          {/* - Lista de Tags Registradas */}
           <div className="lg:col-span-8 bg-[#181C24] border border-white/[0.08] rounded-xl p-6">
             <h3 className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] font-semibold mb-4">
               Tags Oficiais do Sistema ({tags.length})
@@ -354,7 +354,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
             </div>
           </div>
 
-          {/* Add Tag Form */}
+          {/* - Formulário para Cadastrar Nova Tag */}
           <div className="lg:col-span-4 bg-[#181C24] border border-white/[0.08] rounded-xl p-6">
             <h3 className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] font-semibold mb-4">
               Cadastrar Nova Tag
@@ -402,10 +402,10 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         </div>
       )}
 
-      {/* Tab 4: Studio Analytics */}
+      {/* - Aba 4: Analytics do Studio */}
       {cmsTab === 'analytics' && (
         <div className="space-y-6">
-          {/* 4 Stat Cards */}
+          {/* - Cartões de Métricas */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 bg-[#181C24] border border-white/[0.08] rounded-xl">
               <span className="text-xs font-mono text-[#94A3B8]">Total de Tokens Exportados</span>
@@ -432,7 +432,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
             </div>
           </div>
 
-          {/* Formats distribution */}
+          {/* - Distribuição de Formatos Exportados */}
           <div className="p-6 bg-[#181C24] border border-white/[0.08] rounded-xl">
             <h3 className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] font-semibold mb-4">
               Formatos de Exportação Mais Solicitados
@@ -482,7 +482,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         </div>
       )}
 
-      {/* New Article Modal */}
+      {/* - Modal de Novo Artigo Técnico */}
       {showArticleModal && (
         <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-2xl bg-[#181C24] border border-white/[0.12] rounded-xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
@@ -603,7 +603,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
         </div>
       )}
 
-      {/* Assistente Editorial IA */}
+      {/* - Assistente Editorial IA */}
       <ArticleAiAssistantModal
         isOpen={showAiAssistant}
         onClose={() => setShowAiAssistant(false)}
