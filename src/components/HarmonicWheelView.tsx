@@ -1,27 +1,39 @@
 import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
-import { 
-  Sparkles, 
-  Sliders, 
-  ArrowRight, 
-  Download, 
-  RefreshCw, 
-  Bookmark, 
-  Check, 
-  RotateCcw, 
-  RotateCw, 
-  Copy, 
-  MousePointer, 
-  Move,
-  Lock,
-  Unlock
+import {
+  Sparkles,
+  RefreshCw,
+  Bookmark,
+  Check,
+  RotateCcw,
+  RotateCw,
+  Copy,
+  MousePointer,
+  Move
 } from 'lucide-react';
-import { 
-  generateHarmonies, 
-  getHarmonyOffsets, 
-  getColorDetails, 
-  hslToRgb, 
-  rgbToHex 
+import {
+  generateHarmonies,
+  getHarmonyOffsets,
+  getColorDetails
 } from '../utils/colorUtils';
+
+type HarmonyRule = 'analogous' | 'monochromatic' | 'triad' | 'complementary' | 'split-complementary' | 'tetradic';
+
+// Hue region boundaries (in degrees). The first matching upper bound wins;
+// 360 is the wrap-around boundary so the classifier covers the full [0, 360) range.
+const COLOR_REGION_BOUNDARIES: ReadonlyArray<{ maxAngle: number; name: string }> = [
+  { maxAngle: 15, name: 'Vermelho' },
+  { maxAngle: 45, name: 'Laranja' },
+  { maxAngle: 75, name: 'Amarelo' },
+  { maxAngle: 105, name: 'Verde-Limão' },
+  { maxAngle: 150, name: 'Verde' },
+  { maxAngle: 195, name: 'Ciano' },
+  { maxAngle: 225, name: 'Azul Celeste' },
+  { maxAngle: 255, name: 'Azul Cobalto' },
+  { maxAngle: 285, name: 'Violeta / Índigo' },
+  { maxAngle: 320, name: 'Magenta' },
+  { maxAngle: 345, name: 'Carmim / Rosa' },
+  { maxAngle: 360, name: 'Vermelho' }
+];
 
 interface HarmonicWheelViewProps {
   onOpenInGenerator: (colors: string[]) => void;
@@ -34,7 +46,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
 }) => {
   // Harmonic parameters
   const [baseHue, setBaseHue] = useState<number>(210); // initial cyan/blue
-  const [harmonyRule, setHarmonyRule] = useState<'analogous' | 'monochromatic' | 'triad' | 'complementary' | 'split-complementary' | 'tetradic'>('analogous');
+  const [harmonyRule, setHarmonyRule] = useState<HarmonyRule>('analogous');
   const [baseLightness, setBaseLightness] = useState<number>(50);
   const [baseSaturation, setBaseSaturation] = useState<number>(85);
 
@@ -48,7 +60,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   const wheelRef = useRef<HTMLDivElement | null>(null);
   const activeNodeRef = useRef<number | null>(null);
 
-  const rules = [
+  const rules: { id: HarmonyRule; label: string; desc: string }[] = [
     { id: 'analogous', label: 'Análogas', desc: 'Cores vizinhas no círculo cromático (diferença de 25° a 30°)' },
     { id: 'monochromatic', label: 'Monocromática', desc: 'Variações de saturação e luminância na mesma matiz' },
     { id: 'triad', label: 'Tríade', desc: 'Três pontos equidistantes a 120° no círculo' },
@@ -83,7 +95,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
       // In CSS conic-gradient from 0deg: 0° is top (12 o'clock), 90° is right, 180° is bottom, 270° is left
       const angleRad = (hue * Math.PI) / 180;
       const r = (sat / 100) * maxNodeRadius;
-      
+
       const x = wheelRadius + r * Math.sin(angleRad);
       const y = wheelRadius - r * Math.cos(angleRad);
 
@@ -101,19 +113,9 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   }, [generatedColors, wheelRadius, maxNodeRadius]);
 
   // Color region name classifier for live readout
-  const getColorRegionName = (h: number) => {
-    const angle = (h % 360 + 360) % 360;
-    if (angle >= 345 || angle < 15) return 'Vermelho';
-    if (angle >= 15 && angle < 45) return 'Laranja';
-    if (angle >= 45 && angle < 75) return 'Amarelo';
-    if (angle >= 75 && angle < 105) return 'Verde-Limão';
-    if (angle >= 105 && angle < 150) return 'Verde';
-    if (angle >= 150 && angle < 195) return 'Ciano';
-    if (angle >= 195 && angle < 225) return 'Azul Celeste';
-    if (angle >= 225 && angle < 255) return 'Azul Cobalto';
-    if (angle >= 255 && angle < 285) return 'Violeta / Índigo';
-    if (angle >= 285 && angle < 320) return 'Magenta';
-    return 'Carmim / Rosa';
+  const getColorRegionName = (h: number): string => {
+    const angle = ((h % 360) + 360) % 360;
+    return COLOR_REGION_BOUNDARIES.find(({ maxAngle }) => angle < maxAngle)?.name ?? 'Vermelho';
   };
 
   // Convert mouse pointer client coordinates to polar (hue, saturation)
@@ -152,17 +154,18 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(true);
-    setActiveDragNode(nodeIndex !== null ? nodeIndex : 0);
-    activeNodeRef.current = nodeIndex !== null ? nodeIndex : 0;
+    const targetNode = nodeIndex ?? 0;
+    setActiveDragNode(targetNode);
+    activeNodeRef.current = targetNode;
 
     // Capture pointer events so dragging outside the wheel element does not release
     if (e.currentTarget.setPointerCapture) {
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
-      } catch (err) {}
+      } catch (err) { }
     }
 
-    updateFromPointer(e.clientX, e.clientY, nodeIndex !== null ? nodeIndex : 0);
+    updateFromPointer(e.clientX, e.clientY, targetNode);
   };
 
   // Pointer Move Handler
@@ -181,7 +184,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
       if (e.currentTarget.releasePointerCapture) {
         try {
           e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch (err) {}
+        } catch (err) { }
       }
     }
   };
@@ -217,8 +220,10 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   };
 
   const randomizeWheel = () => {
-    setBaseHue(Math.floor(Math.random() * 360));
-    setBaseSaturation(Math.floor(65 + Math.random() * 30));
+    const array = new Uint32Array(2);
+    window.crypto.getRandomValues(array);
+    setBaseHue(Math.floor((array[0] / 4294967296) * 360));
+    setBaseSaturation(Math.floor(65 + (array[1] / 4294967296) * 30));
   };
 
   const handleCopy = (hex: string) => {
@@ -252,8 +257,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-white/[0.08] pb-6">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] animate-pulse" />
-            Adobe Color & Munsell Engine
+            <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] animate-pulse" /> Motor de Harmonia & Munsell
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-['Geist'] mt-1">
             Roda Cromática Harmônica
@@ -302,12 +306,11 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
             {rules.map((rule) => (
               <button
                 key={rule.id}
-                onClick={() => setHarmonyRule(rule.id as any)}
-                className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer ${
-                  harmonyRule === rule.id
+                onClick={() => setHarmonyRule(rule.id)}
+                className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer ${harmonyRule === rule.id
                     ? 'bg-[#262A33] border-[#6366F1] text-white shadow-md'
                     : 'bg-[#111827] border-white/[0.04] text-[#94A3B8] hover:text-white hover:border-white/[0.1]'
-                }`}
+                  }`}
               >
                 <div className="flex items-center justify-between text-xs font-medium">
                   <span>{rule.label}</span>
@@ -451,13 +454,13 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
         {/* Center: Interactive Visual Wheel with Full Mouse Dragging */}
         <div className="lg:col-span-8 flex flex-col gap-6">
           <div className="bg-[#181C24] border border-white/[0.08] rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden shadow-xl">
-            
+
             {/* Live Interactive Mouse Feedback Indicator Banner */}
             <div className="w-full flex items-center justify-between mb-4 px-2">
               <div className="flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full ${isDragging ? 'bg-emerald-400 animate-ping' : 'bg-[#06B6D4]'}`} />
                 <span className="text-xs font-mono text-[#94A3B8]">
-                  {isDragging 
+                  {isDragging
                     ? `Arrastando Nó #${(activeDragNode ?? 0) + 1} • ${baseHue}° (${getColorRegionName(baseHue)})`
                     : 'Clique ou arraste diretamente na roda com o mouse'}
                 </span>
@@ -473,29 +476,28 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
             {/* Interactive Color Wheel Stage */}
             <div className="relative flex items-center justify-center p-6">
               {/* Surrounding Degree Dial */}
-              <div 
+              <div
                 ref={wheelRef}
                 onPointerDown={(e) => handlePointerDown(e, null)}
                 onPointerMove={handlePointerMove}
                 onPointerUp={handlePointerUp}
                 onPointerCancel={handlePointerUp}
-                className={`relative rounded-full select-none touch-none transition-shadow ${
-                  isDragging ? 'cursor-grabbing ring-2 ring-[#6366F1]' : 'cursor-crosshair hover:shadow-[0_0_30px_rgba(99,102,241,0.15)]'
-                }`}
-                style={{ 
-                  width: `${WHEEL_SIZE}px`, 
-                  height: `${WHEEL_SIZE}px` 
+                className={`relative rounded-full select-none touch-none transition-shadow ${isDragging ? 'cursor-grabbing ring-2 ring-[#6366F1]' : 'cursor-crosshair hover:shadow-[0_0_30px_rgba(99,102,241,0.15)]'
+                  }`}
+                style={{
+                  width: `${WHEEL_SIZE}px`,
+                  height: `${WHEEL_SIZE}px`
                 }}
               >
                 {/* Continuous Conic Gradient Wheel Surface */}
-                <div 
+                <div
                   className="w-full h-full rounded-full shadow-2xl border-2 border-white/20 overflow-hidden relative"
                   style={{
                     background: 'conic-gradient(from 0deg, #ff0000 0deg, #ffff00 60deg, #00ff00 120deg, #00ffff 180deg, #0000ff 240deg, #ff00ff 300deg, #ff0000 360deg)'
                   }}
                 >
                   {/* Radial Desaturation Gradient (Center white falloff mimicking real Munsell / HSL chroma) */}
-                  <div 
+                  <div
                     className="w-full h-full rounded-full"
                     style={{
                       background: 'radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.7) 35%, rgba(255,255,255,0) 75%, rgba(0,0,0,0.3) 100%)'
@@ -557,7 +559,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                 </svg>
 
                 {/* Central Anchor Pin */}
-                <div 
+                <div
                   className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-white/30 border border-white/60 shadow-lg flex items-center justify-center pointer-events-none"
                   title="Centro Acromático (Saturação 0%)"
                 >
@@ -571,11 +573,10 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                     <div
                       key={node.index}
                       onPointerDown={(e) => handlePointerDown(e, node.index)}
-                      className={`absolute -ml-4 -mt-4 rounded-full flex items-center justify-center transition-transform cursor-grab active:cursor-grabbing select-none z-20 ${
-                        node.isBase 
-                          ? 'w-8 h-8 border-2 border-white ring-4 ring-[#06B6D4]/50 shadow-[0_0_15px_rgba(6,182,212,0.6)]' 
+                      className={`absolute -ml-4 -mt-4 rounded-full flex items-center justify-center transition-transform cursor-grab active:cursor-grabbing select-none z-20 ${node.isBase
+                          ? 'w-8 h-8 border-2 border-white ring-4 ring-[#06B6D4]/50 shadow-[0_0_15px_rgba(6,182,212,0.6)]'
                           : 'w-7 h-7 border-2 border-white shadow-xl'
-                      } ${isNodeActive ? 'scale-125 ring-4 ring-indigo-400' : 'hover:scale-115'}`}
+                        } ${isNodeActive ? 'scale-125 ring-4 ring-indigo-400' : 'hover:scale-115'}`}
                       style={{
                         left: `${node.x}px`,
                         top: `${node.y}px`,
@@ -583,10 +584,9 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                       }}
                       title={`Nó #${node.index + 1} ${node.isBase ? '(BASE / ÂNCORA)' : ''}: ${node.hex} (${node.hue}°) - Arraste com o mouse`}
                     >
-                      <span 
-                        className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${
-                          node.lum > 50 ? 'text-black bg-white/90' : 'text-white bg-black/70'
-                        }`}
+                      <span
+                        className={`text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center ${node.lum > 50 ? 'text-black bg-white/90' : 'text-white bg-black/70'
+                          }`}
                       >
                         {node.index + 1}
                       </span>
@@ -635,15 +635,16 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                 const isBase = i === 0;
 
                 return (
-                  <div
-                    key={i}
+                  <button
+                    key={`${hex}-${i}`}
+                    type="button"
                     onClick={() => handleCopy(hex)}
-                    className="group rounded-xl overflow-hidden flex flex-col justify-between p-3.5 h-44 sm:h-48 transition-all hover:scale-[1.03] shadow-lg border border-white/[0.06] cursor-pointer relative"
+                    className="group rounded-xl overflow-hidden flex flex-col justify-between p-3.5 h-44 sm:h-48 transition-all hover:scale-[1.03] shadow-lg border border-white/[0.06] cursor-pointer relative text-left w-full focus:outline-none focus:ring-2 focus:ring-[#6366F1]"
                     style={{ backgroundColor: hex }}
                   >
                     {/* Top Header info */}
-                    <div 
-                      className="flex justify-between items-center text-[10px] font-mono font-bold" 
+                    <div
+                      className="flex justify-between items-center text-[10px] font-mono font-bold w-full"
                       style={{ color: details.isLight ? '#000' : '#FFF' }}
                     >
                       <span className="flex items-center gap-1">
@@ -653,7 +654,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                     </div>
 
                     {/* Center Hex and Luminance */}
-                    <div className="text-center my-auto" style={{ color: details.isLight ? '#000' : '#FFF' }}>
+                    <div className="text-center my-auto w-full" style={{ color: details.isLight ? '#000' : '#FFF' }}>
                       <span className="text-sm sm:text-base font-bold font-mono block">
                         {hex}
                       </span>
@@ -663,8 +664,8 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                     </div>
 
                     {/* Bottom Metadata & Copy Feedback */}
-                    <div 
-                      className="text-[10px] font-mono text-center px-1.5 py-1 rounded flex items-center justify-center gap-1 transition-colors"
+                    <div
+                      className="text-[10px] font-mono text-center px-1.5 py-1 rounded flex items-center justify-center gap-1 transition-colors w-full"
                       style={{
                         backgroundColor: details.isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.18)',
                         color: details.isLight ? '#000' : '#FFF'
@@ -684,7 +685,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
                         </>
                       )}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>

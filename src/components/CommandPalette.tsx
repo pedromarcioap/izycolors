@@ -80,7 +80,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       items: [
         { id: 'tab-gen', label: 'Gerador Procedural com Locks', icon: Sparkles, action: () => { onNavigate('generator'); onClose(); } },
         { id: 'tab-exp', label: 'Explorar Paletas da Comunidade', icon: Compass, action: () => { onNavigate('explorer'); onClose(); } },
-        { id: 'tab-wheel', label: 'Roda Cromática Harmônica (Adobe Color)', icon: PaletteIcon, action: () => { onNavigate('wheel'); onClose(); } },
+        { id: 'tab-wheel', label: 'Roda Cromática Harmônica', icon: PaletteIcon, action: () => { onNavigate('wheel'); onClose(); } },
         { id: 'tab-extr', label: 'Extrator de Paleta de Imagem (K-Means)', icon: Eye, action: () => { onNavigate('extractor'); onClose(); } },
         { id: 'tab-lab', label: 'Color Space Lab & Gradientes Perceptuais', icon: SlidersHorizontal, action: () => { onNavigate('lab'); onClose(); } },
         { id: 'tab-acc', label: 'Auditoria de Acessibilidade & Daltonismo', icon: Check, action: () => { onNavigate('accessibility'); onClose(); } },

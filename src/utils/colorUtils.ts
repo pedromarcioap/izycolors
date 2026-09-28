@@ -790,12 +790,12 @@ export function extractPaletteFromImage(imgElement: HTMLImageElement, colorCount
 }
 
 // -------------------------------------------------------------
-// ADOBE ILLUSTRATOR & SWATCHES EXPORTERS
+// ILLUSTRATOR & SWATCHES EXPORTERS
 // -------------------------------------------------------------
 
 /**
- * Generate Adobe Illustrator JSX ExtendScript
- * Allows users to run File > Scripts > Other Script... in Adobe Illustrator
+ * Generate Illustrator JSX ExtendScript
+ * Allows users to run File > Scripts > Other Script... in Illustrator
  * to immediately generate native swatches grouped by palette title.
  */
 export function exportIllustratorScript(colors: string[], paletteTitle: string = 'Izy Colors Swatches'): string {
@@ -818,11 +818,11 @@ export function exportIllustratorScript(colors: string[], paletteTitle: string =
   }).join(',\n');
 
   return `/**
- * IZY COLORS - ADOBE ILLUSTRATOR SWATCH SCRIPT
+ * IZY COLORS - ILLUSTRATOR SWATCH SCRIPT
  * Paleta: "${safeTitle}" (${colors.length} Cores)
  * 
- * INSTRUÇÕES NO ADOBE ILLUSTRATOR:
- * 1. Abra o Adobe Illustrator
+ * INSTRUÇÕES NO ILLUSTRATOR:
+ * 1. Abra o Illustrator
  * 2. Acesse: Arquivo > Scripts > Outro Script... (File > Scripts > Other Script...)
  * 3. Selecione este arquivo .jsx
  * 4. O grupo de amostras "${safeTitle}" será criado no painel de Amostras (Swatches)!
@@ -890,17 +890,17 @@ ${colorItems}
     }
   }
 
-  alert("Izy Colors: " + createdCount + " amostras foram importadas com sucesso para o grupo '" + groupName + "' no Adobe Illustrator!");
+  alert("Izy Colors: " + createdCount + " amostras foram importadas com sucesso para o grupo '" + groupName + "' no Illustrator!");
 })();
 `;
 }
 
 /**
- * Generate binary Adobe Swatch Exchange (.ase) file
- * Compatible with Adobe Illustrator, Photoshop, InDesign, and Figma plugins.
+ * Generate binary Swatch Exchange (.ase) file
+ * Compatible with Illustrator, Photoshop, InDesign, and Figma plugins.
  */
 export function generateAseBlob(colors: string[], paletteTitle: string = 'Izy Colors'): Blob {
-  // Adobe Swatch Exchange format:
+  // Swatch Exchange format:
 
   // Helper to push uint16 big-endian
   const pushU16 = (val: number, arr: number[]) => {

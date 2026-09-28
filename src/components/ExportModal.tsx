@@ -45,16 +45,16 @@ export const ExportModal: React.FC<ExportModalProps> = ({
       fileName = `${paletteTitle.toLowerCase().replace(/\s+/g, '-')}-illustrator.jsx`;
       break;
     case 'ase':
-      exportContent = `// ADOBE SWATCH EXCHANGE (.ASE) BINARY FILE
-// Formato binário proprietário da Adobe Systems para Adobe Illustrator, InDesign e Photoshop.
+      exportContent = `// SWATCH EXCHANGE (.ASE) BINARY FILE
+// Formato binário para Illustrator, InDesign, Photoshop e Figma.
 // 
 // Total de cores: ${colors.length} amostras calibradas
 ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).join('\n')}
 // 
 // CLIQUE NO BOTÃO "BAIXAR ARQUIVO (.ASE)" ABAIXO PARA OBTER O ARQUIVO BINÁRIO NATIVO.
 // 
-// INSTRUÇÕES DE IMPORTAÇÃO NO ADOBE ILLUSTRATOR:
-// 1. No Adobe Illustrator, abra o painel "Amostras" (Janela > Amostras / Window > Swatches)
+// INSTRUÇÕES DE IMPORTAÇÃO NO ILLUSTRATOR:
+// 1. No Illustrator, abra o painel "Amostras" (Janela > Amostras / Window > Swatches)
 // 2. Clique no menu de opções no canto superior direito do painel
 // 3. Selecione "Abrir Biblioteca de Amostras" > "Outra Biblioteca..." (Open Swatch Library > Other Library...)
 // 4. Selecione o arquivo .ase baixado. Todas as amostras estarão prontas para uso vetorial!`;
@@ -131,10 +131,10 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
             </div>
             <h3 className="text-base sm:text-lg font-bold text-white font-['Geist'] mt-0.5 flex items-center gap-2">
               <Code className="w-4 h-4 text-[#6366F1]" />
-              Exportar para Adobe Illustrator & Código
+              Exportar Amostras & Código
             </h3>
             <p className="text-xs text-[#94A3B8] mt-0.5">
-              Amostras nativas para Illustrator (.ase / .jsx), Design Systems, Tailwind, CSS nativo e Figma.
+              Amostras (.ase / .jsx), Design Systems, Tailwind, CSS nativo e Figma.
             </p>
           </div>
           <button 
@@ -168,8 +168,8 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
         <div className="p-3 sm:p-4 bg-[#181C24] border-b border-white/[0.06] flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-1.5 bg-[#0B0F17] p-1 rounded-lg border border-white/[0.06]">
             {[
-              { id: 'illustrator', label: 'Adobe Illustrator (.jsx)', highlight: true },
-              { id: 'ase', label: 'Adobe Swatches (.ase)', highlight: true },
+              { id: 'illustrator', label: 'Illustrator (.jsx)', highlight: true },
+              { id: 'ase', label: 'Swatches (.ase)', highlight: true },
               { id: 'css', label: 'CSS Variables' },
               { id: 'tailwind', label: 'Tailwind Config' },
               { id: 'json', label: 'Tokens JSON' },
@@ -209,7 +209,7 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
           <div className="px-5 py-2.5 bg-indigo-950/40 border-b border-indigo-500/20 text-xs text-indigo-200 flex items-center justify-between">
             <span className="flex items-center gap-1.5 font-mono">
               <PaletteIcon className="w-3.5 h-3.5 text-[#06B6D4]" />
-              <strong>Script para Adobe Illustrator:</strong> Execute em <em>Arquivo &gt; Scripts &gt; Outro Script...</em> para criar o grupo de amostras com precisão CMYK/RGB.
+              <strong>Script para Illustrator:</strong> Execute em <em>Arquivo &gt; Scripts &gt; Outro Script...</em> para criar o grupo de amostras com precisão CMYK/RGB.
             </span>
           </div>
         )}
@@ -218,7 +218,7 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
           <div className="px-5 py-2.5 bg-cyan-950/40 border-b border-cyan-500/20 text-xs text-cyan-200 flex items-center justify-between">
             <span className="flex items-center gap-1.5 font-mono">
               <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" />
-              <strong>Adobe Swatch Exchange (.ase):</strong> Arquivo binário compatível com Illustrator, Photoshop, InDesign e Figma.
+              <strong>Swatch Exchange (.ase):</strong> Arquivo binário compatível com Illustrator, Photoshop, InDesign e Figma.
             </span>
           </div>
         )}
@@ -233,7 +233,7 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
         {/* Actions Footer */}
         <div className="p-4 bg-[#181C24] border-t border-white/[0.08] flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-xs text-[#64748B] font-mono">
-            {colors.length} amostras prontas para Adobe Illustrator & Design Systems
+            {colors.length} amostras prontas para Illustrator & Design Systems
           </span>
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
             {format !== 'ase' && (

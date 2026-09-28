@@ -536,7 +536,7 @@ export function App() {
                 {currentTab === 'generator' && 'Gerador Procedural Oklch'}
                 {currentTab === 'projects' && 'Cofre de Projetos & Coleções'}
                 {currentTab === 'explorer' && 'Comunidade & Forks'}
-                {currentTab === 'wheel' && 'Roda Harmônica Adobe'}
+                {currentTab === 'wheel' && 'Roda Harmônica'}
                 {currentTab === 'extractor' && 'Extrator de Imagens & Curador'}
                 {currentTab === 'lab' && 'Color Space Lab (P3 / Rec.2020)'}
                 {currentTab === 'accessibility' && 'Auditoria Acessibilidade WCAG / APCA'}
@@ -577,7 +577,7 @@ export function App() {
             <button
               onClick={() => handleOpenExport()}
               className="h-8 px-3 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-              title="Exportar para Adobe Illustrator (.jsx / .ase), CSS, Tailwind, JSON e SVG"
+              title="Exportar para Illustrator (.jsx / .ase), CSS, Tailwind, JSON e SVG"
             >
               <Download className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">Exportar Amostras & Tokens</span>
@@ -851,7 +851,7 @@ export function App() {
         authUser={authUser}
       />
 
-      {/* Export Tokens Modal with Adobe Illustrator & Swatches support */}
+      {/* Export Tokens Modal with Illustrator & Swatches support */}
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}

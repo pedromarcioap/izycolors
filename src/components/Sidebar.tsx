@@ -115,10 +115,10 @@ const getNavItems = (
     },
     {
       id: 'wheel',
-      label: 'Roda Harmônica Adobe',
+      label: 'Roda Harmônica',
       shortLabel: 'Harmonia',
       icon: Disc3,
-      badge: 'Adobe',
+      badge: 'Cromática',
       description: 'Regras de harmonia cromática'
     },
     {
@@ -342,7 +342,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onClick={onOpenExportModal}
           className={`w-full rounded-lg bg-gradient-to-r from-[#6366F1] to-[#4F46E5] hover:from-[#5254E0] hover:to-[#4338CA] text-white text-xs font-semibold flex items-center transition-all shadow-md shadow-indigo-600/20 cursor-pointer ${isExpanded ? 'px-3 py-2.5 justify-between' : 'h-10 w-10 mx-auto justify-center'
             }`}
-          title="Exportar para Adobe Illustrator e Tokens"
+          title="Exportar Amostras e Tokens"
         >
           <div className="flex items-center gap-2">
             <Download className="w-4 h-4 text-white shrink-0" />
