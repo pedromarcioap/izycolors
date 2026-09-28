@@ -12,7 +12,6 @@ import {
   Eye,
   Disc3,
   PanelLeftClose,
-  PanelLeftOpen,
   Search,
   ShieldCheck,
   LogOut,
@@ -210,36 +209,38 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {/* Top Header: Brand & Collapse Toggle */}
       <div>
-        <div className={`h-16 flex items-center border-b border-white/[0.06] ${
-          isExpanded ? 'px-3 justify-between' : 'px-2 justify-between gap-1'
-        }`}>
-          <button
-            onClick={() => onTabChange('generator')}
-            className="flex items-center gap-2.5 focus:outline-none shrink-0 cursor-pointer group"
-            title="izycolors - Smart Procedural Harmonies"
-            aria-label="Ir para Gerador"
-          >
-            {isExpanded ? (
+        {isExpanded ? (
+          <div className="h-16 px-3 flex items-center justify-between border-b border-white/[0.06]">
+            <button
+              onClick={() => onTabChange('generator')}
+              className="flex items-center gap-2.5 focus:outline-none overflow-hidden text-left cursor-pointer group min-w-0"
+              title="izycolors - Smart Procedural Harmonies"
+              aria-label="Ir para Gerador"
+            >
               <Logo size="sm" showSubtitle={true} />
-            ) : (
-              <LogoIcon className="w-7 h-7 group-hover:scale-105 transition-transform shrink-0" />
-            )}
-          </button>
+            </button>
 
-          {/* Expand / Retract Toggle Button */}
-          <button
-            onClick={onToggleExpanded}
-            className="p-1 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
-            title={isExpanded ? 'Retrair barra lateral (apenas ícones)' : 'Expandir barra lateral (exibir texto)'}
-            aria-label={isExpanded ? 'Retrair menu' : 'Expandir menu'}
-          >
-            {isExpanded ? (
+            <button
+              onClick={onToggleExpanded}
+              className="p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer shrink-0"
+              title="Retrair barra lateral (apenas ícones)"
+              aria-label="Retrair menu"
+            >
               <PanelLeftClose className="w-4 h-4 text-[#94A3B8] hover:text-[#06B6D4]" />
-            ) : (
-              <PanelLeftOpen className="w-4 h-4 text-[#94A3B8] hover:text-[#06B6D4]" />
-            )}
-          </button>
-        </div>
+            </button>
+          </div>
+        ) : (
+          <div className="h-16 flex items-center justify-center border-b border-white/[0.06]">
+            <button
+              onClick={() => onTabChange('generator')}
+              className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-white/[0.06] transition-colors focus:outline-none cursor-pointer group"
+              title="izycolors - Ir para o Gerador"
+              aria-label="izycolors logo"
+            >
+              <LogoIcon className="w-8 h-8 group-hover:scale-110 transition-transform" />
+            </button>
+          </div>
+        )}
 
         {/* Gamut indicator pill */}
         {isExpanded ? (
