@@ -31,7 +31,6 @@ interface SidebarProps {
   onLogout?: () => void;
   onOpenCommandPalette: () => void;
   onOpenExportModal: () => void;
-  onOpenSupabaseModal: () => void;
   isSupabaseConnected: boolean;
   favoritesCount: number;
   projectsCount: number;
@@ -52,7 +51,6 @@ const roleBadgeClasses: Record<UserRole, string> = {
   editor: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
   pro: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40',
   user: 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40',
-  guest: 'bg-slate-500/20 text-slate-300 border-slate-500/40',
 };
 
 const roleStatusDotClasses: Record<UserRole, string> = {
@@ -61,7 +59,6 @@ const roleStatusDotClasses: Record<UserRole, string> = {
   editor: 'bg-amber-400',
   pro: 'bg-emerald-400',
   user: 'bg-[#06B6D4]',
-  guest: 'bg-[#06B6D4]',
 };
 
 interface NavItem {
@@ -199,7 +196,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
   onOpenCommandPalette,
   onOpenExportModal,
-  onOpenSupabaseModal,
   isSupabaseConnected,
   favoritesCount,
   projectsCount,
@@ -329,7 +325,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 {/* Floating Tooltip when collapsed */}
                 {!isExpanded && (
-                  <div className="absolute left-full ml-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#181C24] border border-white/[0.12] rounded-md shadow-2xl text-xs text-white whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 flex items-center gap-2">
+                  <div className="absolute left-full ml-2.5 top-1/2 -translate-y-1/2 px-2.5 py-1.5 bg-[#181C24] border border-white/[0.12] rounded-md shadow-2xl text-xs text-[#DFE2EE] whitespace-nowrap opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 flex items-center gap-2">
                     <span className="font-semibold">{item.label}</span>
                     {item.badge && (
                       <span className="px-1 py-0.2 bg-[#06B6D4]/10 text-[#06B6D4] border border-[#06B6D4]/30 rounded text-[9px] font-mono">
@@ -387,12 +383,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </button>
 
-        {/* Supabase Persistence Indicator & Trigger */}
-        <button
-          onClick={onOpenSupabaseModal}
-          className={`w-full rounded-lg bg-[#141822] hover:bg-[#1C2028] border border-white/[0.08] text-xs transition-colors cursor-pointer flex items-center ${isExpanded ? 'px-3 py-2 justify-between' : 'h-10 w-10 mx-auto justify-center'
+        {/* Supabase Persistence Read-Only Indicator */}
+        <div
+          className={`w-full rounded-lg bg-[#141822] border border-white/[0.08] text-xs flex items-center ${isExpanded ? 'px-3 py-2 justify-between' : 'h-10 w-10 mx-auto justify-center'
             }`}
-          title="Status do Banco de Dados / Supabase"
+          title="Status de Conexão com Supabase"
         >
           <div className="flex items-center gap-2">
             <Database className={`w-3.5 h-3.5 shrink-0 ${isSupabaseConnected ? 'text-emerald-400' : 'text-[#06B6D4]'}`} />
@@ -405,7 +400,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {isExpanded && (
             <span className={`w-2 h-2 rounded-full shrink-0 ${isSupabaseConnected ? 'bg-emerald-400' : 'bg-[#06B6D4]'}`} />
           )}
-        </button>
+        </div>
 
         {/* User Account / Role Badge & Auth Switcher */}
         <div

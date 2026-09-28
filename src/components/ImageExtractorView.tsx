@@ -25,7 +25,6 @@ interface ImageExtractorViewProps {
   onDeleteCuratedImage: (id: string) => void;
   onResetCuratedImages: () => void;
   isSupabaseConnected: boolean;
-  onOpenSupabaseModal: () => void;
 }
 
 export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
@@ -35,8 +34,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
   onSaveCuratedImage,
   onDeleteCuratedImage,
   onResetCuratedImages,
-  isSupabaseConnected,
-  onOpenSupabaseModal
+  isSupabaseConnected
 }) => {
   const [selectedImage, setSelectedImage] = useState<string>(
     curatedImages[0]?.url || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80'
@@ -135,18 +133,17 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
               Visão Computacional & K-Means
             </span>
-            <button
-              onClick={onOpenSupabaseModal}
-              className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 cursor-pointer transition-colors ${
+            <span
+              className={`px-2 py-0.5 rounded text-[10px] font-mono border flex items-center gap-1 transition-colors ${
                 isSupabaseConnected 
                   ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                  : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8] hover:text-white'
+                  : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8]'
               }`}
-              title="Configurar Supabase / Banco de Dados"
+              title="Status do Banco de Dados Supabase"
             >
               <Database className="w-3 h-3" />
               <span>{isSupabaseConnected ? 'Supabase Conectado' : 'Supabase Persistence Ready'}</span>
-            </button>
+            </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
             Extrator Cromático de Imagens

@@ -16,7 +16,6 @@ import { AuthModal } from './components/AuthModal';
 import { CommandPalette } from './components/CommandPalette';
 import { ExportModal } from './components/ExportModal';
 import { SubmitPaletteModal } from './components/SubmitPaletteModal';
-import { SupabaseConfigModal } from './components/SupabaseConfigModal';
 import { SavePaletteModal } from './components/SavePaletteModal';
 
 import {
@@ -63,7 +62,6 @@ import {
   getCurrentAuthUser,
   setCurrentAuthUser,
   getStoredAuditLogs,
-  switchDemoRole,
   checkCurrentSession,
   logoutAuthUser,
   initAuthListener
@@ -84,8 +82,7 @@ export function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // Supabase & Persistence State
-  const [isSupabaseConnected, setIsSupabaseConnected] = useState<boolean>(isSupabaseConfigured());
-  const [isSupabaseModalOpen, setIsSupabaseModalOpen] = useState(false);
+  const [isSupabaseConnected] = useState<boolean>(() => isSupabaseConfigured());
   const [curatedImages, setCuratedImages] = useState<CuratedDemoImage[]>([]);
 
   // Core domain data
@@ -207,14 +204,14 @@ export function App() {
   // Handle Logout via Supabase Auth
   const handleLogout = useCallback(async () => {
     await logoutAuthUser();
-    const guestUser = switchDemoRole('guest');
-    setAuthUser(guestUser);
+    const regularUser = getCurrentAuthUser();
+    setAuthUser(regularUser);
     setUserProfile(prev => ({
       ...prev,
-      name: guestUser.name,
-      handle: guestUser.handle,
-      avatar: guestUser.avatar,
-      bio: guestUser.bio || ''
+      name: regularUser.name,
+      handle: regularUser.handle,
+      avatar: regularUser.avatar,
+      bio: regularUser.bio || ''
     }));
     if (currentTab === 'admin' || currentTab === 'cms') {
       setCurrentTab('generator');
@@ -233,18 +230,7 @@ export function App() {
   }, [authUser.role, currentTab]);
 
   // Check Supabase connection
-  const checkSupabaseStatus = useCallback(() => {
-    setIsSupabaseConnected(isSupabaseConfigured());
-  }, []);
 
-  // Open Supabase Modal with strict Admin access control
-  const handleOpenSupabaseModal = useCallback(() => {
-    if (authUser.role !== 'admin') {
-      showToast('Acesso negado: A configuração do Supabase é exclusiva para administradores.');
-      return;
-    }
-    setIsSupabaseModalOpen(true);
-  }, [authUser.role, showToast]);
 
   // Persistence to local storage
   useEffect(() => {
@@ -522,7 +508,6 @@ export function App() {
         onLogout={handleLogout}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
         onOpenExportModal={() => handleOpenExport()}
-        onOpenSupabaseModal={handleOpenSupabaseModal}
         isSupabaseConnected={isSupabaseConnected}
         favoritesCount={favoriteColors.length}
         projectsCount={projects.length}
@@ -590,19 +575,18 @@ export function App() {
               </span>
             </button>
 
-            <button
-              onClick={handleOpenSupabaseModal}
-              className={`h-8 px-2.5 rounded-lg text-xs font-mono border flex items-center gap-1.5 transition-colors cursor-pointer ${isSupabaseConnected
+            <span
+              className={`h-8 px-2.5 rounded-lg text-xs font-mono border flex items-center gap-1.5 transition-colors ${isSupabaseConnected
                 ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8] hover:text-white'
+                : 'bg-[#181C24] border-white/[0.08] text-[#94A3B8]'
                 }`}
-              title="Status do Banco de Dados / Supabase (Exclusivo Admin)"
+              title="Status do Banco de Dados / Supabase"
             >
               <Database className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">
                 {isSupabaseConnected ? 'Supabase Conectado' : 'Supabase Sync'}
               </span>
-            </button>
+            </span>
 
             <button
               onClick={() => handleOpenExport()}
@@ -661,7 +645,6 @@ export function App() {
               onDeleteCuratedImage={handleDeleteCuratedImage}
               onResetCuratedImages={handleResetCuratedImages}
               isSupabaseConnected={isSupabaseConnected}
-              onOpenSupabaseModal={handleOpenSupabaseModal}
             />
           )}
 
@@ -735,17 +718,6 @@ export function App() {
             authUser.role === 'admin' ? (
               <AdminAreaView
                 currentUser={authUser}
-                onUserChange={(user) => {
-                  setAuthUser(user);
-                  setUserProfile(prev => ({
-                    ...prev,
-                    name: user.name,
-                    handle: user.handle,
-                    avatar: user.avatar,
-                    bio: user.bio || prev.bio
-                  }));
-                  showToast(`Perfil alternado para ${user.name} (${user.role === 'admin' ? 'Admin' : 'Usuário'})`);
-                }}
                 usersList={usersList}
                 onUpdateUsersList={setUsersList}
                 submissions={submissions}
@@ -758,7 +730,6 @@ export function App() {
                 onOpenInGenerator={handleOpenInGenerator}
                 onNavigateToUserPortal={() => setCurrentTab('profile')}
                 isSupabaseConnected={isSupabaseConnected}
-                onOpenSupabaseModal={handleOpenSupabaseModal}
               />
             ) : (
               <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
@@ -908,14 +879,6 @@ export function App() {
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleNewSubmission}
         defaultColors={generatorSeed}
-      />
-
-      {/* Supabase Persistence & Database Configuration Modal */}
-      <SupabaseConfigModal
-        isOpen={isSupabaseModalOpen}
-        onClose={() => setIsSupabaseModalOpen(false)}
-        onConnectionChange={checkSupabaseStatus}
-        authUser={authUser}
       />
 
       {/* Role-Based Authentication & Account Management Modal */}

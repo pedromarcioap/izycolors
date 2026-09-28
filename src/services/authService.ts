@@ -5,10 +5,10 @@ const STORAGE_KEY_USERS = 'izy_auth_users_v1';
 const STORAGE_KEY_CURRENT = 'izy_auth_current_user_v1';
 const STORAGE_KEY_AUDIT = 'izy_audit_logs_v1';
 
-export const ALL_ROLES: UserRole[] = ['admin', 'moderator', 'editor', 'pro', 'user', 'guest'];
+export const ALL_ROLES: UserRole[] = ['admin', 'moderator', 'editor', 'pro', 'user'];
 
-/** Nível obrigatório e único para cadastros: Administrador */
-export const PUBLIC_SIGNUP_ROLE: UserRole = 'admin';
+/** Nível obrigatório e único para cadastros públicos: Usuário Comum. */
+export const PUBLIC_SIGNUP_ROLE: UserRole = 'user';
 
 /** Cargos de privilégio */
 export const PRIVILEGED_ROLES: UserRole[] = ['admin', 'moderator', 'editor', 'pro'];
@@ -19,23 +19,19 @@ export function isPrivilegedRole(role: unknown): boolean {
 
 /**
  * Resolve o cargo confiável de uma sessão Supabase Auth.
+ * O user_metadata enviado pelo cliente NUNCA é confiável: um cargo elevado
+ * só é aceito quando já consta no registro local mantido por um Administrador.
  */
-export function resolveTrustedRole(metadataRole: unknown, registryRole?: UserRole): UserRole {
-  if (registryRole) {
+export function resolveTrustedRole(_metadataRole: unknown, registryRole?: UserRole): UserRole {
+  if (registryRole && (ALL_ROLES as string[]).includes(registryRole)) {
     return registryRole;
-  }
-  if (
-    typeof metadataRole === 'string' &&
-    (ALL_ROLES as string[]).includes(metadataRole)
-  ) {
-    return metadataRole as UserRole;
   }
   return PUBLIC_SIGNUP_ROLE;
 }
 
 /** Somente Administradores podem criar usuarios, alterar cargos ou suspender contas. */
 export function canManageUserRoles(actor?: AuthUser | null): boolean {
-  if (!actor || actor.role !== 'admin') return false;
+  if (actor?.role !== 'admin') return false;
   const registry = getStoredUsers();
   const stored =
     registry.find(u => u.id === actor.id) ||
@@ -48,75 +44,15 @@ export function canManageUserRoles(actor?: AuthUser | null): boolean {
 function logDeniedOperation(actor: AuthUser | undefined, action: string, details: string, type: AuditLogItem['type'] = 'system') {
   logAuditEvent(
     actor?.name || 'Sessao desconhecida',
-    actor?.role || 'guest',
+    actor?.role || 'user',
     action,
     details,
     type
   );
 }
 
-// Seed initial users for both Admin and Regular User accounts
+// Seed initial local users (regular users only; privileged accounts are created by admins)
 export const INITIAL_USERS: AuthUser[] = [
-  {
-    id: 'usr-admin-1',
-    name: 'Helena Vance',
-    email: 'admin@izycolors.com',
-    role: 'admin',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-    handle: '@helenavance',
-    bio: 'Lead Color Architect & Design Systems Engineer. Especialista em espaços de cor perceptuais e acessibilidade WCAG AAA.',
-    status: 'active',
-    createdAt: '2026-01-15',
-    lastLoginAt: 'Hoje, 09:42',
-    palettesCount: 48,
-    favoritesCount: 112,
-    submissionsCount: 15
-  },
-  {
-    id: 'usr-editor-1',
-    name: 'Bruno Siqueira',
-    email: 'editor@izycolors.com',
-    role: 'editor',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-    handle: '@bruno_editor',
-    bio: 'Curador Editorial & Revisor de Conteúdo Cromático. Responsável pela seleção de Staff Picks e edital da comunidade.',
-    status: 'active',
-    createdAt: '2026-01-28',
-    lastLoginAt: 'Hoje, 08:30',
-    palettesCount: 31,
-    favoritesCount: 84,
-    submissionsCount: 22
-  },
-  {
-    id: 'usr-moderator-1',
-    name: 'Ana Beatriz Fonseca',
-    email: 'moderador@izycolors.com',
-    role: 'moderator',
-    avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&auto=format&fit=crop&q=80',
-    handle: '@anabeatriz_mod',
-    bio: 'Moderadora da Comunidade Izy Colors. Revisão de paletas, curadoria de Staff Picks e gestão de submissões.',
-    status: 'active',
-    createdAt: '2026-02-05',
-    lastLoginAt: 'Hoje, 10:30',
-    palettesCount: 19,
-    favoritesCount: 56,
-    submissionsCount: 35
-  },
-  {
-    id: 'usr-pro-1',
-    name: 'Camila Albuquerque',
-    email: 'pro@izycolors.com',
-    role: 'pro',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
-    handle: '@camila_pro',
-    bio: 'Senior Design Systems Lead. Desenvolvendo tokens OKLCH e paletas de alta amostragem para apps de grande escala.',
-    status: 'active',
-    createdAt: '2026-02-01',
-    lastLoginAt: 'Hoje, 11:05',
-    palettesCount: 28,
-    favoritesCount: 95,
-    submissionsCount: 8
-  },
   {
     id: 'usr-regular-1',
     name: 'Pedro Márcio',
@@ -173,33 +109,6 @@ export const INITIAL_AUDIT_LOGS: AuditLogItem[] = [
     action: 'Login no Sistema',
     details: 'Sessão iniciada via credencial de usuário comum',
     type: 'auth'
-  },
-  {
-    id: 'log-2',
-    timestamp: 'Hoje, 09:42',
-    actor: 'Helena Vance',
-    actorRole: 'admin',
-    action: 'Aprovação de Submissão',
-    details: 'Paleta "Cyber Neon 2026" aprovada e destacada como Staff Pick',
-    type: 'palette'
-  },
-  {
-    id: 'log-3',
-    timestamp: 'Hoje, 08:30',
-    actor: 'Helena Vance',
-    actorRole: 'admin',
-    action: 'Publicação Editorial',
-    details: 'Artigo "Guia Definitivo do Espaço OKLCH" publicado no CMS',
-    type: 'cms'
-  },
-  {
-    id: 'log-4',
-    timestamp: 'Ontem, 16:20',
-    actor: 'Helena Vance',
-    actorRole: 'admin',
-    action: 'Suspensão de Conta',
-    details: 'Usuário @kenzo_sato colocado em estado de revisão',
-    type: 'user'
   }
 ];
 
@@ -210,7 +119,10 @@ export function getStoredUsers(): AuthUser[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Sanitização: normaliza qualquer resíduo do antigo perfil demo 'guest'.
+        return parsed.map((u: AuthUser) =>
+          (u.role as string) === 'guest' ? { ...u, role: 'user' as UserRole } : u
+        );
       }
     }
   } catch (err) {
@@ -234,7 +146,7 @@ export function getCurrentAuthUser(): AuthUser {
     const raw = localStorage.getItem(STORAGE_KEY_CURRENT);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && parsed.id) {
+      if (parsed?.id) {
         return parsed;
       }
     }
@@ -289,89 +201,131 @@ export function logAuditEvent(actor: string, actorRole: UserRole, action: string
   return updated;
 }
 
+type AuthResult = { success: boolean; user?: AuthUser; error?: string; viaSupabase?: boolean };
+
+/** Formata o horário atual no padrão curto usado em lastLoginAt. */
+function formatLoginTime(): string {
+  return 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/** Monta o AuthUser a partir de uma sessão Supabase, preservando dados locais quando existirem. */
+function buildSupabaseAuthUser(
+  supabaseUser: { id: string; user_metadata?: Record<string, any> },
+  normalizedEmail: string,
+  existing?: AuthUser
+): AuthUser {
+  // Cargo privilegiado so e aceito quando ja registrado (atribuido por um Administrador).
+  const trustedRole = resolveTrustedRole(undefined, existing?.role);
+  const lastLoginAt = formatLoginTime();
+
+  if (existing) {
+    return { ...existing, role: trustedRole, lastLoginAt };
+  }
+
+  const localPart = normalizedEmail.split('@')[0];
+  return {
+    id: supabaseUser.id,
+    name: supabaseUser.user_metadata?.name || localPart,
+    email: normalizedEmail,
+    role: trustedRole,
+    avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(normalizedEmail)}`,
+    handle: supabaseUser.user_metadata?.handle || `@${localPart}`,
+    bio: supabaseUser.user_metadata?.bio || 'Membro do Izy Colors Studio',
+    status: 'active',
+    createdAt: new Date().toISOString().split('T')[0],
+    lastLoginAt,
+    palettesCount: 0,
+    favoritesCount: 0,
+    submissionsCount: 0
+  };
+}
+
+/** Persiste o usuário autenticado no registro local, criando ou atualizando o registro. */
+function syncLocalRegistry(authUser: AuthUser, users: AuthUser[], existing?: AuthUser): void {
+  if (existing) {
+    saveStoredUsers(users.map(u => u.id === authUser.id ? authUser : u));
+  } else {
+    saveStoredUsers([authUser, ...users]);
+  }
+}
+
+/** Tenta autenticar via Supabase Auth. Retorna null quando o cliente está indisponível. */
+async function authenticateViaSupabase(
+  normalizedEmail: string,
+  password: string,
+  users: AuthUser[]
+): Promise<AuthResult | null> {
+  const supabase = getSupabaseClient();
+  if (!supabase) return null;
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: normalizedEmail,
+      password
+    });
+
+    if (error) {
+      // Credenciais Supabase inválidas NÃO caem em fallback local.
+      return { success: false, error: error.message || 'Credenciais inválidas no Supabase.' };
+    }
+
+    if (!data.user) return null;
+
+    const existing = users.find(u => u.email.toLowerCase() === normalizedEmail);
+    const authUser = buildSupabaseAuthUser(data.user, normalizedEmail, existing);
+
+    syncLocalRegistry(authUser, users, existing);
+    setCurrentAuthUser(authUser);
+    logAuditEvent(authUser.name, authUser.role, 'Login Supabase Cloud', `Autenticado com sucesso via Supabase Auth (${authUser.role.toUpperCase()})`, 'auth');
+    return { success: true, user: authUser, viaSupabase: true };
+  } catch (err: any) {
+    console.warn('Supabase indisponível, autenticação local:', err);
+    return null;
+  }
+}
+
+/** Fallback local para usuários registrados localmente (somente quando Supabase indisponível). */
+function authenticateLocally(normalizedEmail: string, users: AuthUser[]): AuthResult {
+  const found = users.find(u => u.email.toLowerCase() === normalizedEmail);
+  if (!found) {
+    return {
+      success: false,
+      error: 'Conta não encontrada. Cadastre-se na aba "Criar Nova Conta" para começar.'
+    };
+  }
+
+  if (found.status === 'suspended') {
+    return { success: false, error: 'Esta conta está temporariamente suspensa pelo administrador.' };
+  }
+
+  const updatedUser = { ...found, lastLoginAt: formatLoginTime() };
+  setCurrentAuthUser(updatedUser);
+  logAuditEvent(updatedUser.name, updatedUser.role, 'Login Local', `Sessão aberta como ${updatedUser.role === 'admin' ? 'Administrador' : 'Usuário'}`, 'auth');
+  return { success: true, user: updatedUser, viaSupabase: false };
+}
+
 // Authenticate via email/password (local match or Supabase Auth)
-export async function authenticateUser(email: string, password?: string): Promise<{ success: boolean; user?: AuthUser; error?: string; viaSupabase?: boolean }> {
+export async function authenticateUser(email: string, password?: string): Promise<AuthResult> {
   const users = getStoredUsers();
   const normalizedEmail = email.trim().toLowerCase();
 
   // 1. Try Supabase Auth if client is available
-  const supabase = getSupabaseClient();
-  if (supabase && password) {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password
-      });
-
-      if (!error && data.user) {
-        const existing = users.find(u => u.email.toLowerCase() === normalizedEmail);
-        // Cargo privilegiado so e aceito quando ja registrado (atribuido por um Administrador).
-        const trustedRole = resolveTrustedRole(data.user.user_metadata?.role, existing?.role);
-
-        const authUser: AuthUser = existing ? {
-          ...existing,
-          role: trustedRole,
-          lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        } : {
-          id: data.user.id,
-          name: data.user.user_metadata?.name || normalizedEmail.split('@')[0],
-          email: normalizedEmail,
-          role: trustedRole,
-          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(normalizedEmail)}`,
-          handle: data.user.user_metadata?.handle || `@${normalizedEmail.split('@')[0]}`,
-          bio: data.user.user_metadata?.bio || 'Membro do Izy Colors Studio',
-          status: 'active',
-          createdAt: new Date().toISOString().split('T')[0],
-          lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          palettesCount: 0,
-          favoritesCount: 0,
-          submissionsCount: 0
-        };
-
-        // Sync with local users registry
-        if (!existing) {
-          saveStoredUsers([authUser, ...users]);
-        } else {
-          saveStoredUsers(users.map(u => u.id === authUser.id ? authUser : u));
-        }
-
-        setCurrentAuthUser(authUser);
-        logAuditEvent(authUser.name, authUser.role, 'Login Supabase Cloud', `Autenticado com sucesso via Supabase Auth (${authUser.role.toUpperCase()})`, 'auth');
-        return { success: true, user: authUser, viaSupabase: true };
-      } else if (error) {
-        // If Supabase failed with explicit error, check if this email is a seeded local demo account
-        const isSeededDemo = INITIAL_USERS.some(u => u.email.toLowerCase() === normalizedEmail);
-        if (!isSeededDemo) {
-          return { success: false, error: error.message || 'Credenciais inválidas no Supabase.' };
-        }
-      }
-    } catch (err: any) {
-      console.warn('Supabase auth fallback para autenticação local:', err);
-    }
+  if (password) {
+    const supabaseResult = await authenticateViaSupabase(normalizedEmail, password, users);
+    if (supabaseResult) return supabaseResult;
   }
 
-  // 2. Local fallback matching for registered & seeded demo users
-  const found = users.find(u => u.email.toLowerCase() === normalizedEmail);
-  if (found) {
-    if (found.status === 'suspended') {
-      return { success: false, error: 'Esta conta está temporariamente suspensa pelo administrador.' };
-    }
-    const updatedUser = {
-      ...found,
-      lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-    setCurrentAuthUser(updatedUser);
-    logAuditEvent(updatedUser.name, updatedUser.role, 'Login Local', `Sessão aberta como ${updatedUser.role === 'admin' ? 'Administrador' : 'Usuário'}`, 'auth');
-    return { success: true, user: updatedUser, viaSupabase: false };
-  }
-
-  return {
-    success: false,
-    error: 'Conta não encontrada. Cadastre-se na aba "Criar Nova Conta" para começar.'
-  };
+  // 2. Local fallback matching for locally registered users (somente quando Supabase indisponível)
+  return authenticateLocally(normalizedEmail, users);
 }
 
-// Register a new user (exclusively as Admin)
+/** Garante que o handle esteja limpo (sem espaços nas bordas) e prefixado com '@'. */
+function normalizeHandle(handle: string): string {
+  const trimmed = handle.trim();
+  return trimmed.startsWith('@') ? trimmed : `@${trimmed}`;
+}
+
+// Register a new user (exclusively as regular user — Usuário Comum)
 export async function registerUser(params: {
   name: string;
   email: string;
@@ -381,12 +335,14 @@ export async function registerUser(params: {
 }): Promise<{ success: boolean; user?: AuthUser; error?: string; message?: string; viaSupabase?: boolean }> {
   const users = getStoredUsers();
   const normalizedEmail = params.email.trim().toLowerCase();
-  
-  // Regra do sistema: Todas as novas contas são criadas exclusivamente como Administrador (admin).
-  const desiredRole: UserRole = 'admin';
-  const cleanHandle = params.handle?.trim()
-    ? (params.handle.startsWith('@') ? params.handle : `@${params.handle}`)
-    : `@${normalizedEmail.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '')}`;
+
+  // Regra do sistema: todo cadastro público cria exclusivamente Usuário Comum.
+  // Qualquer cargo elevado enviado pelo cliente é ignorado/rejeitado.
+  const desiredRole: UserRole = 'user';
+  const trimmedHandle = params.handle?.trim();
+  const cleanHandle = trimmedHandle
+    ? normalizeHandle(trimmedHandle)
+    : `@${normalizedEmail.split('@')[0].replace(/\W/g, '')}`;
 
   // Check if user already exists locally
   const alreadyExists = users.some(u => u.email.toLowerCase() === normalizedEmail);
@@ -408,8 +364,8 @@ export async function registerUser(params: {
           data: {
             name: params.name.trim(),
             handle: cleanHandle,
-            role: desiredRole,
-            bio: params.bio?.trim() || 'Administrador Izy Colors Studio'
+            bio: params.bio?.trim() || 'Criador Izy Colors'
+            // Nenhum cargo é enviado: o nível é fixado como 'user' no backend (trigger handle_new_user).
           }
         }
       });
@@ -434,7 +390,7 @@ export async function registerUser(params: {
     role: desiredRole,
     avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(params.name.trim())}`,
     handle: cleanHandle,
-    bio: params.bio?.trim() || 'Administrador Izy Colors Studio',
+    bio: params.bio?.trim() || 'Criador Izy Colors',
     status: 'active',
     createdAt: new Date().toISOString().split('T')[0],
     lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -451,19 +407,19 @@ export async function registerUser(params: {
     newUser.name,
     newUser.role,
     usedSupabase ? 'Registro Supabase Cloud' : 'Registro de Conta',
-    `Nova conta criada como Administrador [ADMIN].`,
+    `Nova conta criada como Usuário Comum [USER].`,
     'auth'
   );
 
-  const levelNote = 'Nível de acesso atribuído: Administrador.';
+  const levelNote = 'Nível de acesso atribuído: Usuário Comum.';
 
   return {
     success: true,
     user: newUser,
     viaSupabase: usedSupabase,
     message: usedSupabase
-      ? `Conta de Administrador criada e sincronizada com o Supabase Auth com sucesso! ${levelNote}`
-      : `Conta de Administrador criada localmente com sucesso! ${levelNote}`
+      ? `Conta criada e sincronizada com o Supabase Auth com sucesso! ${levelNote}`
+      : `Conta criada localmente com sucesso! ${levelNote}`
   };
 }
 
@@ -477,7 +433,7 @@ export async function logoutAuthUser(): Promise<void> {
       console.warn('Erro ao deslogar do Supabase:', e);
     }
   }
-  // Reset to default regular user or guest representation
+  // Reset to default regular user
   const defaultUser = INITIAL_USERS.find(u => u.role === 'user') || INITIAL_USERS[0];
   setCurrentAuthUser(defaultUser);
   logAuditEvent(defaultUser.name, defaultUser.role, 'Log Out', 'Sessão encerrada com sucesso', 'auth');
@@ -500,7 +456,7 @@ export async function checkCurrentSession(): Promise<AuthUser | null> {
         id: u.id,
         name: u.user_metadata?.name || email.split('@')[0],
         email: email,
-        role: resolveTrustedRole(u.user_metadata?.role),
+        role: resolveTrustedRole(undefined),
         avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
         handle: u.user_metadata?.handle || `@${email.split('@')[0]}`,
         bio: u.user_metadata?.bio || 'Criador Izy Colors',
@@ -561,13 +517,13 @@ export function initAuthListener(onUserChange: (user: AuthUser) => void): () => 
 
         const authUser: AuthUser = existing ? {
           ...existing,
-          role: resolveTrustedRole(session.user.user_metadata?.role, existing.role),
+          role: resolveTrustedRole(undefined, existing.role),
           lastLoginAt: 'Hoje, ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         } : {
           id: session.user.id,
           name: session.user.user_metadata?.name || email.split('@')[0],
           email,
-          role: resolveTrustedRole(session.user.user_metadata?.role),
+          role: resolveTrustedRole(undefined),
           avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
           handle: session.user.user_metadata?.handle || `@${email.split('@')[0]}`,
           bio: session.user.user_metadata?.bio || 'Criador Izy Colors',
@@ -591,36 +547,6 @@ export function initAuthListener(onUserChange: (user: AuthUser) => void): () => 
   return () => {
     subscription.unsubscribe();
   };
-}
-
-// Quick switch between demo roles (Admin, Moderator, Editor, Pro, User, Guest)
-export function switchDemoRole(targetRole: UserRole): AuthUser {
-  if (targetRole === 'guest') {
-    const guestUser: AuthUser = {
-      id: 'usr-guest-mode',
-      name: 'Visitante (Trial)',
-      email: 'guest@izycolors.com',
-      role: 'guest',
-      avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=Guest',
-      handle: '@visitante',
-      bio: 'Modo visitante experimental em pré-visualização.',
-      status: 'active',
-      createdAt: new Date().toISOString().split('T')[0],
-      lastLoginAt: 'Agora mesmo',
-      palettesCount: 0,
-      favoritesCount: 0,
-      submissionsCount: 0
-    };
-    setCurrentAuthUser(guestUser);
-    logAuditEvent(guestUser.name, guestUser.role, 'Alternância para Visitante', 'Sessão alterada para modo Visitante (Demonstração)', 'auth');
-    return guestUser;
-  }
-
-  const users = getStoredUsers();
-  const target = users.find(u => u.role === targetRole && u.status === 'active') || INITIAL_USERS.find(u => u.role === targetRole) || INITIAL_USERS[0];
-  setCurrentAuthUser(target);
-  logAuditEvent(target.name, target.role, 'Alternância de Perfil Demo', `Ambiente alterado para perfil ${target.role.toUpperCase()}`, 'auth');
-  return target;
 }
 
 // Update role of a user in Admin area — restrito a Administradores
@@ -700,7 +626,8 @@ export function toggleUserStatus(userId: string, adminActor: AuthUser): AuthUser
   return updated;
 }
 
-// Add a new user directly from Admin Area — todas as contas são criadas como Administrador
+// Add a new user directly from Admin Area — restrito a Administradores.
+// O cargo elevado só é concedido quando o solicitante é um Administrador autenticado.
 export function createNewUserFromAdmin(
   userData: { name: string; email: string; handle: string; role?: UserRole; bio?: string },
   adminActor: AuthUser
@@ -717,7 +644,9 @@ export function createNewUserFromAdmin(
     return { users, newUser: null };
   }
 
-  const safeRole: UserRole = 'admin';
+  const requestedRole = userData.role;
+  const safeRole: UserRole =
+    requestedRole && ALL_ROLES.includes(requestedRole) ? requestedRole : 'user';
 
   const newUser: AuthUser = {
     id: `usr-${Date.now()}`,
@@ -725,8 +654,8 @@ export function createNewUserFromAdmin(
     email: userData.email.toLowerCase(),
     role: safeRole,
     avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(userData.name)}`,
-    handle: userData.handle.startsWith('@') ? userData.handle : `@${userData.handle}`,
-    bio: userData.bio || 'Administrador Izy Colors Studio',
+    handle: normalizeHandle(userData.handle),
+    bio: userData.bio || 'Criador Izy Colors',
     status: 'active',
     createdAt: new Date().toISOString().split('T')[0],
     lastLoginAt: 'Nunca',
@@ -741,8 +670,8 @@ export function createNewUserFromAdmin(
   logAuditEvent(
     adminActor.name,
     'admin',
-    'Novo Administrador Criado',
-    `Administrador criou a conta ${newUser.name} como [ADMINISTRADOR]`,
+    safeRole === 'admin' ? 'Novo Administrador Criado' : 'Novo Usuário Criado',
+    `Administrador criou a conta ${newUser.name} como [${safeRole.toUpperCase()}]`,
     'user'
   );
 

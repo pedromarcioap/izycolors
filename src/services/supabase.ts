@@ -52,23 +52,78 @@ export const DEFAULT_CURATED_IMAGES: CuratedDemoImage[] = [
 
 const LOCAL_STORAGE_KEY_CURATED = 'chromatica_curated_images_v2';
 const LOCAL_STORAGE_KEY_FORKS = 'chromatica_palette_forks_v2';
-const LOCAL_STORAGE_SUPABASE_URL = 'chromatica_supabase_url';
-const LOCAL_STORAGE_SUPABASE_ANON = 'chromatica_supabase_anon_key';
+const LOCAL_STORAGE_KEY_CUSTOM_SUPABASE = 'chromatica_supabase_custom_credentials_v1';
 
 let cachedSupabaseClient: SupabaseClient | null = null;
+let cachedClientUrl = '';
+let cachedClientKey = '';
 
-// Get Supabase credentials from Vite env or user localStorage configuration
+// Read runtime custom credentials persisted by the SupabaseConfigModal
+function getCustomSupabaseCredentials(): { url: string; key: string } | null {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_KEY_CUSTOM_SUPABASE);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.url === 'string' && typeof parsed.key === 'string') {
+      return { url: parsed.url, key: parsed.key };
+    }
+  } catch (err) {
+    // Ignore malformed storage entries
+  }
+  return null;
+}
+
+// Get Supabase credentials: runtime custom config first, then Vite env variables
 export function getSupabaseCredentials(): { url: string; key: string; isConfigured: boolean } {
-  const envUrl = (import.meta.env.VITE_SUPABASE_URL as string) || '';
-  const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
-  const storedUrl = localStorage.getItem(LOCAL_STORAGE_SUPABASE_URL) || '';
-  const storedKey = localStorage.getItem(LOCAL_STORAGE_SUPABASE_ANON) || '';
-
-  const url = storedUrl || envUrl;
-  const key = storedKey || envKey;
+  const custom = getCustomSupabaseCredentials();
+  const url = (custom?.url || (import.meta.env.VITE_SUPABASE_URL as string) || '').trim();
+  const key = custom?.key || (import.meta.env.VITE_SUPABASE_ANON_KEY as string) || '';
   const isConfigured = Boolean(url && key && url.startsWith('http'));
 
   return { url, key, isConfigured };
+}
+
+// Persist custom Supabase credentials set by the user via the config modal.
+// Returns true when the resulting configuration is valid.
+export function setCustomSupabaseCredentials(url: string, key: string): boolean {
+  const trimmedUrl = (url || '').trim();
+  const trimmedKey = (key || '').trim();
+
+  if (trimmedUrl && trimmedKey) {
+    try {
+      localStorage.setItem(
+        LOCAL_STORAGE_KEY_CUSTOM_SUPABASE,
+        JSON.stringify({ url: trimmedUrl, key: trimmedKey })
+      );
+    } catch (err) {
+      console.warn('Falha ao salvar credenciais customizadas do Supabase:', err);
+    }
+  } else {
+    try {
+      localStorage.removeItem(LOCAL_STORAGE_KEY_CUSTOM_SUPABASE);
+    } catch (err) {
+      // ignore
+    }
+  }
+
+  // Force a fresh client so subsequent calls pick up the new credentials
+  cachedSupabaseClient = null;
+  cachedClientUrl = '';
+  cachedClientKey = '';
+
+  return getSupabaseCredentials().isConfigured;
+}
+
+// Remove runtime custom credentials and fall back to Vite env variables
+export function clearCustomSupabaseCredentials(): void {
+  try {
+    localStorage.removeItem(LOCAL_STORAGE_KEY_CUSTOM_SUPABASE);
+  } catch (err) {
+    // ignore
+  }
+  cachedSupabaseClient = null;
+  cachedClientUrl = '';
+  cachedClientKey = '';
 }
 
 // Get or lazy-create the Supabase client
@@ -76,11 +131,13 @@ export function getSupabaseClient(): SupabaseClient | null {
   const { url, key, isConfigured } = getSupabaseCredentials();
   if (!isConfigured) return null;
 
-  if (!cachedSupabaseClient) {
+  if (!cachedSupabaseClient || cachedClientUrl !== url || cachedClientKey !== key) {
     try {
       cachedSupabaseClient = createClient(url, key, {
         auth: { persistSession: true }
       });
+      cachedClientUrl = url;
+      cachedClientKey = key;
     } catch (err) {
       console.warn('Falha ao inicializar cliente Supabase:', err);
       return null;
@@ -89,26 +146,11 @@ export function getSupabaseClient(): SupabaseClient | null {
   return cachedSupabaseClient;
 }
 
-// Set custom credentials at runtime from UI modal
-export function setCustomSupabaseCredentials(url: string, key: string) {
-  if (url && key) {
-    localStorage.setItem(LOCAL_STORAGE_SUPABASE_URL, url.trim());
-    localStorage.setItem(LOCAL_STORAGE_SUPABASE_ANON, key.trim());
-    cachedSupabaseClient = null; // force reload
-  } else {
-    localStorage.removeItem(LOCAL_STORAGE_SUPABASE_URL);
-    localStorage.removeItem(LOCAL_STORAGE_SUPABASE_ANON);
-    cachedSupabaseClient = null;
-  }
-}
-
 // -------------------------------------------------------------
 // CURATED DEMO IMAGES PERSISTENCE SERVICE
 // -------------------------------------------------------------
 
-// Load all curated demonstration images
-export async function loadCuratedImages(): Promise<CuratedDemoImage[]> {
-  // 1. Try local storage first for instant synchronous UI render
+function getLocalCuratedImages(): CuratedDemoImage[] {
   let localList: CuratedDemoImage[] = [];
   try {
     const raw = localStorage.getItem(LOCAL_STORAGE_KEY_CURATED);
@@ -119,7 +161,6 @@ export async function loadCuratedImages(): Promise<CuratedDemoImage[]> {
     console.error('Erro ao ler cache local de imagens curadas:', err);
   }
 
-  // If local list is empty, initialize with defaults
   if (!localList || localList.length === 0) {
     localList = [...DEFAULT_CURATED_IMAGES];
     try {
@@ -129,39 +170,51 @@ export async function loadCuratedImages(): Promise<CuratedDemoImage[]> {
     }
   }
 
-  // 2. If Supabase is connected, attempt to sync from cloud
+  return localList;
+}
+
+async function syncCloudCuratedImages(supabase: SupabaseClient): Promise<CuratedDemoImage[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from('curated_images')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!error && data && data.length > 0) {
+      const cloudImages: CuratedDemoImage[] = data.map((item: any) => ({
+        id: item.id || `curated-${Date.now()}`,
+        name: item.name || item.title || 'Imagem Curada',
+        url: item.url || item.image_url,
+        tag: item.tag || item.category || 'Curadoria',
+        colors: item.colors || [],
+        isCustom: item.is_custom ?? true,
+        createdAt: item.created_at || new Date().toISOString()
+      }));
+
+      const merged = [...cloudImages];
+      for (const def of DEFAULT_CURATED_IMAGES) {
+        if (!merged.some(m => m.id === def.id)) {
+          merged.push(def);
+        }
+      }
+      localStorage.setItem(LOCAL_STORAGE_KEY_CURATED, JSON.stringify(merged));
+      return merged;
+    }
+  } catch (cloudErr) {
+    console.warn('Supabase offline ou tabela inexistente, utilizando cache local persistente:', cloudErr);
+  }
+  return null;
+}
+
+// Load all curated demonstration images
+export async function loadCuratedImages(): Promise<CuratedDemoImage[]> {
+  const localList = getLocalCuratedImages();
+
   const supabase = getSupabaseClient();
   if (supabase) {
-    try {
-      const { data, error } = await supabase
-        .from('curated_images')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (!error && data && data.length > 0) {
-        // Map from Supabase table format
-        const cloudImages: CuratedDemoImage[] = data.map((item: any) => ({
-          id: item.id || `curated-${Date.now()}`,
-          name: item.name || item.title || 'Imagem Curada',
-          url: item.url || item.image_url,
-          tag: item.tag || item.category || 'Curadoria',
-          colors: item.colors || [],
-          isCustom: item.is_custom ?? true,
-          createdAt: item.created_at || new Date().toISOString()
-        }));
-
-        // Merge cloud with defaults ensuring uniqueness by ID
-        const merged = [...cloudImages];
-        for (const def of DEFAULT_CURATED_IMAGES) {
-          if (!merged.some(m => m.id === def.id)) {
-            merged.push(def);
-          }
-        }
-        localStorage.setItem(LOCAL_STORAGE_KEY_CURATED, JSON.stringify(merged));
-        return merged;
-      }
-    } catch (cloudErr) {
-      console.warn('Supabase offline ou tabela inexistente, utilizando cache local persistente:', cloudErr);
+    const cloudMerged = await syncCloudCuratedImages(supabase);
+    if (cloudMerged) {
+      return cloudMerged;
     }
   }
 
@@ -256,7 +309,7 @@ export function isSupabaseConfigured(): boolean {
 export async function resetCuratedImages(): Promise<void> {
   try {
     localStorage.removeItem(LOCAL_STORAGE_KEY_CURATED);
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // -------------------------------------------------------------
@@ -283,6 +336,17 @@ export async function loadForks(): Promise<ForkRecord[]> {
   return [];
 }
 
+function getRandomSuffix(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID().slice(0, 6);
+  }
+  const arr = new Uint8Array(3);
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(arr);
+  }
+  return Array.from(arr, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // Save a fork record (locally and to Supabase)
 export async function recordPaletteFork(
   originalPalette: Palette,
@@ -291,7 +355,7 @@ export async function recordPaletteFork(
   authorAvatar?: string,
   customTitle?: string
 ): Promise<{ forkedPalette: Palette; allForks: ForkRecord[] }> {
-  const forkId = `fork-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
+  const forkId = `fork-${Date.now()}-${getRandomSuffix()}`;
   const title = customTitle || `${originalPalette.title} (Fork)`;
 
   const name = typeof authorOrProfile === 'object' ? authorOrProfile.name : authorOrProfile;

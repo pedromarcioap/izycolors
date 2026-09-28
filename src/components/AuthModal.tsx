@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  X, LogIn, UserPlus, Sparkles, ShieldCheck, User, Mail, Lock, AtSign,
+  X, LogIn, UserPlus, ShieldCheck, User, Mail, Lock, AtSign,
   Cloud, AlertCircle, CheckCircle2, LogOut, KeyRound,
-  Crown, Eye, EyeOff
+  Eye, EyeOff
 } from 'lucide-react';
 import { AuthUser, UserRole } from '../types';
 import {
   authenticateUser,
   registerUser,
   logoutAuthUser,
-  switchDemoRole,
   resetPasswordForEmail
 } from '../services/authService';
 import { getSupabaseCredentials } from '../services/supabase';
@@ -33,7 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   onNavigateToAdmin,
   onNavigateToUserPortal
 }) => {
-  const [tab, setTab] = useState<'login' | 'register' | 'reset' | 'quick'>('login');
+  const [tab, setTab] = useState<'login' | 'register' | 'reset'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -45,9 +44,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
   const supabaseCreds = getSupabaseCredentials();
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!email.trim()) {
       setErrorMsg('Informe o endereço de e-mail.');
@@ -75,7 +88,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleRegisterSubmit = async (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!name.trim() || !email.trim()) {
       setErrorMsg('Preencha os campos obrigatórios.');
@@ -110,7 +123,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleResetSubmit = async (e: React.FormEvent) => {
+  const handleResetSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!email.trim()) {
       setErrorMsg('Informe o e-mail da sua conta para recuperar a senha.');
@@ -130,12 +143,6 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
-  const handleQuickSwitch = (role: UserRole) => {
-    const user = switchDemoRole(role);
-    onUserChange(user);
-    onClose();
-  };
-
   const handleLogoutClick = async () => {
     await logoutAuthUser();
     onLogout();
@@ -152,18 +159,25 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         return 'bg-amber-500/20 text-amber-300 border-amber-500/40';
       case 'pro':
         return 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40';
-      case 'guest':
-        return 'bg-slate-500/20 text-slate-300 border-slate-500/40';
       default:
         return 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40';
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      {/* Backdrop */}
+      <button
+        type="button"
+        className="fixed inset-0 bg-black/80 backdrop-blur-sm w-full h-full border-0 p-0 cursor-default"
+        onClick={onClose}
+        aria-label="Fechar modal"
+        tabIndex={-1}
+      />
+
+      {/* Modal Content */}
       <div
-        className="bg-[#141822] border border-white/[0.12] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative"
-        onClick={(e) => e.stopPropagation()}
+        className="bg-[#141822] border border-white/[0.12] rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden flex flex-col relative z-10"
       >
         {/* Header */}
         <div className="p-6 border-b border-white/[0.08] flex items-center justify-between bg-[#0E131E]">
@@ -173,8 +187,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 Sessão & Controle de Acesso
               </span>
               <span className={`text-[10px] font-mono px-2 py-0.5 rounded border flex items-center gap-1 ${supabaseCreds.isConfigured
-                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                  : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                 }`}>
                 <Cloud className="w-3 h-3" />
                 {supabaseCreds.isConfigured ? 'Supabase Auth Online' : 'Modo Local'}
@@ -185,7 +199,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </h2>
           </div>
           <button
+            type="button"
             onClick={onClose}
+            aria-label="Fechar modal"
             className="w-8 h-8 rounded-lg bg-white/[0.04] hover:bg-white/[0.1] text-[#94A3B8] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -214,6 +230,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           <div className="flex items-center gap-2">
             {currentUser.role === 'admin' ? (
               <button
+                type="button"
                 onClick={() => {
                   onClose();
                   onNavigateToAdmin?.();
@@ -224,6 +241,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </button>
             ) : (
               <button
+                type="button"
                 onClick={() => {
                   onClose();
                   onNavigateToUserPortal?.();
@@ -239,10 +257,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         {/* Tab Selection */}
         <div className="flex border-b border-white/[0.06] bg-[#10141D]">
           <button
+            type="button"
             onClick={() => { setTab('login'); setErrorMsg(null); setSuccessMsg(null); }}
             className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${tab === 'login'
-                ? 'border-[#6366F1] text-white bg-white/[0.02]'
-                : 'border-transparent text-[#94A3B8] hover:text-white'
+              ? 'border-[#6366F1] text-white bg-white/[0.02]'
+              : 'border-transparent text-[#94A3B8] hover:text-white'
               }`}
           >
             <LogIn className="w-3.5 h-3.5 text-[#6366F1]" />
@@ -250,26 +269,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={() => { setTab('register'); setErrorMsg(null); setSuccessMsg(null); }}
             className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${tab === 'register'
-                ? 'border-[#EC4899] text-white bg-white/[0.02]'
-                : 'border-transparent text-[#94A3B8] hover:text-white'
+              ? 'border-[#EC4899] text-white bg-white/[0.02]'
+              : 'border-transparent text-[#94A3B8] hover:text-white'
               }`}
           >
             <UserPlus className="w-3.5 h-3.5 text-[#EC4899]" />
             <span>Criar Conta</span>
           </button>
 
-          <button
-            onClick={() => { setTab('quick'); setErrorMsg(null); setSuccessMsg(null); }}
-            className={`flex-1 py-3 text-xs font-medium text-center transition-colors border-b-2 flex items-center justify-center gap-1.5 cursor-pointer ${tab === 'quick'
-                ? 'border-[#06B6D4] text-white bg-white/[0.02]'
-                : 'border-transparent text-[#94A3B8] hover:text-white'
-              }`}
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#06B6D4]" />
-            <span>Acesso Demo</span>
-          </button>
         </div>
 
         {/* Body Content */}
@@ -292,12 +302,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           {tab === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                <label htmlFor="login-email" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                   E-mail de Acesso
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
+                    id="login-email"
                     type="email"
                     required
                     placeholder="seu.email@exemplo.com"
@@ -310,7 +321,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-xs font-mono uppercase text-[#94A3B8]">
+                  <label htmlFor="login-password" className="block text-xs font-mono uppercase text-[#94A3B8]">
                     Senha
                   </label>
                   <button
@@ -324,6 +335,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
+                    id="login-password"
                     type={showPassword ? "text" : "password"}
                     placeholder={supabaseCreds.isConfigured ? "Sua senha do Supabase Auth" : "Qualquer senha (modo local)"}
                     value={password}
@@ -351,31 +363,27 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </button>
               </div>
 
-              <div className="text-center pt-1 border-t border-white/[0.06] mt-4">
-                <p className="text-[11px] text-[#64748B]">
-                  Contas de administração: <code className="text-purple-300 font-mono">admin@izycolors.com</code>, <code className="text-amber-300 font-mono">editor@izycolors.com</code>, <code className="text-emerald-300 font-mono">pro@izycolors.com</code>
-                </p>
-              </div>
             </form>
           )}
 
           {/* Register New Account Tab */}
           {tab === 'register' && (
             <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              <div className="p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl flex items-start gap-2.5">
-                <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
-                <p className="text-[11px] text-purple-200 leading-relaxed">
-                  Todas as novas contas criadas recebem privilégios completos de <strong>Administrador</strong> no sistema.
+              <div className="p-3 bg-[#06B6D4]/10 border border-[#06B6D4]/20 rounded-xl flex items-start gap-2.5">
+                <ShieldCheck className="w-4 h-4 text-[#06B6D4] shrink-0 mt-0.5" />
+                <p className="text-[11px] text-[#A5F3FC] leading-relaxed">
+                  Todas as novas contas são criadas como <strong>Usuário Comum</strong>. Perfis de administrador são concedidos apenas por um administrador autenticado.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                <label htmlFor="register-name" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                   Nome Completo *
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
+                    id="register-name"
                     type="text"
                     required
                     placeholder="Ex: Clara Mendes"
@@ -388,12 +396,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                  <label htmlFor="register-email" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                     E-mail *
                   </label>
                   <div className="relative">
                     <Mail className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      id="register-email"
                       type="email"
                       required
                       placeholder="clara@design.com"
@@ -405,12 +414,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                  <label htmlFor="register-handle" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                     Handle / Usuário
                   </label>
                   <div className="relative">
                     <AtSign className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                     <input
+                      id="register-handle"
                       type="text"
                       placeholder="@clara_m"
                       value={handle}
@@ -422,12 +432,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                <label htmlFor="register-password" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                   Senha de Acesso {supabaseCreds.isConfigured && '(mínimo 6 caracteres)'} *
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
+                    id="register-password"
                     type="password"
                     required
                     placeholder="Sua senha secreta"
@@ -445,7 +456,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   className="w-full h-10 bg-[#EC4899] hover:bg-[#D93D87] text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-pink-600/30 cursor-pointer disabled:opacity-50"
                 >
                   <UserPlus className="w-4 h-4" />
-                  <span>{loading ? 'Criando conta de administrador...' : 'Criar Conta de Administrador'}</span>
+                  <span>{loading ? 'Criando conta...' : 'Criar Conta'}</span>
                 </button>
               </div>
             </form>
@@ -465,12 +476,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
+                <label htmlFor="reset-email" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
                   E-mail Cadastrado *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
+                    id="reset-email"
                     type="email"
                     required
                     placeholder="seu.email@exemplo.com"
@@ -494,60 +506,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             </form>
           )}
 
-          {/* Quick Demo Access Tab */}
-          {tab === 'quick' && (
-            <div className="space-y-3">
-              <p className="text-xs text-[#94A3B8] leading-relaxed">
-                Alterne instantaneamente entre as contas de administração para testar a governança e permissões:
-              </p>
-
-              {/* Admin Card */}
-              <div
-                onClick={() => handleQuickSwitch('admin')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'admin'
-                    ? 'bg-purple-950/30 border-purple-500/60 ring-1 ring-purple-500/40 shadow-lg'
-                    : 'bg-[#181C26] border-white/[0.08] hover:border-purple-500/40 hover:bg-[#1E2330]'
-                  }`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-purple-500/20 border border-purple-500/40 flex items-center justify-center shrink-0">
-                  <ShieldCheck className="w-4 h-4 text-purple-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Administrador Master</span>
-                    <span className="text-[10px] font-mono text-purple-300">@helenavance</span>
-                  </div>
-                  <p className="text-[11px] text-[#94A3B8]">Acesso irrestrito a governança, Supabase, CMS e audit logs.</p>
-                </div>
-              </div>
-
-              {/* Pro Card */}
-              <div
-                onClick={() => handleQuickSwitch('pro')}
-                className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center gap-3 ${currentUser.role === 'pro'
-                    ? 'bg-emerald-950/30 border-emerald-500/60 ring-1 ring-emerald-500/40 shadow-lg'
-                    : 'bg-[#181C26] border-white/[0.08] hover:border-emerald-500/40 hover:bg-[#1E2330]'
-                  }`}
-              >
-                <div className="w-9 h-9 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-                  <Crown className="w-4 h-4 text-emerald-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-white">Administrador Pro</span>
-                    <span className="text-[10px] font-mono text-emerald-300">@camila_pro</span>
-                  </div>
-                  <p className="text-[11px] text-[#94A3B8]">Gamuts profissionais P3/Rec.2020 e exportação .ASE/.JSX.</p>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Footer Actions */}
         <div className="p-4 bg-[#0E131E] border-t border-white/[0.08] flex items-center justify-between text-xs font-mono">
           <span className="text-[#64748B]">Izy Colors Auth & RBAC System</span>
           <button
+            type="button"
             onClick={handleLogoutClick}
             className="text-red-400 hover:text-red-300 flex items-center gap-1.5 transition-colors cursor-pointer"
             title="Encerrar sessão atual"

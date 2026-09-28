@@ -23,13 +23,11 @@ import {
   updateUserRole,
   toggleUserStatus,
   createNewUserFromAdmin,
-  canManageUserRoles,
-  switchDemoRole
+  canManageUserRoles
 } from '../services/authService';
 
 interface AdminAreaViewProps {
   currentUser: AuthUser;
-  onUserChange: (user: AuthUser) => void;
   usersList: AuthUser[];
   onUpdateUsersList: (users: AuthUser[]) => void;
   submissions: CommunitySubmission[];
@@ -42,12 +40,10 @@ interface AdminAreaViewProps {
   onOpenInGenerator: (colors: string[]) => void;
   onNavigateToUserPortal: () => void;
   isSupabaseConnected: boolean;
-  onOpenSupabaseModal: () => void;
 }
 
 export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   currentUser,
-  onUserChange,
   usersList,
   onUpdateUsersList,
   submissions,
@@ -59,8 +55,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   auditLogs,
   onOpenInGenerator,
   onNavigateToUserPortal,
-  isSupabaseConnected,
-  onOpenSupabaseModal
+  isSupabaseConnected
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'moderation' | 'cms' | 'logs' | 'settings'>('overview');
   const [userSearch, setUserSearch] = useState('');
@@ -73,6 +68,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserHandle, setNewUserHandle] = useState('');
   const [newUserBio, setNewUserBio] = useState('');
+  const [newUserRole, setNewUserRole] = useState<UserRole>('user');
 
   // Article creation modal inside admin
   const [showArticleModal, setShowArticleModal] = useState(false);
@@ -131,17 +127,6 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
             <button
-              onClick={() => {
-                const adminUser = switchDemoRole('admin');
-                onUserChange(adminUser);
-              }}
-              className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-purple-600/30 transition-all cursor-pointer"
-            >
-              <ShieldCheck className="w-4 h-4" />
-              <span>Alternar para Perfil de Administrador</span>
-            </button>
-
-            <button
               onClick={onNavigateToUserPortal}
               className="w-full sm:w-auto px-5 py-2.5 bg-[#1C2230] hover:bg-[#262E40] border border-white/[0.08] text-[#DFE2EE] rounded-lg text-xs font-medium flex items-center justify-center gap-2 transition-colors cursor-pointer"
             >
@@ -160,7 +145,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   const moderatorCount = usersList.filter(u => u.role === 'moderator').length;
   const editorCount = usersList.filter(u => u.role === 'editor').length;
   const proCount = usersList.filter(u => u.role === 'pro').length;
-  const regularCount = usersList.filter(u => u.role === 'user' || u.role === 'guest').length;
+  const regularCount = usersList.filter(u => u.role === 'user').length;
 
   // Somente Administradores podem alterar cargos, status e criar usuários.
   const handleRoleChange = (userId: string, nextRole: UserRole) => {
@@ -183,7 +168,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
     showFeedback('Status do usuário atualizado.');
   };
 
-  const handleCreateUserSubmit = (e: React.FormEvent) => {
+  const handleCreateUserSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserEmail.trim()) return;
 
@@ -191,7 +176,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
       name: newUserName.trim(),
       email: newUserEmail.trim(),
       handle: newUserHandle.trim() || `@${newUserEmail.split('@')[0]}`,
-      role: 'admin',
+      role: newUserRole,
       bio: newUserBio.trim()
     }, currentUser);
 
@@ -206,10 +191,11 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
     setNewUserEmail('');
     setNewUserHandle('');
     setNewUserBio('');
+    setNewUserRole('user');
     showFeedback(`Usuário ${newUser.name} cadastrado com sucesso.`);
   };
 
-  const handleCreateArticleSubmit = (e: React.FormEvent) => {
+  const handleCreateArticleSubmit = (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!newArticleTitle.trim()) return;
 
@@ -271,17 +257,16 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              onClick={onOpenSupabaseModal}
-              className={`h-9 px-3.5 rounded-lg border text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer ${isSupabaseConnected
+            <span
+              className={`h-9 px-3.5 rounded-lg border text-xs font-mono flex items-center gap-2 transition-colors ${isSupabaseConnected
                 ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400'
-                : 'bg-[#181C26] border-white/[0.08] text-[#94A3B8] hover:text-white'
+                : 'bg-[#181C26] border-white/[0.08] text-[#94A3B8]'
                 }`}
-              title="Configurar Supabase Relational Database"
+              title="Status do Banco de Dados Supabase"
             >
               <Database className="w-3.5 h-3.5" />
               <span>{isSupabaseConnected ? 'Supabase Sincronizado' : 'Supabase Status'}</span>
-            </button>
+            </span>
 
             <button
               onClick={onNavigateToUserPortal}
@@ -629,27 +614,29 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
                       {/* Role Pill */}
                       <td className="p-3.5">
-                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${user.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' :
-                          user.role === 'moderator' ? 'bg-rose-500/20 text-rose-300 border-rose-500/40' :
-                            user.role === 'editor' ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' :
-                              user.role === 'pro' ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' :
-                                user.role === 'guest' ? 'bg-slate-500/20 text-slate-300 border-slate-500/40' :
-                                  'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
-                          }`}>
-                          {user.role === 'admin' && <ShieldCheck className="w-3 h-3 text-purple-400" />}
-                          {user.role === 'moderator' && <Award className="w-3 h-3 text-rose-400" />}
-                          {user.role === 'editor' && <FileText className="w-3 h-3 text-amber-400" />}
-                          {user.role === 'pro' && <Sparkles className="w-3 h-3 text-emerald-400" />}
-                          {(user.role === 'user' || user.role === 'guest') && <Users className="w-3 h-3 text-[#06B6D4]" />}
-                          {user.role === 'moderator' ? 'MODERADOR' : user.role.toUpperCase()}
-                        </span>
+                        {(() => {
+                          const badgeMap: Record<UserRole, { style: string; icon: React.ReactNode; label: string }> = {
+                            admin: { style: 'bg-purple-500/20 text-purple-300 border-purple-500/40', icon: <ShieldCheck className="w-3 h-3 text-purple-400" />, label: 'ADMIN' },
+                            moderator: { style: 'bg-rose-500/20 text-rose-300 border-rose-500/40', icon: <Award className="w-3 h-3 text-rose-400" />, label: 'MODERADOR' },
+                            editor: { style: 'bg-amber-500/20 text-amber-300 border-amber-500/40', icon: <FileText className="w-3 h-3 text-amber-400" />, label: 'EDITOR' },
+                            pro: { style: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40', icon: <Sparkles className="w-3 h-3 text-emerald-400" />, label: 'PRO' },
+                            user: { style: 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40', icon: <Users className="w-3 h-3 text-[#06B6D4]" />, label: 'USER' }
+                          };
+                          const badge = badgeMap[user.role] || badgeMap.user;
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase border ${badge.style}`}>
+                              {badge.icon}
+                              {badge.label}
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       {/* Status */}
                       <td className="p-3.5">
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono ${user.status === 'active'
-                          ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-500/30'
-                          : 'bg-red-950/40 text-red-400 border border-red-500/30'
+                          ? 'bg-emerald-950/40 text-emerald-400 border-emerald-500/30'
+                          : 'bg-red-950/40 text-red-400 border-red-500/30'
                           }`}>
                           <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'active' ? 'bg-emerald-400' : 'bg-red-400'}`} />
                           {user.status === 'active' ? 'Ativo' : 'Suspenso'}
@@ -682,7 +669,6 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                             <option value="editor">EDITOR</option>
                             <option value="pro">PRO</option>
                             <option value="user">USER</option>
-                            <option value="guest">GUEST</option>
                           </select>
 
                           {/* Toggle Status */}
@@ -724,93 +710,97 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
           </div>
 
           <div className="space-y-4">
-            {submissions.map((sub) => (
-              <div
-                key={sub.id}
-                className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
-              >
-                <div className="space-y-2">
+            {submissions.map((sub) => {
+              let statusBadgeStyle = 'bg-amber-950/50 text-amber-400 border-amber-500/30';
+              if (sub.status === 'Aprovado') {
+                statusBadgeStyle = 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30';
+              } else if (sub.status === 'Rejeitado') {
+                statusBadgeStyle = 'bg-red-950/50 text-red-400 border-red-500/30';
+              }
+
+              return (
+                <div
+                  key={sub.id}
+                  className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4"
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">{sub.title}</span>
+                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${statusBadgeStyle}`}>
+                        {sub.status}
+                      </span>
+                    </div>
+
+                    {/* Swatches strip */}
+                    <div className="flex items-center gap-1.5">
+                      {sub.colors.map((hex, i) => (
+                        <div
+                          key={`${sub.id}-color-${hex}-${i}`}
+                          className="w-10 h-8 rounded border border-white/10 shadow flex items-center justify-center text-[9px] font-mono text-white/90"
+                          style={{ backgroundColor: hex }}
+                        >
+                          {hex.substring(1, 4)}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs font-mono text-[#94A3B8]">
+                      <span>Por: <strong className="text-white">{sub.author}</strong> ({sub.authorHandle})</span>
+                      <span>•</span>
+                      <span>Gamut: {sub.suggestedGamut}</span>
+                      <span>•</span>
+                      <span className="text-emerald-400">{sub.contrastScore}</span>
+                    </div>
+                  </div>
+
+                  {/* Moderation Actions */}
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-white">{sub.title}</span>
-                    <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${sub.status === 'Aprovado'
-                      ? 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30'
-                      : sub.status === 'Rejeitado'
-                        ? 'bg-red-950/50 text-red-400 border-red-500/30'
-                        : 'bg-amber-950/50 text-amber-400 border-amber-500/30'
-                      }`}>
-                      {sub.status}
-                    </span>
-                  </div>
+                    <button
+                      onClick={() => onOpenInGenerator(sub.colors)}
+                      className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Inspecionar no Gerador Procedural"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>Inspecionar</span>
+                    </button>
 
-                  {/* Swatches strip */}
-                  <div className="flex items-center gap-1.5">
-                    {sub.colors.map((hex, i) => (
-                      <div
-                        key={i}
-                        className="w-10 h-8 rounded border border-white/10 shadow flex items-center justify-center text-[9px] font-mono text-white/90"
-                        style={{ backgroundColor: hex }}
-                      >
-                        {hex.substring(1, 4)}
-                      </div>
-                    ))}
-                  </div>
+                    <button
+                      onClick={() => {
+                        onApproveSubmission(sub.id, true);
+                        showFeedback(`Paleta "${sub.title}" aprovada como Staff Pick!`);
+                      }}
+                      className="h-8 px-3 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shadow cursor-pointer"
+                      title="Destacar como Escolha da Equipe Editorial"
+                    >
+                      <Award className="w-3.5 h-3.5" />
+                      <span>Aprovar Staff Pick</span>
+                    </button>
 
-                  <div className="flex items-center gap-3 text-xs font-mono text-[#94A3B8]">
-                    <span>Por: <strong className="text-white">{sub.author}</strong> ({sub.authorHandle})</span>
-                    <span>•</span>
-                    <span>Gamut: {sub.suggestedGamut}</span>
-                    <span>•</span>
-                    <span className="text-emerald-400">{sub.contrastScore}</span>
+                    <button
+                      onClick={() => {
+                        onApproveSubmission(sub.id, false);
+                        showFeedback(`Paleta "${sub.title}" aprovada.`);
+                      }}
+                      className="h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shadow cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Aprovar</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        onRejectSubmission(sub.id);
+                        showFeedback(`Paleta "${sub.title}" rejeitada.`);
+                      }}
+                      className="h-8 px-2.5 bg-red-950/30 hover:bg-red-950/50 border border-red-500/30 text-red-400 rounded text-xs transition-colors cursor-pointer"
+                      title="Rejeitar submissão"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
                 </div>
-
-                {/* Moderation Actions */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => onOpenInGenerator(sub.colors)}
-                    className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-                    title="Inspecionar no Gerador Procedural"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    <span>Inspecionar</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onApproveSubmission(sub.id, true);
-                      showFeedback(`Paleta "${sub.title}" aprovada como Staff Pick!`);
-                    }}
-                    className="h-8 px-3 bg-purple-600 hover:bg-purple-500 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shadow cursor-pointer"
-                    title="Destacar como Escolha da Equipe Editorial"
-                  >
-                    <Award className="w-3.5 h-3.5" />
-                    <span>Aprovar Staff Pick</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onApproveSubmission(sub.id, false);
-                      showFeedback(`Paleta "${sub.title}" aprovada.`);
-                    }}
-                    className="h-8 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-semibold flex items-center gap-1.5 transition-colors shadow cursor-pointer"
-                  >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Aprovar</span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onRejectSubmission(sub.id);
-                      showFeedback(`Paleta "${sub.title}" rejeitada.`);
-                    }}
-                    className="h-8 px-2.5 bg-red-950/30 hover:bg-red-950/50 border border-red-500/30 text-red-400 rounded text-xs transition-colors cursor-pointer"
-                    title="Rejeitar submissão"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -926,8 +916,9 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
             <form onSubmit={handleCreateUserSubmit} className="mt-4 space-y-3.5">
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Nome Completo</label>
+                <label htmlFor="admin-new-user-name" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Nome Completo</label>
                 <input
+                  id="admin-new-user-name"
                   type="text"
                   required
                   placeholder="Ex: Beatriz Lima"
@@ -938,8 +929,9 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">E-mail</label>
+                <label htmlFor="admin-new-user-email" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">E-mail</label>
                 <input
+                  id="admin-new-user-email"
                   type="email"
                   required
                   placeholder="beatriz@design.com"
@@ -950,8 +942,9 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Handle</label>
+                <label htmlFor="admin-new-user-handle" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Handle</label>
                 <input
+                  id="admin-new-user-handle"
                   type="text"
                   placeholder="@beatriz_design"
                   value={newUserHandle}
@@ -961,22 +954,18 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Cargo / Nível</label>
-                <div
-                  aria-disabled="true"
-                  title="Todas as novas contas no sistema são criadas exclusivamente como Administrador."
-                  className="w-full bg-[#10141D] border border-purple-500/30 rounded-lg px-3 py-2 text-xs flex items-center justify-between select-none"
+                <label htmlFor="admin-new-user-role" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Cargo / Nível</label>
+                <select
+                  id="admin-new-user-role"
+                  value={newUserRole}
+                  onChange={(e) => setNewUserRole(e.target.value as UserRole)}
+                  className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
                 >
-                  <span className="text-purple-300 font-bold flex items-center gap-1.5">
-                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-                    Administrador
-                  </span>
-                  <span className="flex items-center gap-1 text-[10px] font-mono text-purple-400/90 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20">
-                    Padrão do Sistema
-                  </span>
-                </div>
+                  <option value="user">Usuário Comum</option>
+                  <option value="admin">Administrador</option>
+                </select>
                 <p className="text-[10px] text-[#64748B] mt-1.5 leading-relaxed">
-                  Contas criadas no sistema possuem permissão total de administração e governança.
+                  Somente administradores autenticados podem criar contas com perfil de administrador.
                 </p>
               </div>
 
@@ -1016,8 +1005,9 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
 
             <form onSubmit={handleCreateArticleSubmit} className="mt-4 space-y-3.5">
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Título do Artigo</label>
+                <label htmlFor="admin-new-article-title" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Título do Artigo</label>
                 <input
+                  id="admin-new-article-title"
                   type="text"
                   required
                   placeholder="Ex: Anatomia de um Design System com Oklch"
@@ -1028,8 +1018,9 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Categoria</label>
+                <label htmlFor="admin-new-article-category" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Categoria</label>
                 <select
+                  id="admin-new-article-category"
                   value={newArticleCategory}
                   onChange={(e) => setNewArticleCategory(e.target.value as any)}
                   className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#06B6D4]"
@@ -1043,8 +1034,9 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
               </div>
 
               <div>
-                <label className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Resumo Executivo</label>
+                <label htmlFor="admin-new-article-summary" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Resumo Executivo</label>
                 <textarea
+                  id="admin-new-article-summary"
                   rows={3}
                   required
                   placeholder="Breve resumo para os leitores e feeds de novidades..."

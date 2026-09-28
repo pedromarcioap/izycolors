@@ -2,9 +2,9 @@ export type ColorGamut = 'sRGB' | 'Display P3' | 'Rec.2020';
 
 export type ColorBlindnessType = 'protanopia' | 'deuteranopia' | 'tritanopia' | 'achromatopsia';
 
-export type UserRole = 'admin' | 'moderator' | 'editor' | 'pro' | 'user' | 'guest';
+export type UserRole = 'admin' | 'moderator' | 'editor' | 'pro' | 'user';
 
-export type NavigationTab = 
+export type NavigationTab =
   | 'generator'
   | 'explorer'
   | 'wheel'
