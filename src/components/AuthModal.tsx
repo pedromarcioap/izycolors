@@ -13,6 +13,8 @@ import {
 } from '../services/authService';
 import { getSupabaseCredentials } from '../services/supabase';
 
+import { LogoIcon } from './Logo';
+
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;

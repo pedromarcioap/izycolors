@@ -20,6 +20,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { ColorGamut, NavigationTab, AuthUser, UserRole } from '../types';
+import { LogoIcon, Logo } from './Logo';
 
 interface SidebarProps {
   currentTab: NavigationTab;
@@ -215,24 +216,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <div className="h-16 px-3 flex items-center justify-between border-b border-white/[0.06]">
           <button
             onClick={() => onTabChange('generator')}
-            className="flex items-center gap-2.5 focus:outline-none overflow-hidden text-left cursor-pointer"
-            title="Izy Colors"
+            className="flex items-center gap-2.5 focus:outline-none overflow-hidden text-left cursor-pointer group"
+            title="izycolors - Smart Procedural Harmonies"
           >
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-tr from-[#6366F1] via-[#EC4899] to-[#06B6D4] p-[1.5px] shadow-lg shadow-indigo-500/20 shrink-0 hover:scale-105 transition-transform">
-              <div className="w-full h-full bg-[#0B0F17] rounded-[6.5px] flex items-center justify-center">
-                <div className="w-3.5 h-3.5 rounded-full bg-gradient-to-br from-[#06B6D4] via-[#6366F1] to-[#EC4899]" />
-              </div>
-            </div>
-            {isExpanded && (
-              <div className="flex flex-col animate-in fade-in duration-200 truncate">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-sm font-bold tracking-tight text-white font-['Geist']">Izy Colors</span>
-                  <span className="text-[9px] font-bold tracking-widest text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-1 py-0.2 rounded uppercase">
-                    PRO
-                  </span>
-                </div>
-                <span className="text-[10px] font-mono text-[#64748B] truncate">Color Architecture</span>
-              </div>
+            {isExpanded ? (
+              <Logo size="sm" showSubtitle={true} />
+            ) : (
+              <LogoIcon className="w-8 h-8 group-hover:scale-105 transition-transform" />
             )}
           </button>
 
