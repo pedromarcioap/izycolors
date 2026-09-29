@@ -503,7 +503,18 @@ export const INITIAL_CMS_ARTICLES: CmsArticle[] = [
 
 O espaço Oklch (desenvolvido por Björn Ottosson em 2020) resolve este problema calculando a luminosidade de acordo com a resposta física dos cones da retina humana. Quando interpolamos dois tons em Oklch ou Oklab, não passamos pelo infame "vale da morte cinzento" onde as cores intermediárias perdem saturação.
 
-Além disso, com a proliferação de telas Retina e OLED com suporte ao gamut Display P3 e Rec.2020, o Oklch nos permite acessar cores 30% mais vívidas que o sRGB jamais conseguiria renderizar.`,
+## Matriz de Aplicação Sistemática de Cores (Tokens & Gamut)
+
+| Color role | Working hex | Best job | Failure mode |
+| --- | --- | --- | --- |
+| Cloud Dancer | #F0EEE9 | Large backgrounds, quiet packaging, premium editorial layouts | Beige sameness without a strong typographic anchor |
+| Carbon | #1C1B1A | Body text, navigation, media panels, product names | Visual heaviness when used without breathing room |
+| Butter | #F4D35C | Labels, highlights, packaging, calls to action | Cheap or juvenile treatment when saturated across large areas |
+| Signal Coral | #F05A47 | Beauty, food, launches, urgency, small focal accents | Alarmism and brand sameness after repeated overuse |
+| Cobalt | #315CFF | Digital products, links, technology, energetic contrast | Borrowed associations with institutional trust |
+| Aubergine | #5A294D | Luxury, depth, editorial fashion, richer dark alternatives | Costume-like purple signaling without restraint |
+
+> **Nota do Editor:** Ao aplicar tokens em telas OLED e Display P3, certifique-se de validar as taxas de contraste no algoritmo APCA para evitar fadiga ocular em leituras prolongadas.`,
     author: 'Helena Vance',
     readTime: '6 min de leitura',
     status: 'Publicado',
@@ -519,7 +530,15 @@ Além disso, com a proliferação de telas Retina e OLED com suporte ao gamut Di
     summary: 'Como o algoritmo APCA do futuro padrão WCAG 3.0 avalia o peso da fonte, espessura dos traços e polaridade fundo-texto com precisão clínica.',
     content: `O clássico teste de razão 4.5:1 do WCAG 2.1 baseia-se em matemática simples de luminância relativa. Porém, qualquer designer sênior já notou o problema: um texto fino em cinza pode passar no teste 4.5:1 e ainda ser quase ilegível, enquanto um texto ultra-negrito com razão 4.0:1 pode ser lido sem esforço.
 
-O Advanced Perceptual Contrast Algorithm (APCA) leva em consideração a frequência espacial, o tamanho da fonte em pixels, o peso (regular, medium, bold) e a polaridade da luz (texto claro em fundo escuro estimula a fóvea diferentemente de texto escuro em fundo claro). No Izy Colors, integramos tanto a checagem oficial WCAG 2.1 AA/AAA quanto a leitura de índice APCA Lc.`,
+O Advanced Perceptual Contrast Algorithm (APCA) leva em consideração a frequência espacial, o tamanho da fonte em pixels, o peso (regular, medium, bold) e a polaridade da luz (texto claro em fundo escuro estimula a fóvea diferentemente de texto escuro em fundo claro). No Izy Colors, integramos tanto a checagem oficial WCAG 2.1 AA/AAA quanto a leitura de índice APCA Lc.
+
+### Comparativo de Diretrizes de Acessibilidade
+
+| Norma | Métrica Base | Foco Principal | Status no IzyColors |
+| --- | --- | --- | --- |
+| WCAG 2.1 | Razão de Luminância (4.5:1 / 7:1) | Contraste Mínimo Universal | Nativo / Suportado |
+| WCAG 3.0 (APCA) | Frequência Espacial & Luma | Percepção Visual Real e Peso Tipográfico | Nativo / Recomendado |
+| W3C Color Module 4 | Gamut P3 & OKLCH | Fidelidade de Cores em Hardware Moderno | Nativo |`,
     author: 'Helena Vance',
     readTime: '8 min de leitura',
     status: 'Publicado',

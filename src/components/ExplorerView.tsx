@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { Palette, CmsArticle } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
+import { MarkdownRenderer } from './MarkdownRenderer';
 
 interface ExplorerViewProps {
   palettes: Palette[];
@@ -671,13 +672,9 @@ const ArticleReaderModal: React.FC<ArticleReaderModalProps> = ({ article, onClos
           "{article.summary}"
         </div>
 
-        {/* Article Main Body Content */}
-        <div className="prose prose-invert max-w-none text-sm leading-relaxed text-[#DFE2EE] space-y-4 font-['Geist']">
-          {article.content.split('\n\n').map((paragraph, idx) => (
-            <p key={`para-${article.id}-${idx}`} className="whitespace-pre-line text-[#CBD5E1]">
-              {paragraph}
-            </p>
-          ))}
+        {/* Article Main Body Content (Rendered Markdown) */}
+        <div className="prose prose-invert max-w-none text-sm font-['Geist']">
+          <MarkdownRenderer content={article.content} />
         </div>
 
         {/* Footer actions */}
