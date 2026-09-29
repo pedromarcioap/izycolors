@@ -907,6 +907,7 @@ export function App() {
           {currentTab === 'explorer' && (
             <ExplorerView
               palettes={palettes}
+              articles={articles}
               onOpenInGenerator={handleOpenInGenerator}
               onSaveToCollection={handleSaveToCollection}
               onLikePalette={handleLikePalette}
