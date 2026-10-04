@@ -1,23 +1,27 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Check } from 'lucide-react';
-import { CommunitySubmission, ColorGamut } from '../types';
+import { CommunitySubmission, ColorGamut, AuthUser } from '../types';
 
 interface SubmitPaletteModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (submission: CommunitySubmission) => void;
   defaultColors?: string[];
+  currentUser?: AuthUser;
 }
 
 export const SubmitPaletteModal: React.FC<SubmitPaletteModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  defaultColors = ['#08BBD9', '#3B82F6', '#9354F5', '#FF2A85', '#0E1726']
+  defaultColors = ['#08BBD9', '#3B82F6', '#9354F5', '#FF2A85', '#0E1726'],
+  currentUser
 }) => {
   const [title, setTitle] = useState('');
-  const [author] = useState('Helena Vance');
-  const [handle] = useState('@helena.design');
+  const authorName = currentUser?.name?.trim() || 'Criador Izy Colors';
+  const authorHandle = currentUser?.handle?.trim() || '@criador';
+  const authorAvatar = currentUser?.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(authorName)}`;
+
   const [colors, setColors] = useState(() =>
     defaultColors.map((value, index) => ({ id: `swatch-${index}`, value }))
   );
@@ -33,9 +37,9 @@ export const SubmitPaletteModal: React.FC<SubmitPaletteModalProps> = ({
     const newSub: CommunitySubmission = {
       id: `sub-${Date.now()}`,
       title,
-      author,
-      authorHandle: handle,
-      authorAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=100&auto=format&fit=crop&q=80',
+      author: authorName,
+      authorHandle: authorHandle,
+      authorAvatar: authorAvatar,
       colors: colors.map(c => c.value),
       tags: tags.split(',').map(t => t.trim()).filter(Boolean),
       submittedAt: 'Agora',

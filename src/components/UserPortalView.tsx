@@ -294,58 +294,64 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
             </button>
           </div>
 
-          <div className="space-y-3">
-            {(mySubmissions.length > 0 ? mySubmissions : safeSubmissions).map((sub) => {
-              let badgeStyle = 'bg-amber-950/50 text-amber-400 border-amber-500/30';
-              if (sub.status === 'Aprovado') {
-                badgeStyle = 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30';
-              } else if (sub.status === 'Rejeitado') {
-                badgeStyle = 'bg-red-950/50 text-red-400 border-red-500/30';
-              }
+          {mySubmissions.length === 0 ? (
+            <p className="text-xs text-[#94A3B8] py-8 text-center">
+              Nenhuma submissão enviada ainda. Submeta suas paletas para a curadoria editorial pelo botão acima.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {mySubmissions.map((sub) => {
+                let badgeStyle = 'bg-amber-950/50 text-amber-400 border-amber-500/30';
+                if (sub.status === 'Aprovado') {
+                  badgeStyle = 'bg-emerald-950/50 text-emerald-400 border-emerald-500/30';
+                } else if (sub.status === 'Rejeitado') {
+                  badgeStyle = 'bg-red-950/50 text-red-400 border-red-500/30';
+                }
 
-              return (
-                <div
-                  key={sub.id}
-                  className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-white">{sub.title}</span>
-                      <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${badgeStyle}`}>
-                        {sub.status}
-                      </span>
-                      {sub.contrastScore && (
-                        <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded flex items-center gap-1">
-                          <Sparkles className="w-3 h-3 text-purple-400" />
-                          {sub.contrastScore}
+                return (
+                  <div
+                    key={sub.id}
+                    className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                  >
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-white">{sub.title}</span>
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${badgeStyle}`}>
+                          {sub.status}
                         </span>
-                      )}
+                        {sub.contrastScore && (
+                          <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-purple-400" />
+                            {sub.contrastScore}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 mt-2">
+                        {sub.colors.map((hex) => (
+                          <div
+                            key={`${sub.id}-${hex}`}
+                            className="w-8 h-6 rounded border border-white/10"
+                            style={{ backgroundColor: hex }}
+                          />
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 mt-2">
-                      {sub.colors.map((hex) => (
-                        <div
-                          key={`${sub.id}-${hex}`}
-                          className="w-8 h-6 rounded border border-white/10"
-                          style={{ backgroundColor: hex }}
-                        />
-                      ))}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => onOpenInGenerator(sub.colors)}
+                        className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                      >
+                        <span>Abrir no Gerador</span>
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
                     </div>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => onOpenInGenerator(sub.colors)}
-                      className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-                    >
-                      <span>Abrir no Gerador</span>
-                      <ChevronRight className="w-3 h-3" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 

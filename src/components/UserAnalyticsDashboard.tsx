@@ -328,84 +328,119 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
       else srgbCount += 1;
     });
 
-    // Add baseline distribution representing real color engine conversions
-    const totalItems = Math.max(safePalettes.length + safeVaultPalettes.length + safeFavoriteColors.length, 12);
-    const calculatedOklch = Math.max(oklchCount, Math.round(totalItems * 0.38));
-    const calculatedP3 = Math.max(p3Count, Math.round(totalItems * 0.28));
-    const calculatedSrgb = Math.max(srgbCount, Math.round(totalItems * 0.22));
-    const calculatedLab = Math.max(labCount, Math.round(totalItems * 0.08));
-    const calculatedHsl = Math.max(hslCount, Math.round(totalItems * 0.04));
-
-    const totalCalculated = calculatedOklch + calculatedP3 + calculatedSrgb + calculatedLab + calculatedHsl;
+    const totalCalculated = oklchCount + p3Count + srgbCount + labCount + hslCount;
 
     return [
       {
         name: 'OKLCH (Uniforme)',
         key: 'oklch',
-        value: calculatedOklch,
-        percent: Math.round((calculatedOklch / totalCalculated) * 100),
+        value: oklchCount,
+        percent: totalCalculated > 0 ? Math.round((oklchCount / totalCalculated) * 100) : 0,
         color: '#06B6D4',
         desc: 'Espaço perceptual uniforme de ampla gama'
       },
       {
         name: 'Display P3 (Wide Gamut)',
         key: 'p3',
-        value: calculatedP3,
-        percent: Math.round((calculatedP3 / totalCalculated) * 100),
+        value: p3Count,
+        percent: totalCalculated > 0 ? Math.round((p3Count / totalCalculated) * 100) : 0,
         color: '#6366F1',
         desc: 'Monitores Apple e telas HDR modernas'
       },
       {
         name: 'sRGB (Web Standard)',
         key: 'srgb',
-        value: calculatedSrgb,
-        percent: Math.round((calculatedSrgb / totalCalculated) * 100),
+        value: srgbCount,
+        percent: totalCalculated > 0 ? Math.round((srgbCount / totalCalculated) * 100) : 0,
         color: '#10B981',
         desc: 'Padrão clássico CSS e compatibilidade universal'
       },
       {
         name: 'CIE L*a*b* / LCH',
         key: 'lab',
-        value: calculatedLab,
-        percent: Math.round((calculatedLab / totalCalculated) * 100),
+        value: labCount,
+        percent: totalCalculated > 0 ? Math.round((labCount / totalCalculated) * 100) : 0,
         color: '#EC4899',
         desc: 'Modelagem espectral e física da luz'
       },
       {
         name: 'HSL / HSV',
         key: 'hsl',
-        value: calculatedHsl,
-        percent: Math.round((calculatedHsl / totalCalculated) * 100),
+        value: hslCount,
+        percent: totalCalculated > 0 ? Math.round((hslCount / totalCalculated) * 100) : 0,
         color: '#F59E0B',
         desc: 'Coordenadas intuitivas de matiz e saturação'
       }
     ];
   }, [safePalettes, safeVaultPalettes, safeFavoriteColors]);
 
-  // 3. Growth of Palette Collections Over Time (Timeline data)
+  // 3. Growth of Palette Collections Over Time (Timeline data from real user data)
   const timelineGrowthData = useMemo(() => {
-    // Generate chronological progression aligned with user collections and historical curve
-    const months = [
-      { label: 'Abril', collections: 1, palettes: 3, tokens: 15 },
-      { label: 'Maio', collections: 2, palettes: 5, tokens: 28 },
-      { label: 'Junho', collections: 3, palettes: 8, tokens: 44 },
-      { label: 'Julho', collections: 4, palettes: 12, tokens: 68 },
-      { label: 'Agosto', collections: Math.max(safeCollections.length - 1, 5), palettes: Math.max(safePalettes.length + safeVaultPalettes.length - 2, 16), tokens: Math.max(colorAnalytics.totalTokens - 15, 88) },
-      { label: 'Setembro (Atual)', collections: safeCollections.length, palettes: safePalettes.length + safeVaultPalettes.length, tokens: colorAnalytics.totalTokens }
-    ];
+    const parseItemDate = (dateStr?: string): Date => {
+      if (!dateStr || dateStr === 'Hoje' || dateStr === 'Agora' || dateStr.startsWith('Hoje')) {
+        return new Date();
+      }
+      const direct = new Date(dateStr);
+      if (!Number.isNaN(direct.getTime())) return direct;
+      const parts = dateStr.trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const day = Number.parseInt(parts[0], 10);
+        const mStr = parts[1].slice(0, 3).toLowerCase();
+        const monthMap: Record<string, number> = {
+          jan: 0, fev: 1, mar: 2, abr: 3, mai: 4, jun: 5,
+          jul: 6, ago: 7, set: 8, out: 9, nov: 10, dez: 11
+        };
+        const month = monthMap[mStr];
+        const year = parts[2] ? Number.parseInt(parts[2], 10) : new Date().getFullYear();
+        if (!Number.isNaN(day) && month !== undefined) {
+          return new Date(year, month, day);
+        }
+      }
+      return new Date();
+    };
 
-    if (timeRange === '30d') {
-      return months.slice(-2);
-    } else if (timeRange === '90d') {
-      return months.slice(-3);
-    } else if (timeRange === '180d') {
-      return months;
+    const monthCountMap: Record<typeof timeRange, number> = {
+      '30d': 2,
+      '90d': 3,
+      '180d': 6,
+      'all': 6
+    };
+    const monthCount = monthCountMap[timeRange] ?? 6;
+    const now = new Date();
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    const buckets: Array<{ label: string; endDate: Date; collections: number; palettes: number; tokens: number }> = [];
+
+    for (let i = monthCount - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      const mIdx = (now.getMonth() - i + 12) % 12;
+      const label = i === 0 ? `${monthNames[mIdx]} (Atual)` : monthNames[mIdx];
+      buckets.push({ label, endDate: d, collections: 0, palettes: 0, tokens: 0 });
     }
-    return months;
-  }, [timeRange, safeCollections.length, safePalettes.length, safeVaultPalettes.length, colorAnalytics.totalTokens]);
+
+    return buckets.map(bucket => {
+      const matchCollections = safeCollections.filter(c => parseItemDate(c.createdAt) <= bucket.endDate).length;
+      const matchPalettes = safePalettes.filter(p => parseItemDate(p.createdAt) <= bucket.endDate);
+      const matchVault = safeVaultPalettes.filter(vp => parseItemDate(vp.createdAt) <= bucket.endDate);
+      const totalPalettesCount = matchPalettes.length + matchVault.length;
+
+      let tokenCount = 0;
+      matchPalettes.forEach(p => { tokenCount += (p.colors || []).length; });
+      matchVault.forEach(vp => { tokenCount += (vp.colors || []).length; });
+      safeFavoriteColors.forEach(f => {
+        if (parseItemDate(f.dateAdded) <= bucket.endDate) tokenCount += 1;
+      });
+
+      return {
+        label: bucket.label,
+        collections: matchCollections,
+        palettes: totalPalettesCount,
+        tokens: tokenCount
+      };
+    });
+  }, [timeRange, safeCollections, safePalettes, safeVaultPalettes, safeFavoriteColors]);
 
   const handleCopy = (hex: string) => {
-    navigator.clipboard.writeText(hex);
+    void navigator.clipboard.writeText(hex);
     setCopiedToken(hex);
     setTimeout(() => setCopiedToken(null), 1800);
   };

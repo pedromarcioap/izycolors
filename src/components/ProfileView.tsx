@@ -80,25 +80,19 @@ interface ProfileViewProps {
 
 type SubTab = 'analytics' | 'palettes' | 'submissions' | 'swatches' | 'showcase' | 'collections' | 'vault' | 'settings';
 
-const DEFAULT_BADGES = ['Curador Ativo', 'WCAG AAA Master', 'OKLCH Pioneer'];
-const DEFAULT_TITLE = 'Criador & Especialista em Cores';
-const DEFAULT_BIO = 'Criador e explorador de paletas cromáticas no ecossistema Izy Colors.';
-const DEFAULT_PALETTE_COLORS = ['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85'];
-const DEFAULT_VAULT_COLORS = ['#0B0F17', '#181C24', '#08BBD9', '#6366F1', '#EC4899'];
-
 function toArray<T>(value: T[] | undefined): T[] {
   return value ?? [];
 }
 
-/** Resolves the badge list, falling back to the default set. */
+/** Resolves the badge list safely from the database. */
 function resolveBadges(badges: string[] | undefined): string[] {
-  return badges && badges.length > 0 ? badges : DEFAULT_BADGES;
+  return badges && badges.length > 0 ? badges : [];
 }
 
-/** Resolves the profile title, falling back based on the user role. */
+/** Resolves the profile title based on real profile or role. */
 function resolveTitle(title: string | undefined, role: string | undefined): string {
   if (title) return title;
-  return role === 'admin' ? 'Administrador do Sistema & Curador' : DEFAULT_TITLE;
+  return role === 'admin' ? 'Administrador do Sistema' : 'Membro da Comunidade';
 }
 
 /** Maps a submission status to its badge classes. */
@@ -353,50 +347,58 @@ const SubmissionsPanel: React.FC<SubmissionsPanelProps> = ({ submissions, onOpen
       )}
     </div>
 
-    <div className="space-y-3 pt-2">
-      {submissions.map((sub) => (
-        <div
-          key={sub.id}
-          className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-        >
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-bold text-white">{sub.title}</span>
-              <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${submissionStatusClasses(sub.status)}`}>
-                {sub.status}
-              </span>
-              {sub.contrastScore && (
-                <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded flex items-center gap-1">
-                  <Sparkles className="w-3 h-3 text-purple-400" />
-                  {sub.contrastScore}
+    {submissions.length === 0 ? (
+      <EmptyState
+        icon={<Award className="w-8 h-8 text-amber-500/40 mx-auto mb-2" />}
+        title="Nenhuma submissão enviada ainda."
+        hint="Envie suas paletas para a curadoria da comunidade pelo botão acima ou pelo Explorer."
+      />
+    ) : (
+      <div className="space-y-3 pt-2">
+        {submissions.map((sub) => (
+          <div
+            key={sub.id}
+            className="p-4 bg-[#181C26] border border-white/[0.06] rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          >
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-bold text-white">{sub.title}</span>
+                <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${submissionStatusClasses(sub.status)}`}>
+                  {sub.status}
                 </span>
-              )}
+                {sub.contrastScore && (
+                  <span className="text-[10px] font-mono bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-purple-400" />
+                    {sub.contrastScore}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 mt-2.5">
+                {sub.colors.map((hex) => (
+                  <div
+                    key={hex}
+                    className="w-8 h-6 rounded border border-white/10"
+                    style={{ backgroundColor: hex }}
+                    title={hex}
+                  />
+                ))}
+              </div>
             </div>
 
-            <div className="flex items-center gap-1.5 mt-2.5">
-              {sub.colors.map((hex) => (
-                <div
-                  key={hex}
-                  className="w-8 h-6 rounded border border-white/10"
-                  style={{ backgroundColor: hex }}
-                  title={hex}
-                />
-              ))}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onOpenInGenerator(sub.colors)}
+                className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <span>Abrir no Gerador</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => onOpenInGenerator(sub.colors)}
-              className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <span>Abrir no Gerador</span>
-              <ChevronRight className="w-3 h-3" />
-            </button>
-          </div>
-        </div>
-      ))}
-    </div>
+        ))}
+      </div>
+    )}
   </div>
 );
 
@@ -570,7 +572,9 @@ const VaultPanel: React.FC<VaultPanelProps> = ({
 }) => {
   const handleLoadIntoGenerator = () => {
     const allColors = vaultPalettes.flatMap((p) => p.colors || []);
-    onOpenInGenerator(allColors.length > 0 ? allColors.slice(0, 5) : DEFAULT_VAULT_COLORS);
+    if (allColors.length > 0) {
+      onOpenInGenerator(allColors.slice(0, 5));
+    }
   };
 
   return (
@@ -1018,7 +1022,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [showEditModal, setShowEditModal] = useState(false);
   const [editName, setEditName] = useState(authUser?.name || userProfile?.name || '');
   const [editHandle, setEditHandle] = useState(authUser?.handle || userProfile?.handle || '');
-  const [editTitle, setEditTitle] = useState(userProfile?.title || DEFAULT_TITLE);
+  const [editTitle, setEditTitle] = useState(userProfile?.title || '');
   const [editBio, setEditBio] = useState(authUser?.bio || userProfile?.bio || '');
   const [editWebsite, setEditWebsite] = useState(userProfile?.website || '');
   const [savedFeedback, setSavedFeedback] = useState(false);
@@ -1043,7 +1047,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     setEditName(authUser?.name || userProfile?.name || '');
     setEditHandle(authUser?.handle || userProfile?.handle || '');
     setEditBio(authUser?.bio || userProfile?.bio || '');
-    setEditTitle(userProfile?.title || DEFAULT_TITLE);
+    setEditTitle(userProfile?.title || '');
     setEditWebsite(userProfile?.website || '');
     if (userProfile?.exportPreferences) {
       setTokenFormat(userProfile.exportPreferences.defaultFormat || 'OKLCH');
@@ -1109,7 +1113,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     (s.author?.toLowerCase() === authUser?.name?.toLowerCase())
   );
 
-  const visibleSubmissions = mySubmissions.length > 0 ? mySubmissions : safeSubmissions;
+  const visibleSubmissions = mySubmissions;
   const badges = resolveBadges(userProfile.badges);
 
   const renderActivePanel = () => {
@@ -1300,16 +1304,18 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 {resolveTitle(userProfile.title, authUser.role)}
               </p>
 
-              <p className="text-xs sm:text-sm text-[#94A3B8] mt-2 max-w-2xl leading-relaxed">
-                {authUser.bio || userProfile.bio || DEFAULT_BIO}
-              </p>
+              {(authUser.bio || userProfile.bio) && (
+                <p className="text-xs sm:text-sm text-[#94A3B8] mt-2 max-w-2xl leading-relaxed">
+                  {authUser.bio || userProfile.bio}
+                </p>
+              )}
 
               {/* Status and External Links */}
               <div className="flex flex-wrap items-center gap-4 mt-3 text-xs font-mono text-[#94A3B8]">
                 <span className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] ${isSupabaseConnected ? 'text-emerald-400 bg-emerald-500/10' : 'text-amber-400 bg-amber-500/10'
                   }`}>
                   <Cloud className="w-3.5 h-3.5" />
-                  {isSupabaseConnected ? 'Nuvem Supabase Ativa' : 'Armazenamento Local'}
+                  {isSupabaseConnected ? 'Nuvem Supabase Ativa' : 'Supabase Desconectado'}
                 </span>
 
                 {userProfile.website && (
@@ -1325,7 +1331,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap items-center gap-2.5 shrink-0 self-start">
             <button
-              onClick={() => onOpenInGenerator(DEFAULT_PALETTE_COLORS)}
+              onClick={() => onOpenInGenerator(['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85'])}
               className="h-9 px-3.5 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors shadow-lg shadow-indigo-600/30 cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -1364,17 +1370,19 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
         </div>
 
         {/* Badges Strip */}
-        <div className="mt-6 pt-6 border-t border-white/[0.08] flex flex-wrap items-center gap-2">
-          {badges.map((badge) => (
-            <span
-              key={badge}
-              className="px-3 py-1 rounded-full bg-[#111827] border border-white/[0.08] text-xs font-mono text-[#DFE2EE] flex items-center gap-1.5 shadow-inner"
-            >
-              <Award className="w-3.5 h-3.5 text-[#06B6D4]" />
-              <span>{badge}</span>
-            </span>
-          ))}
-        </div>
+        {badges.length > 0 && (
+          <div className="mt-6 pt-6 border-t border-white/[0.08] flex flex-wrap items-center gap-2">
+            {badges.map((badge) => (
+              <span
+                key={badge}
+                className="px-3 py-1 rounded-full bg-[#111827] border border-white/[0.08] text-xs font-mono text-[#DFE2EE] flex items-center gap-1.5 shadow-inner"
+              >
+                <Award className="w-3.5 h-3.5 text-[#06B6D4]" />
+                <span>{badge}</span>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 4 Unified Metric Cards */}

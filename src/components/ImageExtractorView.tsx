@@ -207,10 +207,10 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
           <button
             onClick={onResetCuratedImages}
             className="text-[11px] font-mono text-[#64748B] hover:text-[#94A3B8] transition-colors cursor-pointer flex items-center gap-1"
-            title="Restaurar lista original de demonstração"
+            title="Recarregar imagens curadas do banco de dados Supabase"
           >
             <RefreshCw className="w-3 h-3" />
-            <span>Restaurar Originais</span>
+            <span>Sincronizar com Banco</span>
           </button>
         </div>
 

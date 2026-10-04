@@ -617,6 +617,7 @@ const CmsTab: React.FC<{
   handleRejectSubmission: (id: string) => void;
   handleAddTag: (name: string, category: string) => void;
   handleOpenInGenerator: (colors: string[]) => void;
+  currentUser: AuthUser;
 }> = ({
   hasCmsAccess,
   isSignedIn,
@@ -629,7 +630,8 @@ const CmsTab: React.FC<{
   handleApproveSubmission,
   handleRejectSubmission,
   handleAddTag,
-  handleOpenInGenerator
+  handleOpenInGenerator,
+  currentUser
 }) => {
     if (!hasCmsAccess) {
       return (
@@ -653,6 +655,7 @@ const CmsTab: React.FC<{
         onRejectSubmission={handleRejectSubmission}
         onAddTag={handleAddTag}
         onOpenInGenerator={handleOpenInGenerator}
+        currentUser={currentUser}
       />
     );
   };
@@ -1093,6 +1096,7 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           handleRejectSubmission={handleRejectSubmission}
           handleAddTag={handleAddTag}
           handleOpenInGenerator={handleOpenInGenerator}
+          currentUser={viewer}
         />
       )}
 
@@ -1644,6 +1648,7 @@ export function App() {
         onClose={() => setIsSubmitModalOpen(false)}
         onSubmit={handleNewSubmission}
         defaultColors={activePalette}
+        currentUser={viewer}
       />
 
       {/* Role-Based Authentication & Account Management Modal */}

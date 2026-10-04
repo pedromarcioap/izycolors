@@ -588,43 +588,7 @@ export function generateSeedBasedPalette(
   return result;
 }
 
-// Skeleton for AI LLM Palette Generation (OpenAI / Vercel AI SDK Integration)
-export async function generatePaletteFromPromptAI(
-  prompt: string,
-  existingColors: ColorItem[] = []
-): Promise<string[]> {
-  /*
-   * ESQUELETO DE INTEGRAÇÃO COM LLM (OpenAI / Vercel AI SDK)
-   * 
-   * Exemplo de payload para OpenAI GPT-4o-mini ou Vercel AI SDK:
-   * 
-   * const response = await fetch('https://api.openai.com/v1/chat/completions', {
-   *   method: 'POST',
-   *   headers: {
-   *     'Content-Type': 'application/json',
-   *     'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-   *   },
-   *   body: JSON.stringify({
-   *     model: 'gpt-4o-mini',
-   *     messages: [
-   *       {
-   *         role: 'system',
-   *         content: 'Você é um especialista em Design System e teoria das cores. Retorne estritamente um JSON com uma array de 5 códigos HEX perfeitos para o conceito fornecido.'
-   *       },
-   *       { role: 'user', content: `Conceito/Mood: "${prompt}"` }
-   *     ],
-   *     response_format: { type: "json_object" }
-   *   })
-   * });
-   */
 
-  // Simulação assíncrona local com fallback para o motor semântico HSL
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      resolve(convertPromptToPalette(prompt, existingColors));
-    }, 300);
-  });
-}
 
 // Color blindness simulation algorithms (Brettel, Vienot, Mollon 1997 / Machado 2009 approximation)
 export type DeficiencyType = 'normal' | 'protanopia' | 'deuteranopia' | 'tritanopia' | 'achromatopsia';

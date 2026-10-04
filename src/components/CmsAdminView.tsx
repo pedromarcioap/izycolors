@@ -9,7 +9,7 @@ import {
   Check,
   Sparkles
 } from 'lucide-react';
-import { CmsArticle, CommunitySubmission } from '../types';
+import { CmsArticle, CommunitySubmission, AuthUser } from '../types';
 import { ArticleAiAssistantModal } from './ArticleAiAssistantModal';
 import { AiArticleResponse, slugifyArticle } from '../services/aiArticleService';
 
@@ -22,6 +22,7 @@ interface CmsAdminViewProps {
   onRejectSubmission: (id: string) => void;
   onAddTag: (name: string, category: string) => void;
   onOpenInGenerator: (colors: string[]) => void;
+  currentUser?: AuthUser;
 }
 
 export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
@@ -32,7 +33,8 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
   onApproveSubmission,
   onRejectSubmission,
   onAddTag,
-  onOpenInGenerator
+  onOpenInGenerator,
+  currentUser
 }) => {
   const [cmsTab, setCmsTab] = useState<'articles' | 'curation' | 'taxonomy' | 'analytics'>('articles');
 
@@ -60,7 +62,7 @@ export const CmsAdminView: React.FC<CmsAdminViewProps> = ({
       category: newCategory as CmsArticle['category'],
       summary: newSummary,
       content: newContent || newSummary,
-      author: 'Helena Vance',
+      author: currentUser?.name?.trim() || 'Redação Izy Colors',
       readTime: '5 min de leitura',
       status: 'Publicado',
       featured: false,
