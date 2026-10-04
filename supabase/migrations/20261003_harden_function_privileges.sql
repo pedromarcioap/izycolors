@@ -13,13 +13,17 @@
 --   · `current_user_role()` → apenas service_role (uso administrativo)
 -- ============================================================================
 
--- 1. Funções de TRIGGER: jamais devem ser invocáveis via /rest/v1/rpc.
---    O EXECUTE do trigger é verificado no momento da criação do trigger e na
---    execução (contra o dono da tabela), portanto revogar aqui é seguro.
+-- 1. Funções de TRIGGER: jamais devem ser invocáveis via /rest/v1/rpc (anon/authenticated).
+--    O EXECUTE do trigger precisa ser mantido para postgres, service_role e supabase_auth_admin.
 REVOKE ALL ON FUNCTION public.handle_new_user() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.handle_user_email_change() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.guard_profile_privileged_columns() FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.guard_palette_system_columns() FROM PUBLIC, anon, authenticated;
+
+GRANT EXECUTE ON FUNCTION public.handle_new_user() TO postgres, service_role, supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.handle_user_email_change() TO postgres, service_role, supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.guard_profile_privileged_columns() TO postgres, service_role, supabase_auth_admin;
+GRANT EXECUTE ON FUNCTION public.guard_palette_system_columns() TO postgres, service_role, supabase_auth_admin;
 
 -- 2. `current_user_role()` não é usada por nenhuma policy: reservada ao
 --    service_role para ferramentas administrativas do lado do servidor.

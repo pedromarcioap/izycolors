@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Check, X, ArrowLeftRight, CheckCircle2, ShieldCheck } from 'lucide-react';
-import { getContrastRatio, simulateColorBlindness } from '../utils/colorUtils';
+import { getContrastRatio, simulateColorBlindness, toValidColorInputValue } from '../utils/colorUtils';
 import { ColorBlindnessType } from '../types';
 
 interface AccessibilityViewProps {
@@ -224,7 +224,7 @@ export const AccessibilityView: React.FC<AccessibilityViewProps> = ({
                   <input
                     id="fg-color-input"
                     type="color"
-                    value={fgColor}
+                    value={toValidColorInputValue(fgColor)}
                     onChange={(e) => setFgColor(e.target.value)}
                     aria-label="Seletor de cor do texto"
                     className="w-8 h-8 rounded border border-white/20 bg-transparent cursor-pointer"
@@ -262,7 +262,7 @@ export const AccessibilityView: React.FC<AccessibilityViewProps> = ({
                   <input
                     id="bg-color-input"
                     type="color"
-                    value={bgColor}
+                    value={toValidColorInputValue(bgColor)}
                     onChange={(e) => setBgColor(e.target.value)}
                     aria-label="Seletor de cor de fundo"
                     className="w-8 h-8 rounded border border-white/20 bg-transparent cursor-pointer"

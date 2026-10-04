@@ -137,13 +137,17 @@ export function mapAuthUser(row: ProfileRow): AuthUser {
     };
 }
 
-/** Busca o perfil do usuário autenticado (criado automaticamente no cadastro). */
+/** Busca o perfil do usuário autenticado (criado automaticamente no cadastro). Retorna null se não houver sessão ativa. */
 export async function fetchCurrentProfile(): Promise<AuthUser | null> {
     const supabase = getSupabaseClient();
+    const { data: authData, error: authError } = await supabase.auth.getUser();
+    if (authError || !authData?.user) {
+        return null;
+    }
     const { data, error } = await supabase
         .from(TABLES.profiles)
         .select('*')
-        .eq('id', (await getCurrentAuthUserId()))
+        .eq('id', authData.user.id)
         .maybeSingle();
     if (error) throw new Error(`Falha ao carregar o perfil: ${describeError(error)}`);
     return data ? mapAuthUser(data as ProfileRow) : null;

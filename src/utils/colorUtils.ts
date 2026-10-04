@@ -21,6 +21,22 @@ export function rgbToHex(r: number, g: number, b: number): string {
   return '#' + [clamp(r), clamp(g), clamp(b)].map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
 }
 
+/**
+ * Garante que uma string de cor esteja no formato estrito aceito pelo HTML5 <input type="color">
+ * (#rrggbb em 7 caracteres). Evita avisos de conformidade CSS no console do navegador.
+ */
+export function toValidColorInputValue(hex?: string | null, fallback = '#000000'): string {
+  if (!hex || typeof hex !== 'string') return fallback;
+  let clean = hex.trim().replace(/^#+/, '');
+  if (clean.length === 3) {
+    clean = clean.split('').map(c => c + c).join('');
+  }
+  if (/^[0-9A-Fa-f]{6}$/.test(clean)) {
+    return `#${clean.toLowerCase()}`;
+  }
+  return fallback;
+}
+
 // Convert RGB to HSL
 export function rgbToHsl(r: number, g: number, b: number): { h: number; s: number; l: number } {
   const rNorm = r / 255;

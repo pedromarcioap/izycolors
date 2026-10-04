@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Copy, Check } from 'lucide-react';
-import { getColorDetails } from '../utils/colorUtils';
+import { getColorDetails, toValidColorInputValue } from '../utils/colorUtils';
 
 interface ColorSpaceLabViewProps {
   colors: string[];
@@ -109,7 +109,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
             <div className="flex items-center gap-2">
               <input
                 type="color"
-                value={activeHex}
+                value={toValidColorInputValue(activeHex)}
                 onChange={(e) => setActiveHex(e.target.value)}
                 className="w-10 h-10 rounded border border-white/20 bg-transparent cursor-pointer"
               />
@@ -227,7 +227,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
                 <div className="flex items-center gap-2 bg-[#111827] border border-white/[0.08] p-1.5 rounded-lg">
                   <input
                     type="color"
-                    value={activeHex}
+                    value={toValidColorInputValue(activeHex)}
                     onChange={(e) => setActiveHex(e.target.value)}
                     className="w-6 h-6 rounded border border-white/20 bg-transparent cursor-pointer"
                   />
@@ -240,7 +240,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
                 <div className="flex items-center gap-2 bg-[#111827] border border-white/[0.08] p-1.5 rounded-lg">
                   <input
                     type="color"
-                    value={gradientEndHex}
+                    value={toValidColorInputValue(gradientEndHex)}
                     onChange={(e) => setGradientEndHex(e.target.value)}
                     className="w-6 h-6 rounded border border-white/20 bg-transparent cursor-pointer"
                   />

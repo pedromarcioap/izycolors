@@ -26,7 +26,8 @@ import {
   getColorDetails,
   getContrastRatio,
   hslToRgb,
-  rgbToHex
+  rgbToHex,
+  toValidColorInputValue
 } from '../utils/colorUtils';
 import { WcagTooltip } from './WcagTooltip';
 import { useGenerator } from '../hooks/useGenerator';
@@ -316,7 +317,7 @@ const GeneratorColorColumn: React.FC<GeneratorColorColumnProps> = ({
               <div className="flex items-center gap-2 mb-3">
                 <input
                   type="color"
-                  value={col.hex}
+                  value={toValidColorInputValue(col.hex)}
                   onChange={(e) => handleColorUpdate(idx, e.target.value)}
                   className="w-8 h-8 rounded border border-white/20 cursor-pointer bg-transparent"
                 />
