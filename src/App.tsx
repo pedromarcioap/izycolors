@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { GeneratorView } from './components/GeneratorView';
 import { ExplorerView } from './components/ExplorerView';
@@ -18,6 +18,8 @@ import { SubmitPaletteModal } from './components/SubmitPaletteModal';
 import { SavePaletteModal } from './components/SavePaletteModal';
 import { WorkflowDock } from './components/WorkflowDock';
 import { AvatarEditorModal } from './components/AvatarEditorModal';
+import { useAppHandlers } from './hooks/useAppHandlers';
+import { useAppData } from './hooks/useAppData';
 
 import {
   NavigationTab,
@@ -34,50 +36,15 @@ import {
   UserProfile,
   CuratedDemoImage,
   AuthUser,
-  AuditLogItem
+  UserRole,
+  AuditLogItem,
+  ColorFormat,
+  NamingConvention,
+  ProjectSlot
 } from './types';
 
-import {
-  INITIAL_PALETTES,
-  INITIAL_USER_PROFILE,
-  INITIAL_PROJECTS,
-  INITIAL_COLLECTIONS,
-  INITIAL_FAVORITE_COLORS,
-  INITIAL_VAULT_PALETTES,
-  INITIAL_CMS_ARTICLES,
-  INITIAL_SUBMISSIONS,
-  INITIAL_TAXONOMY_TAGS
-} from './data/initialData';
-
-import {
-  loadCuratedImages,
-  saveCuratedImage,
-  deleteCuratedImage,
-  resetCuratedImages,
-  recordPaletteFork,
-  isSupabaseConfigured,
-  getSupabaseClient
-} from './services/supabase';
-
-import {
-  uploadUserAvatar,
-  removeUserAvatar,
-  updateProfileAvatar,
-  processAvatarImage,
-  blobToDataUrl,
-  getInitialsAvatarUrl
-} from './services/avatarService';
-
-import {
-  getStoredUsers,
-  saveStoredUsers,
-  getCurrentAuthUser,
-  setCurrentAuthUser,
-  getStoredAuditLogs,
-  checkCurrentSession,
-  logoutAuthUser,
-  initAuthListener
-} from './services/authService';
+import { isSupabaseConfigured } from './services/supabase';
+import { CreatorProfile, TaxonomyTag } from './services/db';
 
 import {
   Menu,
@@ -89,7 +56,9 @@ import {
   Disc3,
   SlidersHorizontal,
   Bookmark,
-  AlertTriangle
+  AlertTriangle,
+  Lock,
+  LogIn
 } from 'lucide-react';
 
 const DEFAULT_PALETTE = ['#1A1A1A', '#2563EB', '#38BDF8', '#F1F5F9', '#FFFFFF'];
@@ -110,31 +79,116 @@ const TAB_TITLES: Record<Exclude<NavigationTab, 'generator'>, string> = {
   profile: 'Perfil de Criador'
 };
 
+/** Abas liberadas para visitantes sem sessão. */
+const PUBLIC_TABS: ReadonlySet<NavigationTab> = new Set<NavigationTab>(['generator', 'explorer']);
+
+/** Papéis com acesso ao CMS Editorial e à curadoria de conteúdo. */
+const CMS_ROLES: ReadonlySet<UserRole> = new Set<UserRole>(['admin', 'moderator', 'editor']);
+
+/** Indica se o papel informado pode acessar o CMS Editorial. */
+function canAccessCms(role: UserRole): boolean {
+  return CMS_ROLES.has(role);
+}
+
+/**
+ * Identidade visual usada APENAS para renderizar a interface enquanto o
+ * visitante está deslogado. Não representa uma conta real e nunca é
+ * persistida: qualquer ação que exija sessão abre o modal de autenticação.
+ */
+const ANONYMOUS_VIEWER: AuthUser = {
+  id: '',
+  email: '',
+  name: 'Visitante',
+  handle: '@visitante',
+  role: 'user',
+  avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=izycolors',
+  bio: '',
+  status: 'active',
+  createdAt: '',
+  lastLoginAt: '',
+  palettesCount: 0,
+  favoritesCount: 0,
+  submissionsCount: 0
+};
+
 type GenerateInputMode = 'procedural' | 'image';
 type RefineTool = 'wheel' | 'lab';
 
-const readStoredPalette = (): string[] => {
-  try {
-    const raw = localStorage.getItem('izycolors_active_palette');
-    if (raw) {
-      const parsed: unknown = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0 && parsed.every(c => typeof c === 'string')) {
-        return parsed as string[];
-      }
-    }
-  } catch (err) {
-    console.error('Erro ao ler izycolors_active_palette:', err);
-  }
-  return DEFAULT_PALETTE;
-};
+/**
+ * Resolve a aba efetiva considerando as regras de RBAC (sessão + papel).
+ * Extraído do componente para manter a complexidade cognitiva baixa.
+ *
+ * As três guardas são avaliadas nesta ordem sobre a aba recebida e a última
+ * que casar prevalece — exatamente o efeito de chamar `setCurrentTab` em
+ * sequência dentro do efeito (React aplica a última atualização do lote).
+ */
+function resolveGuardedTab(
+  currentTab: NavigationTab,
+  isSignedIn: boolean,
+  role: UserRole
+): NavigationTab {
+  let resolvedTab = currentTab;
+  if (!isSignedIn && !PUBLIC_TABS.has(currentTab)) resolvedTab = 'generator';
+  if (currentTab === 'admin' && role !== 'admin') resolvedTab = 'profile';
+  if (currentTab === 'cms' && !canAccessCms(role)) resolvedTab = 'profile';
+  return resolvedTab;
+}
 
-const readStoredStage = (): StudioStage => {
-  const raw = localStorage.getItem('izycolors_active_stage');
-  if (raw === 'refine' || raw === 'audit' || raw === 'export') {
-    return raw;
-  }
-  return 'generate';
-};
+/**
+ * Normaliza as preferências de exportação persistidas no perfil do criador,
+ * aplicando os padrões da aplicação para cada campo nunca salvo.
+ */
+function buildExportPreferences(creatorProfile: CreatorProfile | null): UserProfile['exportPreferences'] {
+  const preferences = (creatorProfile?.exportPreferences ?? {}) as Partial<UserProfile['exportPreferences']>;
+  return {
+    defaultFormat: (preferences.defaultFormat as ColorFormat) ?? 'OKLCH',
+    variablePrefix: preferences.variablePrefix ?? 'sys-color',
+    namingConvention: (preferences.namingConvention as NamingConvention) ?? 'kebab-case',
+    includeComments: preferences.includeComments ?? true
+  };
+}
+
+/** Calcula o perfil derivado do criador a partir dos dados reais. */
+function buildUserProfile(
+  creatorProfile: CreatorProfile | null,
+  viewer: AuthUser,
+  myPalettes: Palette[],
+  articles: CmsArticle[],
+  submissions: CommunitySubmission[]
+): UserProfile {
+  const likedByOthers = myPalettes.reduce((total, palette) => total + (palette.likes ?? 0), 0);
+  const forks = myPalettes.filter((palette) => palette.isFork).length;
+  const staffPicks = myPalettes.filter((palette) => palette.staffPick).length;
+  const myArticles = articles.filter((article) => article.author === creatorProfile?.name).length;
+  const approved = submissions.filter((submission) => submission.status === 'Aprovado').length;
+  const decided = submissions.filter((submission) => submission.status !== 'Pendente').length;
+  const approvalRate = decided > 0 ? `${((approved / decided) * 100).toFixed(1)}%` : '—';
+
+  return {
+    name: creatorProfile?.name ?? viewer.name,
+    handle: creatorProfile?.handle ?? viewer.handle,
+    title: creatorProfile?.title ?? '',
+    bio: creatorProfile?.bio ?? '',
+    avatar: creatorProfile?.avatar ?? viewer.avatar,
+    isPro: creatorProfile?.isPro ?? false,
+    website: creatorProfile?.website ?? '',
+    github: creatorProfile?.github ?? '',
+    figma: creatorProfile?.figma ?? '',
+    behance: creatorProfile?.behance ?? '',
+    badges: creatorProfile?.badges ?? [],
+    stats: {
+      palettesCreated: myPalettes.length,
+      palettesCreatedMonthlyDelta: 0,
+      clonesAndForks: String(forks),
+      globalRank: '—',
+      likesReceived: likedByOthers.toLocaleString('pt-BR'),
+      approvalRate,
+      cmsArticlesCount: myArticles,
+      editorialFeaturedCount: staffPicks
+    },
+    exportPreferences: buildExportPreferences(creatorProfile)
+  };
+}
 
 const GenerateInputModeBar: React.FC<{
   mode: GenerateInputMode;
@@ -238,85 +292,1024 @@ const ExportStagePanel: React.FC<{
   </div>
 );
 
+const SignInGate: React.FC<{ onOpenAuth: () => void; title: string; description: string }> = ({
+  onOpenAuth,
+  title,
+  description
+}) => (
+  <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
+    <Lock className="w-12 h-12 text-[#06B6D4] mx-auto mb-4" />
+    <h3 className="text-lg font-bold text-white font-['Geist']">{title}</h3>
+    <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">{description}</p>
+    <button
+      onClick={onOpenAuth}
+      className="px-4 py-2 bg-[#6366F1] text-white font-semibold text-xs rounded-lg hover:bg-[#5254E0] transition-colors cursor-pointer inline-flex items-center gap-2"
+    >
+      <LogIn className="w-4 h-4" />
+      Entrar ou criar conta
+    </button>
+  </div>
+);
+
+/** Painel exibido quando a aba exige privilégios que a sessão não possui. */
+const AccessDeniedPanel: React.FC<{
+  iconClassName: string;
+  title: string;
+  description: string;
+  isSignedIn: boolean;
+  onOpenAuth: () => void;
+  onNavigateToProfile: () => void;
+}> = ({ iconClassName, title, description, isSignedIn, onOpenAuth, onNavigateToProfile }) => (
+  <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
+    <ShieldAlert className={`w-12 h-12 ${iconClassName} mx-auto mb-4`} />
+    <h3 className="text-lg font-bold text-white font-['Geist']">{title}</h3>
+    <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">{description}</p>
+    <button
+      onClick={isSignedIn ? onNavigateToProfile : onOpenAuth}
+      className="px-4 py-2 bg-[#6366F1] text-white font-semibold text-xs rounded-lg hover:bg-[#6366F1]/90 transition-colors cursor-pointer"
+    >
+      {isSignedIn ? 'Ir para Meu Perfil & Painel' : 'Entrar para continuar'}
+    </button>
+  </div>
+);
+
+/** Palco "Gerar" do Estúdio: entrada procedural ou extração de imagem. */
+const GenerateStageContent: React.FC<{
+  generateInputMode: GenerateInputMode;
+  setGenerateInputMode: (mode: GenerateInputMode) => void;
+  activePalette: string[];
+  setActivePalette: (colors: string[]) => void;
+  setActiveStage: (stage: StudioStage) => void;
+  curatedImages: CuratedDemoImage[];
+  isSupabaseConnected: boolean;
+  handleSaveToFavorites: (hex: string, name: string) => void;
+  handleSaveCuratedImage: (img: CuratedDemoImage) => void;
+  handleDeleteCuratedImage: (id: string) => void;
+  handleResetCuratedImages: () => void;
+  handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
+  handleOpenExport: (colors?: string[], title?: string) => void;
+}> = ({
+  generateInputMode,
+  setGenerateInputMode,
+  activePalette,
+  setActivePalette,
+  setActiveStage,
+  curatedImages,
+  isSupabaseConnected,
+  handleSaveToFavorites,
+  handleSaveCuratedImage,
+  handleDeleteCuratedImage,
+  handleResetCuratedImages,
+  handleOpenSavePaletteModal,
+  handleOpenExport
+}) => (
+    <>
+      <GenerateInputModeBar mode={generateInputMode} onChange={setGenerateInputMode} />
+      {generateInputMode === 'procedural' ? (
+        <GeneratorView
+          colors={activePalette}
+          onColorsChange={setActivePalette}
+          onSaveToFavorites={handleSaveToFavorites}
+          onSaveToCollection={handleOpenSavePaletteModal}
+          onOpenExport={handleOpenExport}
+        />
+      ) : (
+        <ImageExtractorView
+          curatedImages={curatedImages}
+          onApplyToActivePalette={setActivePalette}
+          onProceedToRefine={() => setActiveStage('refine')}
+          onSaveCuratedImage={handleSaveCuratedImage}
+          onDeleteCuratedImage={handleDeleteCuratedImage}
+          onResetCuratedImages={handleResetCuratedImages}
+          isSupabaseConnected={isSupabaseConnected}
+        />
+      )}
+    </>
+  );
+
+/** Palco "Refinar" do Estúdio: roda harmônica ou Color Space Lab. */
+const RefineStageContent: React.FC<{
+  refineTool: RefineTool;
+  setRefineTool: (tool: RefineTool) => void;
+  activePalette: string[];
+  setActivePalette: (colors: string[]) => void;
+}> = ({ refineTool, setRefineTool, activePalette, setActivePalette }) => (
+  <>
+    <RefineToolTabs tool={refineTool} onChange={setRefineTool} />
+    {refineTool === 'wheel' ? (
+      <HarmonicWheelView colors={activePalette} onColorsChange={setActivePalette} />
+    ) : (
+      <ColorSpaceLabView colors={activePalette} onColorsChange={setActivePalette} />
+    )}
+  </>
+);
+
+/** Conteúdo do Estúdio: renderiza apenas o palco ativo. */
+const StudioContent: React.FC<{
+  activeStage: StudioStage;
+  activePalette: string[];
+  generateInputMode: GenerateInputMode;
+  refineTool: RefineTool;
+  curatedImages: CuratedDemoImage[];
+  isSupabaseConnected: boolean;
+  setActivePalette: (colors: string[]) => void;
+  setActiveStage: (stage: StudioStage) => void;
+  setGenerateInputMode: (mode: GenerateInputMode) => void;
+  setRefineTool: (tool: RefineTool) => void;
+  handleSaveToFavorites: (hex: string, name: string) => void;
+  handleSaveCuratedImage: (img: CuratedDemoImage) => void;
+  handleDeleteCuratedImage: (id: string) => void;
+  handleResetCuratedImages: () => void;
+  handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
+  handleOpenExport: (colors?: string[], title?: string) => void;
+  openSavePaletteModal: () => void;
+  openExportModal: () => void;
+}> = ({
+  activeStage,
+  activePalette,
+  generateInputMode,
+  refineTool,
+  curatedImages,
+  isSupabaseConnected,
+  setActivePalette,
+  setActiveStage,
+  setGenerateInputMode,
+  setRefineTool,
+  handleSaveToFavorites,
+  handleSaveCuratedImage,
+  handleDeleteCuratedImage,
+  handleResetCuratedImages,
+  handleOpenSavePaletteModal,
+  handleOpenExport,
+  openSavePaletteModal,
+  openExportModal
+}) => (
+    <div className="flex-1 flex flex-col min-h-0">
+      {activeStage === 'generate' && (
+        <GenerateStageContent
+          generateInputMode={generateInputMode}
+          setGenerateInputMode={setGenerateInputMode}
+          activePalette={activePalette}
+          setActivePalette={setActivePalette}
+          setActiveStage={setActiveStage}
+          curatedImages={curatedImages}
+          isSupabaseConnected={isSupabaseConnected}
+          handleSaveToFavorites={handleSaveToFavorites}
+          handleSaveCuratedImage={handleSaveCuratedImage}
+          handleDeleteCuratedImage={handleDeleteCuratedImage}
+          handleResetCuratedImages={handleResetCuratedImages}
+          handleOpenSavePaletteModal={handleOpenSavePaletteModal}
+          handleOpenExport={handleOpenExport}
+        />
+      )}
+
+      {activeStage === 'refine' && (
+        <RefineStageContent
+          refineTool={refineTool}
+          setRefineTool={setRefineTool}
+          activePalette={activePalette}
+          setActivePalette={setActivePalette}
+        />
+      )}
+
+      {activeStage === 'audit' && (
+        <AccessibilityView colors={activePalette} onColorsChange={setActivePalette} />
+      )}
+
+      {activeStage === 'export' && (
+        <ExportStagePanel colors={activePalette} onSave={openSavePaletteModal} onExport={openExportModal} />
+      )}
+    </div>
+  );
+
+/** Aba Comunidade & Forks. */
+const ExplorerTab: React.FC<{
+  palettes: Palette[];
+  articles: CmsArticle[];
+  isSignedIn: boolean;
+  setIsSubmitModalOpen: (open: boolean) => void;
+  requireSession: () => boolean;
+  handleOpenInGenerator: (colors: string[]) => void;
+  handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
+  handleLikePalette: (paletteId: string) => void;
+  handleForkPalette: (palette: Palette) => void;
+  handleSendToAudit: (colors: string[]) => void;
+}> = ({
+  palettes,
+  articles,
+  isSignedIn,
+  setIsSubmitModalOpen,
+  requireSession,
+  handleOpenInGenerator,
+  handleOpenSavePaletteModal,
+  handleLikePalette,
+  handleForkPalette,
+  handleSendToAudit
+}) => (
+    <ExplorerView
+      palettes={palettes}
+      articles={articles}
+      onOpenInGenerator={handleOpenInGenerator}
+      onSaveToCollection={handleOpenSavePaletteModal}
+      onLikePalette={handleLikePalette}
+      onForkPalette={handleForkPalette}
+      onOpenSubmissionModal={() => (isSignedIn ? setIsSubmitModalOpen(true) : requireSession())}
+      onSendToAudit={handleSendToAudit}
+    />
+  );
+
+/** Aba Cofre de Projetos & Coleções. */
+const ProjectsTab: React.FC<{
+  isSignedIn: boolean;
+  openAuth: () => void;
+  projects: ProjectWorkspace[];
+  collections: CollectionBoard[];
+  favoriteColors: FavoriteColor[];
+  vaultPalettes: VaultPalette[];
+  showToast: (message: string, type?: 'success' | 'error') => void;
+  handleOpenInGenerator: (colors: string[]) => void;
+  handleOpenExport: (colors?: string[], title?: string) => void;
+  handleCreateProject: (project: ProjectWorkspace) => void;
+  handleDeleteProject: (id: string) => void;
+  handleCreateCollection: (collection: CollectionBoard) => void;
+  handleSavePaletteToProject: (projectId: string, palette: ProjectPalette) => void;
+  handleDeleteProjectPalette: (projectId: string, paletteId: string) => void;
+  handleSavePaletteToVault: (palette: VaultPalette) => void;
+  handleDeleteVaultPalette: (id: string) => void;
+  handleDeleteFavoriteColor: (id: string) => void;
+  handleDeleteCollection: (id: string) => void;
+  handleSendToAudit: (colors: string[]) => void;
+  handleAddColorsToProject: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => void;
+  handleAddColorsToCollection: (collectionId: string, colors: string[]) => void;
+}> = ({
+  isSignedIn,
+  openAuth,
+  projects,
+  collections,
+  favoriteColors,
+  vaultPalettes,
+  showToast,
+  handleOpenInGenerator,
+  handleOpenExport,
+  handleCreateProject,
+  handleDeleteProject,
+  handleCreateCollection,
+  handleSavePaletteToProject,
+  handleDeleteProjectPalette,
+  handleSavePaletteToVault,
+  handleDeleteVaultPalette,
+  handleDeleteFavoriteColor,
+  handleDeleteCollection,
+  handleSendToAudit,
+  handleAddColorsToProject,
+  handleAddColorsToCollection
+}) => {
+    if (!isSignedIn) {
+      return (
+        <SignInGate
+          onOpenAuth={openAuth}
+          title="Cofre de Projetos"
+          description="Seus projetos, coleções, paletas privadas e amostras favoritas ficam vinculados à sua conta no Supabase."
+        />
+      );
+    }
+    return (
+      <ProjectsVaultView
+        projects={projects}
+        collections={collections}
+        favoriteColors={favoriteColors}
+        vaultPalettes={vaultPalettes}
+        onOpenInGenerator={handleOpenInGenerator}
+        onOpenExport={handleOpenExport}
+        onCreateProject={handleCreateProject}
+        onDeleteProject={handleDeleteProject}
+        onCreateCollection={handleCreateCollection}
+        onSavePaletteToProject={handleSavePaletteToProject}
+        onDeletePaletteFromProject={handleDeleteProjectPalette}
+        onSavePaletteToVault={handleSavePaletteToVault}
+        onDeleteVaultPalette={handleDeleteVaultPalette}
+        onDeleteFavoriteColor={handleDeleteFavoriteColor}
+        onDeleteCollection={handleDeleteCollection}
+        onSendToAudit={handleSendToAudit}
+        onAddColorsToProject={handleAddColorsToProject}
+        onAddColorsToCollection={handleAddColorsToCollection}
+        showToast={showToast}
+      />
+    );
+  };
+
+/** Aba CMS Editorial & Curadoria. */
+const CmsTab: React.FC<{
+  hasCmsAccess: boolean;
+  isSignedIn: boolean;
+  openAuth: () => void;
+  onNavigateToProfile: () => void;
+  articles: CmsArticle[];
+  submissions: CommunitySubmission[];
+  taxonomyTags: TaxonomyTag[];
+  handleCreateArticle: (article: CmsArticle) => void;
+  handleApproveSubmission: (id: string, asStaffPick: boolean) => void;
+  handleRejectSubmission: (id: string) => void;
+  handleAddTag: (name: string, category: string) => void;
+  handleOpenInGenerator: (colors: string[]) => void;
+}> = ({
+  hasCmsAccess,
+  isSignedIn,
+  openAuth,
+  onNavigateToProfile,
+  articles,
+  submissions,
+  taxonomyTags,
+  handleCreateArticle,
+  handleApproveSubmission,
+  handleRejectSubmission,
+  handleAddTag,
+  handleOpenInGenerator
+}) => {
+    if (!hasCmsAccess) {
+      return (
+        <AccessDeniedPanel
+          iconClassName="text-amber-400"
+          title="Acesso Restrito"
+          description="O painel CMS Editorial e curadoria de conteúdo é restrito a editores e administradores credenciados."
+          isSignedIn={isSignedIn}
+          onOpenAuth={openAuth}
+          onNavigateToProfile={onNavigateToProfile}
+        />
+      );
+    }
+    return (
+      <CmsAdminView
+        articles={articles}
+        submissions={submissions}
+        tags={taxonomyTags}
+        onCreateArticle={handleCreateArticle}
+        onApproveSubmission={handleApproveSubmission}
+        onRejectSubmission={handleRejectSubmission}
+        onAddTag={handleAddTag}
+        onOpenInGenerator={handleOpenInGenerator}
+      />
+    );
+  };
+
+/** Aba Painel Administrativo & Governança. */
+const AdminTab: React.FC<{
+  authUser: AuthUser | null;
+  isSignedIn: boolean;
+  openAuth: () => void;
+  onNavigateToProfile: () => void;
+  usersList: AuthUser[];
+  setUsersList: (users: AuthUser[]) => void;
+  submissions: CommunitySubmission[];
+  articles: CmsArticle[];
+  auditLogs: AuditLogItem[];
+  isSupabaseConnected: boolean;
+  handleApproveSubmission: (id: string, asStaffPick: boolean) => void;
+  handleRejectSubmission: (id: string) => void;
+  handleCreateArticle: (article: CmsArticle) => void;
+  handleDeleteArticle: (id: string) => void;
+  handleOpenInGenerator: (colors: string[]) => void;
+}> = ({
+  authUser,
+  isSignedIn,
+  openAuth,
+  onNavigateToProfile,
+  usersList,
+  setUsersList,
+  submissions,
+  articles,
+  auditLogs,
+  isSupabaseConnected,
+  handleApproveSubmission,
+  handleRejectSubmission,
+  handleCreateArticle,
+  handleDeleteArticle,
+  handleOpenInGenerator
+}) => {
+    if (authUser?.role !== 'admin') {
+      return (
+        <AccessDeniedPanel
+          iconClassName="text-purple-400"
+          title="Painel Restrito a Administradores"
+          description="Esta área contém governança de usuários, logs de auditoria e configurações de persistência na nuvem. Privilégios de administrador são obrigatórios."
+          isSignedIn={isSignedIn}
+          onOpenAuth={openAuth}
+          onNavigateToProfile={onNavigateToProfile}
+        />
+      );
+    }
+    return (
+      <AdminAreaView
+        currentUser={authUser}
+        usersList={usersList}
+        onUpdateUsersList={setUsersList}
+        submissions={submissions}
+        onApproveSubmission={handleApproveSubmission}
+        onRejectSubmission={handleRejectSubmission}
+        articles={articles}
+        onCreateArticle={handleCreateArticle}
+        onDeleteArticle={handleDeleteArticle}
+        auditLogs={auditLogs}
+        onOpenInGenerator={handleOpenInGenerator}
+        onNavigateToUserPortal={onNavigateToProfile}
+        isSupabaseConnected={isSupabaseConnected}
+      />
+    );
+  };
+
+/** Aba Área do Usuário & Criador. */
+const UserDashboardTab: React.FC<{
+  authUser: AuthUser | null;
+  isSignedIn: boolean;
+  openAuth: () => void;
+  onNavigateToProfile: () => void;
+  myPalettes: Palette[];
+  vaultPalettes: VaultPalette[];
+  projects: ProjectWorkspace[];
+  collections: CollectionBoard[];
+  favoriteColors: FavoriteColor[];
+  submissions: CommunitySubmission[];
+  handleOpenInGenerator: (colors: string[]) => void;
+  handleOpenExport: (colors?: string[], title?: string) => void;
+}> = ({
+  authUser,
+  isSignedIn,
+  openAuth,
+  onNavigateToProfile,
+  myPalettes,
+  vaultPalettes,
+  projects,
+  collections,
+  favoriteColors,
+  submissions,
+  handleOpenInGenerator,
+  handleOpenExport
+}) => {
+    if (!isSignedIn || !authUser) {
+      return (
+        <SignInGate
+          onOpenAuth={openAuth}
+          title="Área do Criador"
+          description="Entre para acompanhar suas métricas reais de criação, forks e curadoria."
+        />
+      );
+    }
+    return (
+      <UserAnalyticsDashboard
+        palettes={myPalettes}
+        vaultPalettes={vaultPalettes}
+        projects={projects}
+        collections={collections}
+        favoriteColors={favoriteColors}
+        submissions={submissions}
+        onOpenInGenerator={handleOpenInGenerator}
+        onOpenExport={handleOpenExport}
+        onNavigateToProfile={onNavigateToProfile}
+      />
+    );
+  };
+
+/** Aba Perfil de Criador. */
+const ProfileTab: React.FC<{
+  authUser: AuthUser | null;
+  openAuth: () => void;
+  userProfile: UserProfile;
+  myPalettes: Palette[];
+  projects: ProjectWorkspace[];
+  collections: CollectionBoard[];
+  favoriteColors: FavoriteColor[];
+  vaultPalettes: VaultPalette[];
+  submissions: CommunitySubmission[];
+  isSupabaseConnected: boolean;
+  showToast: (message: string, type?: 'success' | 'error') => void;
+  setIsAvatarEditorOpen: (open: boolean) => void;
+  setIsSubmitModalOpen: (open: boolean) => void;
+  handleOpenInGenerator: (colors: string[]) => void;
+  handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
+  handleOpenExport: (colors?: string[], title?: string) => void;
+  handleUpdateProfile: (updated: Partial<UserProfile>) => void;
+  handleDeleteFavoriteColor: (id: string) => void;
+  handleDeleteVaultPalette: (id: string) => void;
+  handleDeleteCollection: (id: string) => void;
+  handleAddColorsToProject: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => void;
+  handleAddColorsToCollection: (collectionId: string, colors: string[]) => void;
+  handleCreateProject: (project: ProjectWorkspace) => void;
+  handleCreateCollection: (collection: CollectionBoard) => void;
+  handleLogout: () => void;
+}> = ({
+  authUser,
+  openAuth,
+  userProfile,
+  myPalettes,
+  projects,
+  collections,
+  favoriteColors,
+  vaultPalettes,
+  submissions,
+  isSupabaseConnected,
+  showToast,
+  setIsAvatarEditorOpen,
+  setIsSubmitModalOpen,
+  handleOpenInGenerator,
+  handleOpenSavePaletteModal,
+  handleOpenExport,
+  handleUpdateProfile,
+  handleDeleteFavoriteColor,
+  handleDeleteVaultPalette,
+  handleDeleteCollection,
+  handleAddColorsToProject,
+  handleAddColorsToCollection,
+  handleCreateProject,
+  handleCreateCollection,
+  handleLogout
+}) => {
+    if (!authUser) {
+      return (
+        <SignInGate
+          onOpenAuth={openAuth}
+          title="Perfil de Criador"
+          description="Crie sua conta para editar seu perfil, preferências de exportação e portfólio."
+        />
+      );
+    }
+    return (
+      <ProfileView
+        authUser={authUser}
+        userProfile={userProfile}
+        palettes={myPalettes}
+        projects={projects}
+        collections={collections}
+        favoriteColors={favoriteColors}
+        vaultPalettes={vaultPalettes}
+        submissions={submissions}
+        onOpenInGenerator={handleOpenInGenerator}
+        onSaveToCollection={handleOpenSavePaletteModal}
+        onOpenExport={handleOpenExport}
+        onUpdateProfile={handleUpdateProfile}
+        onDeleteFavoriteColor={handleDeleteFavoriteColor}
+        onDeleteVaultPalette={handleDeleteVaultPalette}
+        onDeleteCollection={handleDeleteCollection}
+        onAddColorsToProject={handleAddColorsToProject}
+        onAddColorsToCollection={handleAddColorsToCollection}
+        onCreateProject={handleCreateProject}
+        onCreateCollection={handleCreateCollection}
+        showToast={showToast}
+        onOpenAuthModal={openAuth}
+        onOpenAvatarEditor={() => setIsAvatarEditorOpen(true)}
+        onLogout={handleLogout}
+        onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
+        isSupabaseConnected={isSupabaseConnected}
+      />
+    );
+  };
+
+interface MainContentRouterProps {
+  currentTab: NavigationTab;
+  viewer: AuthUser;
+  authUser: AuthUser | null;
+  isSignedIn: boolean;
+  activeStage: StudioStage;
+  activePalette: string[];
+  generateInputMode: GenerateInputMode;
+  refineTool: RefineTool;
+  curatedImages: CuratedDemoImage[];
+  palettes: Palette[];
+  myPalettes: Palette[];
+  articles: CmsArticle[];
+  submissions: CommunitySubmission[];
+  taxonomyTags: TaxonomyTag[];
+  projects: ProjectWorkspace[];
+  collections: CollectionBoard[];
+  favoriteColors: FavoriteColor[];
+  vaultPalettes: VaultPalette[];
+  usersList: AuthUser[];
+  auditLogs: AuditLogItem[];
+  userProfile: UserProfile;
+  isSupabaseConnected: boolean;
+  setActivePalette: (colors: string[]) => void;
+  setActiveStage: (stage: StudioStage) => void;
+  setGenerateInputMode: (mode: GenerateInputMode) => void;
+  setRefineTool: (tool: RefineTool) => void;
+  setCurrentTab: (tab: NavigationTab) => void;
+  setUsersList: (users: AuthUser[]) => void;
+  setIsAuthModalOpen: (open: boolean) => void;
+  setIsSubmitModalOpen: (open: boolean) => void;
+  setIsAvatarEditorOpen: (open: boolean) => void;
+  requireSession: () => boolean;
+  showToast: (message: string, type?: 'success' | 'error') => void;
+  handleOpenInGenerator: (colors: string[]) => void;
+  handleSendToAudit: (colors: string[]) => void;
+  handleOpenExport: (colors?: string[], title?: string) => void;
+  handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
+  handleSaveToFavorites: (hex: string, name: string) => Promise<void>;
+  handleSaveCuratedImage: (img: CuratedDemoImage) => Promise<void>;
+  handleDeleteCuratedImage: (id: string) => Promise<void>;
+  handleResetCuratedImages: () => Promise<void>;
+  handleLikePalette: (paletteId: string) => Promise<void>;
+  handleForkPalette: (palette: Palette) => Promise<void>;
+  handleCreateProject: (project: ProjectWorkspace) => Promise<void>;
+  handleDeleteProject: (id: string) => Promise<void>;
+  handleCreateCollection: (collection: CollectionBoard) => Promise<void>;
+  handleSavePaletteToProject: (projectId: string, palette: ProjectPalette) => Promise<void>;
+  handleDeleteProjectPalette: (projectId: string, paletteId: string) => Promise<void>;
+  handleSavePaletteToVault: (palette: VaultPalette) => Promise<void>;
+  handleDeleteVaultPalette: (id: string) => Promise<void>;
+  handleDeleteFavoriteColor: (id: string) => Promise<void>;
+  handleDeleteCollection: (id: string) => Promise<void>;
+  handleAddColorsToProject: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => Promise<void>;
+  handleAddColorsToCollection: (collectionId: string, colors: string[]) => Promise<void>;
+  handleCreateArticle: (article: CmsArticle) => Promise<void>;
+  handleDeleteArticle: (id: string) => Promise<void>;
+  handleApproveSubmission: (id: string, asStaffPick: boolean) => Promise<void>;
+  handleRejectSubmission: (id: string) => Promise<void>;
+  handleAddTag: (name: string, category: string) => Promise<void>;
+  handleUpdateProfile: (updated: Partial<UserProfile>) => Promise<void>;
+  handleLogout: () => Promise<void>;
+}
+
+const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
+  const {
+    currentTab,
+    viewer,
+    authUser,
+    isSignedIn,
+    activeStage,
+    activePalette,
+    generateInputMode,
+    refineTool,
+    curatedImages,
+    palettes,
+    myPalettes,
+    articles,
+    submissions,
+    taxonomyTags,
+    projects,
+    collections,
+    favoriteColors,
+    vaultPalettes,
+    usersList,
+    auditLogs,
+    userProfile,
+    isSupabaseConnected,
+    setActivePalette,
+    setActiveStage,
+    setGenerateInputMode,
+    setRefineTool,
+    setCurrentTab,
+    setUsersList,
+    setIsAuthModalOpen,
+    setIsSubmitModalOpen,
+    setIsAvatarEditorOpen,
+    requireSession,
+    showToast,
+    handleOpenInGenerator,
+    handleSendToAudit,
+    handleOpenExport,
+    handleOpenSavePaletteModal,
+    handleSaveToFavorites,
+    handleSaveCuratedImage,
+    handleDeleteCuratedImage,
+    handleResetCuratedImages,
+    handleLikePalette,
+    handleForkPalette,
+    handleCreateProject,
+    handleDeleteProject,
+    handleCreateCollection,
+    handleSavePaletteToProject,
+    handleDeleteProjectPalette,
+    handleSavePaletteToVault,
+    handleDeleteVaultPalette,
+    handleDeleteFavoriteColor,
+    handleDeleteCollection,
+    handleAddColorsToProject,
+    handleAddColorsToCollection,
+    handleCreateArticle,
+    handleDeleteArticle,
+    handleApproveSubmission,
+    handleRejectSubmission,
+    handleAddTag,
+    handleUpdateProfile,
+    handleLogout
+  } = props;
+
+  const openAuth = () => setIsAuthModalOpen(true);
+  const openSavePaletteModal = () => handleOpenSavePaletteModal();
+  const openExportModal = () => handleOpenExport();
+  const navigateToProfile = () => setCurrentTab('profile');
+  const hasCmsAccess = canAccessCms(viewer.role);
+
+  return (
+    <main className="flex-1 flex flex-col min-w-0">
+      {currentTab === 'generator' && (
+        <StudioContent
+          activeStage={activeStage}
+          activePalette={activePalette}
+          generateInputMode={generateInputMode}
+          refineTool={refineTool}
+          curatedImages={curatedImages}
+          isSupabaseConnected={isSupabaseConnected}
+          setActivePalette={setActivePalette}
+          setActiveStage={setActiveStage}
+          setGenerateInputMode={setGenerateInputMode}
+          setRefineTool={setRefineTool}
+          handleSaveToFavorites={handleSaveToFavorites}
+          handleSaveCuratedImage={handleSaveCuratedImage}
+          handleDeleteCuratedImage={handleDeleteCuratedImage}
+          handleResetCuratedImages={handleResetCuratedImages}
+          handleOpenSavePaletteModal={handleOpenSavePaletteModal}
+          handleOpenExport={handleOpenExport}
+          openSavePaletteModal={openSavePaletteModal}
+          openExportModal={openExportModal}
+        />
+      )}
+
+      {currentTab === 'explorer' && (
+        <ExplorerTab
+          palettes={palettes}
+          articles={articles}
+          isSignedIn={isSignedIn}
+          setIsSubmitModalOpen={setIsSubmitModalOpen}
+          requireSession={requireSession}
+          handleOpenInGenerator={handleOpenInGenerator}
+          handleOpenSavePaletteModal={handleOpenSavePaletteModal}
+          handleLikePalette={handleLikePalette}
+          handleForkPalette={handleForkPalette}
+          handleSendToAudit={handleSendToAudit}
+        />
+      )}
+
+      {currentTab === 'projects' && (
+        <ProjectsTab
+          isSignedIn={isSignedIn}
+          openAuth={openAuth}
+          projects={projects}
+          collections={collections}
+          favoriteColors={favoriteColors}
+          vaultPalettes={vaultPalettes}
+          showToast={showToast}
+          handleOpenInGenerator={handleOpenInGenerator}
+          handleOpenExport={handleOpenExport}
+          handleCreateProject={handleCreateProject}
+          handleDeleteProject={handleDeleteProject}
+          handleCreateCollection={handleCreateCollection}
+          handleSavePaletteToProject={handleSavePaletteToProject}
+          handleDeleteProjectPalette={handleDeleteProjectPalette}
+          handleSavePaletteToVault={handleSavePaletteToVault}
+          handleDeleteVaultPalette={handleDeleteVaultPalette}
+          handleDeleteFavoriteColor={handleDeleteFavoriteColor}
+          handleDeleteCollection={handleDeleteCollection}
+          handleSendToAudit={handleSendToAudit}
+          handleAddColorsToProject={handleAddColorsToProject}
+          handleAddColorsToCollection={handleAddColorsToCollection}
+        />
+      )}
+
+      {currentTab === 'cms' && (
+        <CmsTab
+          hasCmsAccess={hasCmsAccess}
+          isSignedIn={isSignedIn}
+          openAuth={openAuth}
+          onNavigateToProfile={navigateToProfile}
+          articles={articles}
+          submissions={submissions}
+          taxonomyTags={taxonomyTags}
+          handleCreateArticle={handleCreateArticle}
+          handleApproveSubmission={handleApproveSubmission}
+          handleRejectSubmission={handleRejectSubmission}
+          handleAddTag={handleAddTag}
+          handleOpenInGenerator={handleOpenInGenerator}
+        />
+      )}
+
+      {currentTab === 'admin' && (
+        <AdminTab
+          authUser={authUser}
+          isSignedIn={isSignedIn}
+          openAuth={openAuth}
+          onNavigateToProfile={navigateToProfile}
+          usersList={usersList}
+          setUsersList={setUsersList}
+          submissions={submissions}
+          articles={articles}
+          auditLogs={auditLogs}
+          isSupabaseConnected={isSupabaseConnected}
+          handleApproveSubmission={handleApproveSubmission}
+          handleRejectSubmission={handleRejectSubmission}
+          handleCreateArticle={handleCreateArticle}
+          handleDeleteArticle={handleDeleteArticle}
+          handleOpenInGenerator={handleOpenInGenerator}
+        />
+      )}
+
+      {currentTab === 'user_dashboard' && (
+        <UserDashboardTab
+          authUser={authUser}
+          isSignedIn={isSignedIn}
+          openAuth={openAuth}
+          onNavigateToProfile={navigateToProfile}
+          myPalettes={myPalettes}
+          vaultPalettes={vaultPalettes}
+          projects={projects}
+          collections={collections}
+          favoriteColors={favoriteColors}
+          submissions={submissions}
+          handleOpenInGenerator={handleOpenInGenerator}
+          handleOpenExport={handleOpenExport}
+        />
+      )}
+
+      {currentTab === 'profile' && (
+        <ProfileTab
+          authUser={authUser}
+          openAuth={openAuth}
+          userProfile={userProfile}
+          myPalettes={myPalettes}
+          projects={projects}
+          collections={collections}
+          favoriteColors={favoriteColors}
+          vaultPalettes={vaultPalettes}
+          submissions={submissions}
+          isSupabaseConnected={isSupabaseConnected}
+          showToast={showToast}
+          setIsAvatarEditorOpen={setIsAvatarEditorOpen}
+          setIsSubmitModalOpen={setIsSubmitModalOpen}
+          handleOpenInGenerator={handleOpenInGenerator}
+          handleOpenSavePaletteModal={handleOpenSavePaletteModal}
+          handleOpenExport={handleOpenExport}
+          handleUpdateProfile={handleUpdateProfile}
+          handleDeleteFavoriteColor={handleDeleteFavoriteColor}
+          handleDeleteVaultPalette={handleDeleteVaultPalette}
+          handleDeleteCollection={handleDeleteCollection}
+          handleAddColorsToProject={handleAddColorsToProject}
+          handleAddColorsToCollection={handleAddColorsToCollection}
+          handleCreateProject={handleCreateProject}
+          handleCreateCollection={handleCreateCollection}
+          handleLogout={handleLogout}
+        />
+      )}
+    </main>
+  );
+};
+
+interface AppHeaderProps {
+  currentTab: NavigationTab;
+  activeStage: StudioStage;
+  gamut: ColorGamut;
+  viewer: AuthUser;
+  authUser: AuthUser | null;
+  isSignedIn: boolean;
+  isSidebarExpanded: boolean;
+  onToggleSidebar: () => void;
+  onOpenAuthModal: () => void;
+  onOpenExport: () => void;
+}
+
+const AppHeader: React.FC<AppHeaderProps> = ({
+  currentTab,
+  activeStage,
+  gamut,
+  viewer,
+  authUser,
+  isSignedIn,
+  isSidebarExpanded,
+  onToggleSidebar,
+  onOpenAuthModal,
+  onOpenExport
+}) => {
+  const tabTitle =
+    currentTab === 'generator'
+      ? STUDIO_STAGE_LABELS[activeStage]
+      : TAB_TITLES[currentTab as Exclude<NavigationTab, 'generator'>];
+
+  const accountTitle = isSignedIn && authUser
+    ? `Conta: ${authUser.name} (${authUser.role})`
+    : 'Entrar ou criar conta';
+
+  const isAdmin = authUser?.role === 'admin';
+
+  return (
+    <header className="h-16 bg-[#0E131E]/90 backdrop-blur-md border-b border-white/[0.08] sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onToggleSidebar}
+          className="p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
+          title={isSidebarExpanded ? 'Retrair Menu' : 'Expandir Menu'}
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+        <div className="h-4 w-px bg-white/10 hidden sm:block" />
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-semibold text-white capitalize">{tabTitle}</span>
+          <span className="text-[10px] font-mono text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/20 px-1.5 py-0.5 rounded uppercase hidden md:inline-block">
+            {gamut}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        {/* User Account / Auth Modal Trigger */}
+        <button
+          onClick={onOpenAuthModal}
+          className="h-8 px-2 sm:px-2.5 rounded-lg bg-[#181C24] hover:bg-[#202534] border border-white/[0.08] hover:border-white/20 text-xs flex items-center gap-2 transition-colors cursor-pointer"
+          title={accountTitle}
+        >
+          <img
+            src={viewer.avatar}
+            alt={viewer.name}
+            className="w-5 h-5 rounded-full object-cover border border-white/20"
+          />
+          <span className="hidden sm:inline text-white font-medium text-xs">
+            {isSignedIn && authUser ? authUser.name.split(' ')[0] : 'Entrar'}
+          </span>
+          {isSignedIn && authUser && (
+            <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border ${isAdmin
+              ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
+              : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
+              }`}>
+              {isAdmin ? 'ADMIN' : 'USUÁRIO'}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={onOpenExport}
+          className="h-8 px-3 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+          title="Exportar para Illustrator (.jsx / .ase), CSS, Tailwind, JSON e SVG"
+        >
+          <Download className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Exportar Amostras & Tokens</span>
+        </button>
+      </div>
+    </header>
+  );
+};
+
+const ToastNotification: React.FC<{ toast: { message: string; type: 'success' | 'error' } }> = ({ toast }) => {
+  const isError = toast.type === 'error';
+  return (
+    <output
+      className={`fixed top-20 right-6 z-50 bg-[#141A24] text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top-4 ${isError
+        ? 'border border-red-500/50'
+        : 'border border-[#06B6D4]/40'
+        }`}
+    >
+      {isError ? (
+        <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+      ) : (
+        <Check className="w-4 h-4 text-[#06B6D4] shrink-0" />
+      )}
+      <span>{toast.message}</span>
+    </output>
+  );
+};
+
 export function App() {
   // Navigation & Studio state
   const [currentTab, setCurrentTab] = useState<NavigationTab>('generator');
-  const [activePalette, setActivePalette] = useState<string[]>(readStoredPalette);
-  const [activeStage, setActiveStage] = useState<StudioStage>(readStoredStage);
+  const [activePalette, setActivePalette] = useState<string[]>(DEFAULT_PALETTE);
+  const [activeStage, setActiveStage] = useState<StudioStage>('generate');
   const [generateInputMode, setGenerateInputMode] = useState<GenerateInputMode>('procedural');
   const [refineTool, setRefineTool] = useState<RefineTool>('wheel');
   const [gamut, setGamut] = useState<ColorGamut>('Display P3');
   const [isSidebarExpanded, setIsSidebarExpanded] = useState<boolean>(false);
 
   // Authentication & Role Governance State
-  const [authUser, setAuthUser] = useState<AuthUser>(() => getCurrentAuthUser());
-  const [usersList, setUsersList] = useState<AuthUser[]>(() => getStoredUsers());
-  const [auditLogs] = useState<AuditLogItem[]>(() => getStoredAuditLogs());
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [creatorProfile, setCreatorProfile] = useState<CreatorProfile | null>(null);
+  const [usersList, setUsersList] = useState<AuthUser[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLogItem[]>([]);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isBootstrapping, setIsBootstrapping] = useState(true);
 
   // Supabase & Persistence State
-  const [isSupabaseConnected] = useState<boolean>(() => isSupabaseConfigured());
+  const isSupabaseConnected = useMemo(() => isSupabaseConfigured(), []);
   const [curatedImages, setCuratedImages] = useState<CuratedDemoImage[]>([]);
 
   // Core domain data
-  const [palettes, setPalettes] = useState<Palette[]>(() => {
-    const saved = localStorage.getItem('chromatica_palettes');
-    return saved ? JSON.parse(saved) : INITIAL_PALETTES;
-  });
-
-  const [projects, setProjects] = useState<ProjectWorkspace[]>(() => {
-    const saved = localStorage.getItem('chromatica_projects');
-    return saved ? JSON.parse(saved) : INITIAL_PROJECTS;
-  });
-
-  const [collections, setCollections] = useState<CollectionBoard[]>(() => {
-    const saved = localStorage.getItem('chromatica_collections');
-    return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
-  });
-
-  const [favoriteColors, setFavoriteColors] = useState<FavoriteColor[]>(() => {
-    const saved = localStorage.getItem('chromatica_fav_colors');
-    return saved ? JSON.parse(saved) : INITIAL_FAVORITE_COLORS;
-  });
-
-  const [vaultPalettes, setVaultPalettes] = useState<VaultPalette[]>(() => {
-    const saved = localStorage.getItem('chromatica_vault_palettes');
-    return saved ? JSON.parse(saved) : INITIAL_VAULT_PALETTES;
-  });
-
-  const [articles, setArticles] = useState<CmsArticle[]>(() => {
-    const saved = localStorage.getItem('chromatica_articles');
-    return saved ? JSON.parse(saved) : INITIAL_CMS_ARTICLES;
-  });
-
-  const [submissions, setSubmissions] = useState<CommunitySubmission[]>(() => {
-    const saved = localStorage.getItem('chromatica_submissions');
-    return saved ? JSON.parse(saved) : INITIAL_SUBMISSIONS;
-  });
-
-  const [taxonomyTags, setTaxonomyTags] = useState(INITIAL_TAXONOMY_TAGS);
-  const [userProfile, setUserProfile] = useState<UserProfile>(() => {
-    const current = getCurrentAuthUser();
-    let savedProfile: Partial<UserProfile> = {};
-    try {
-      const raw = localStorage.getItem('chromatica_user_profile');
-      if (raw) savedProfile = JSON.parse(raw);
-    } catch (err) {
-      console.error('Erro ao ler chromatica_user_profile:', err);
-    }
-    return {
-      ...INITIAL_USER_PROFILE,
-      ...savedProfile,
-      name: current.name || savedProfile.name || INITIAL_USER_PROFILE.name,
-      handle: current.handle || savedProfile.handle || INITIAL_USER_PROFILE.handle,
-      avatar: current.avatar || savedProfile.avatar || INITIAL_USER_PROFILE.avatar,
-      bio: current.bio || savedProfile.bio || INITIAL_USER_PROFILE.bio,
-      exportPreferences: {
-        ...INITIAL_USER_PROFILE.exportPreferences,
-        ...savedProfile.exportPreferences
-      }
-    };
-  });
+  const [palettes, setPalettes] = useState<Palette[]>([]);
+  const [myPalettes, setMyPalettes] = useState<Palette[]>([]);
+  const [projects, setProjects] = useState<ProjectWorkspace[]>([]);
+  const [collections, setCollections] = useState<CollectionBoard[]>([]);
+  const [favoriteColors, setFavoriteColors] = useState<FavoriteColor[]>([]);
+  const [vaultPalettes, setVaultPalettes] = useState<VaultPalette[]>([]);
+  const [articles, setArticles] = useState<CmsArticle[]>([]);
+  const [submissions, setSubmissions] = useState<CommunitySubmission[]>([]);
+  const [taxonomyTags, setTaxonomyTags] = useState<TaxonomyTag[]>([]);
 
   // Modals state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -328,428 +1321,158 @@ export function App() {
   const [savePaletteModalTitle, setSavePaletteModalTitle] = useState<string>('Nova Paleta Harmônica');
   const [notificationToast, setNotificationToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  const viewer: AuthUser = authUser ?? ANONYMOUS_VIEWER;
+  const isSignedIn = authUser !== null;
+
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
     setNotificationToast({ message, type });
     setTimeout(() => setNotificationToast(null), 3500);
   }, []);
 
-  // Propaga o novo avatar para todos os pontos da interface (cabeçalho, menu lateral e perfil).
-  const applyAvatarChange = (avatarUrl: string | null) => {
-    const fallbackAvatar = getInitialsAvatarUrl(authUser.email || authUser.name || 'user');
-    const nextAvatar = avatarUrl || fallbackAvatar;
+  const requireSession = useCallback((): boolean => {
+    if (authUser) return true;
+    showToast('Entre na sua conta para executar esta ação.', 'error');
+    setIsAuthModalOpen(true);
+    return false;
+  }, [authUser, showToast]);
 
-    const nextUser: AuthUser = { ...authUser, avatar: nextAvatar };
-    setAuthUser(nextUser);
-    setCurrentAuthUser(nextUser);
-
-    const updatedUsers = usersList.map(user => (user.id === nextUser.id ? nextUser : user));
-    setUsersList(updatedUsers);
-    saveStoredUsers(updatedUsers);
-
-    setUserProfile(prev => ({ ...prev, avatar: nextAvatar }));
-  };
-
-  // Envia (ou persiste localmente) o novo avatar, mantendo o anterior em caso de falha.
-  const handleSaveAvatar = async (file: File) => {
-    const supabase = getSupabaseClient();
-    let hasSupabaseSession = false;
-
-    if (supabase) {
-      try {
-        const { data } = await supabase.auth.getSession();
-        hasSupabaseSession = Boolean(data.session);
-      } catch {
-        hasSupabaseSession = false;
-      }
-    }
-
-    let nextAvatar: string | null = null;
-
-    if (supabase && hasSupabaseSession) {
-      nextAvatar = await uploadUserAvatar(file);
-      await updateProfileAvatar(nextAvatar);
-    } else {
-      // Fallback local para contas fora da nuvem: imagem processada persiste como Data URL.
-      const blob = await processAvatarImage(file);
-      nextAvatar = await blobToDataUrl(blob);
-    }
-
-    applyAvatarChange(nextAvatar);
-    showToast('Foto do perfil atualizada com sucesso.');
-  };
-
-  // Remove o avatar existente (mantendo o anterior em caso de falha no envio).
-  const handleRemoveAvatar = async () => {
-    const supabase = getSupabaseClient();
-    let hasSupabaseSession = false;
-
-    if (supabase) {
-      try {
-        const { data } = await supabase.auth.getSession();
-        hasSupabaseSession = Boolean(data.session);
-      } catch {
-        hasSupabaseSession = false;
-      }
-    }
-
-    if (supabase && hasSupabaseSession) {
-      await removeUserAvatar();
-      await updateProfileAvatar(null);
-    }
-
-    applyAvatarChange(null);
-    showToast('Foto do perfil removida.');
-  };
-
-  // Load curated images and sync active auth session on mount
-  useEffect(() => {
-    loadCuratedImages().then(images => {
-      setCuratedImages(images);
-    });
-
-    // Check if there is an active Supabase or local session
-    checkCurrentSession().then(user => {
-      if (user) {
-        setAuthUser(user);
-        setUserProfile(prev => ({
-          ...prev,
-          name: user.name,
-          handle: user.handle,
-          avatar: user.avatar,
-          bio: user.bio || prev.bio
-        }));
-      }
-    });
-
-    // Subscribe to Supabase Auth state changes in real time
-    const unsubscribeAuth = initAuthListener((user) => {
-      setAuthUser(user);
-      setUserProfile(prev => ({
-        ...prev,
-        name: user.name,
-        handle: user.handle,
-        avatar: user.avatar,
-        bio: user.bio || prev.bio
-      }));
-    });
-
-    return () => {
-      unsubscribeAuth();
-    };
-  }, []);
-
-  // Handle Logout via Supabase Auth
-  const handleLogout = useCallback(async () => {
-    await logoutAuthUser();
-    const regularUser = getCurrentAuthUser();
-    setAuthUser(regularUser);
-    setUserProfile(prev => ({
-      ...prev,
-      name: regularUser.name,
-      handle: regularUser.handle,
-      avatar: regularUser.avatar,
-      bio: regularUser.bio || ''
-    }));
-    if (currentTab === 'admin' || currentTab === 'cms') {
-      setCurrentTab('generator');
-    }
-    showToast('Sessão encerrada com sucesso via Supabase Auth.');
-  }, [currentTab, showToast]);
-
-  // Strict RBAC Guard: Protect admin and cms routes based on user role
-  useEffect(() => {
-    if (currentTab === 'admin' && authUser.role !== 'admin') {
-      setCurrentTab('profile');
-    }
-    if (currentTab === 'cms' && authUser.role !== 'admin' && authUser.role !== 'moderator' && authUser.role !== 'editor') {
-      setCurrentTab('profile');
-    }
-  }, [authUser.role, currentTab]);
-
-  // Persistence to local storage
-  useEffect(() => {
-    localStorage.setItem('izycolors_active_palette', JSON.stringify(activePalette));
-  }, [activePalette]);
-
-  useEffect(() => {
-    localStorage.setItem('izycolors_active_stage', activeStage);
-  }, [activeStage]);
-
-  useEffect(() => {
-    localStorage.setItem('chromatica_palettes', JSON.stringify(palettes));
-  }, [palettes]);
-
-  useEffect(() => {
-    localStorage.setItem('chromatica_projects', JSON.stringify(projects));
-  }, [projects]);
-
-  useEffect(() => {
-    localStorage.setItem('chromatica_collections', JSON.stringify(collections));
-  }, [collections]);
-
-  useEffect(() => {
-    localStorage.setItem('chromatica_fav_colors', JSON.stringify(favoriteColors));
-  }, [favoriteColors]);
-
-  useEffect(() => {
-    localStorage.setItem('chromatica_vault_palettes', JSON.stringify(vaultPalettes));
-  }, [vaultPalettes]);
-
-  useEffect(() => {
-    localStorage.setItem('chromatica_articles', JSON.stringify(articles));
-  }, [articles]);
-
-  useEffect(() => {
-    localStorage.setItem('chromatica_submissions', JSON.stringify(submissions));
-  }, [submissions]);
-
-  useEffect(() => {
+  /** Executa uma mutação convertendo qualquer erro do banco em toast. */
+  const runMutation = useCallback(async (action: () => Promise<unknown>, success?: string): Promise<boolean> => {
     try {
-      localStorage.setItem('chromatica_user_profile', JSON.stringify(userProfile));
-    } catch (e) {
-      console.error('Erro ao persistir chromatica_user_profile:', e);
+      await action();
+      if (success) showToast(success);
+      return true;
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Erro inesperado.', 'error');
+      return false;
     }
-  }, [userProfile]);
+  }, [showToast]);
 
+  // -------------------------------------------------------------------------
+  // Carga de dados, bootstrap de sessão e efeitos (extraídos para um hook)
+  // -------------------------------------------------------------------------
+
+  const { loadPrivateData, handleLogout } = useAppData({
+    isSignedIn,
+    activePalette,
+    activeStage,
+    setAuthUser,
+    setCreatorProfile,
+    setUsersList,
+    setAuditLogs,
+    setIsBootstrapping,
+    setCurrentTab,
+    setPalettes,
+    setArticles,
+    setTaxonomyTags,
+    setCuratedImages,
+    setProjects,
+    setCollections,
+    setFavoriteColors,
+    setVaultPalettes,
+    setSubmissions,
+    setMyPalettes,
+    setActivePalette,
+    setActiveStage,
+    showToast
+  });
+
+  // RBAC Guard: admin, curadoria e áreas privadas exigem sessão
   useEffect(() => {
-    saveStoredUsers(usersList);
-  }, [usersList]);
-
-  // Load a palette into the centralized active palette and open the Studio at the
-  // creation/editing stage.
-  const handleOpenInGenerator = (colors: string[]) => {
-    if (colors && colors.length > 0) setActivePalette(colors);
-    setActiveStage('generate');
-    setCurrentTab('generator');
-  };
-
-  // Load a palette into the active palette and open the Studio directly at the audit stage.
-  const handleSendToAudit = (colors: string[]) => {
-    if (colors && colors.length > 0) setActivePalette(colors);
-    setActiveStage('audit');
-    setCurrentTab('generator');
-  };
-
-  // Open Export Modal with given or default (active palette) colors
-  const handleOpenExport = (colors?: string[], title?: string) => {
-    if (colors && colors.length > 0) setActivePalette(colors);
-    if (title) setExportPaletteTitle(title);
-    setIsExportModalOpen(true);
-  };
-
-  // Save single color to favorite swatches / vault
-  const handleSaveToFavorites = (hex: string, name: string) => {
-    const exists = favoriteColors.some(c => c.hex.toLowerCase() === hex.toLowerCase());
-    if (exists) {
-      showToast(`Amostra ${hex} já consta no seu cofre.`);
-      return;
+    const guardedTab = resolveGuardedTab(currentTab, isSignedIn, viewer.role);
+    if (guardedTab !== currentTab) {
+      setCurrentTab(guardedTab);
     }
-    const newFav: FavoriteColor = {
-      id: `fav-${Date.now()}`,
-      hex: hex.toUpperCase(),
-      name: name || 'Custom Swatch',
-      note: 'Salvo via Gerador / Studio',
-      dateAdded: 'Hoje',
-      tags: ['Salvo', gamut]
-    };
-    setFavoriteColors(prev => [newFav, ...prev]);
-    showToast(`Amostra ${hex} salva com sucesso no Cofre de Cores!`);
-  };
+  }, [viewer.role, isSignedIn, currentTab]);
 
-  // Open Save Palette Modal for saving entire palette to Vault, Project, or Collection
-  const handleOpenSavePaletteModal = (colors?: string[], title?: string) => {
-    if (colors && colors.length > 0) setActivePalette(colors);
-    setSavePaletteModalTitle(title || 'Nova Paleta Harmônica');
-    setIsSavePaletteModalOpen(true);
-  };
+  // -------------------------------------------------------------------------
+  // Perfil derivado (estatísticas calculadas com dados reais)
+  // -------------------------------------------------------------------------
 
-  // Save full palette to private Vault
-  const handleSavePaletteToVault = (vaultPalette: VaultPalette) => {
-    setVaultPalettes(prev => [vaultPalette, ...prev]);
-    showToast(`Paleta completa "${vaultPalette.title}" salva com sucesso no Cofre Privado!`);
-  };
+  const userProfile: UserProfile = useMemo<UserProfile>(
+    () => buildUserProfile(creatorProfile, viewer, myPalettes, articles, submissions),
+    [creatorProfile, viewer, myPalettes, articles, submissions]
+  );
 
-  // Save full palette to a specific project workspace
-  const handleSavePaletteToProject = (projectId: string, projectPalette: ProjectPalette) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          palettes: [projectPalette, ...(p.palettes || [])],
-          updatedAt: 'Agora'
-        };
-      }
-      return p;
-    }));
-    showToast(`Paleta "${projectPalette.name}" adicionada ao projeto com sucesso!`);
-  };
+  // -------------------------------------------------------------------------
+  // Handlers — extraídos para um hook dedicado (mantém a complexidade baixa)
+  // -------------------------------------------------------------------------
 
-  // Create new project with palette included
-  const handleCreateProjectWithPalette = (newProject: ProjectWorkspace) => {
-    setProjects(prev => [newProject, ...prev]);
-    showToast(`Projeto "${newProject.name}" criado com sua nova paleta!`);
-  };
+  const {
+    handleOpenInGenerator,
+    handleSendToAudit,
+    handleOpenExport,
+    handleSaveToFavorites,
+    handleOpenSavePaletteModal,
+    handleSavePaletteToVault,
+    handleSavePaletteToProject,
+    handleCreateProjectWithPalette,
+    handleDeleteVaultPalette,
+    handleDeleteProjectPalette,
+    handleSaveToCollectionBoard,
+    handleDeleteFavoriteColor,
+    handleCreateProject,
+    handleDeleteProject,
+    handleCreateCollection,
+    handleDeleteCollection,
+    handleAddColorsToProject,
+    handleAddColorsToCollection,
+    handleLikePalette,
+    handleForkPalette,
+    handleNewSubmission,
+    handleCreateArticle,
+    handleDeleteArticle,
+    handleApproveSubmission,
+    handleRejectSubmission,
+    handleAddTag,
+    handleSaveCuratedImage,
+    handleDeleteCuratedImage,
+    handleResetCuratedImages,
+    handleSaveAvatar,
+    handleRemoveAvatar,
+    handleUpdateProfile
+  } = useAppHandlers({
+    gamut,
+    requireSession,
+    runMutation,
+    showToast,
+    setActivePalette,
+    setActiveStage,
+    setCurrentTab,
+    setExportPaletteTitle,
+    setIsExportModalOpen,
+    setSavePaletteModalTitle,
+    setIsSavePaletteModalOpen,
+    setFavoriteColors,
+    setVaultPalettes,
+    setProjects,
+    setCollections,
+    setPalettes,
+    setMyPalettes,
+    setSubmissions,
+    setArticles,
+    setTaxonomyTags,
+    setCuratedImages,
+    setCreatorProfile,
+    setAuthUser,
+    collections,
+    projects,
+    favoriteColors,
+    submissions
+  });
 
-  // Save palette into a specific Collection board
-  const handleSaveToCollectionBoard = (collectionId: string, colors: string[]) => {
-    setCollections(prev => prev.map(c => {
-      if (c.id === collectionId) {
-        return {
-          ...c,
-          coverColors: colors
-        };
-      }
-      return c;
-    }));
-    showToast('Paleta vinculada ao quadro de coleção com sucesso!');
-  };
+  const forksCount = palettes.filter((p) => p.isFork || (p.forks && p.forks > 0)).length;
 
-  // Delete full palette from Vault
-  const handleDeleteVaultPalette = (id: string) => {
-    setVaultPalettes(prev => prev.filter(p => p.id !== id));
-    showToast('Paleta removida do Cofre.');
-  };
-
-  // Delete palette from Project
-  const handleDeleteProjectPalette = (projectId: string, paletteId: string) => {
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        return {
-          ...p,
-          palettes: (p.palettes || []).filter(pal => pal.id !== paletteId)
-        };
-      }
-      return p;
-    }));
-    showToast('Paleta removida do projeto.');
-  };
-
-  // Save current palette to a collection (shortcut or modal)
-  const handleSaveToCollection = (colors: string[]) => {
-    handleOpenSavePaletteModal(colors);
-  };
-
-  // Likes on community palettes
-  const handleLikePalette = (paletteId: string) => {
-    setPalettes(prev => prev.map(p => p.id === paletteId ? { ...p, likes: p.likes + 1 } : p));
-  };
-
-  // Forks & Clones Handler — also loads the fork into the active palette Studio
-  const handleForkPalette = async (palette: Palette) => {
-    // 1. Increment fork counter on original palette
-    setPalettes(prev => prev.map(p => p.id === palette.id ? { ...p, forks: (p.forks || 0) + 1 } : p));
-
-    // 2. Persist fork in Supabase / Local storage
-    const { forkedPalette } = await recordPaletteFork(palette, userProfile);
-
-    // 3. Add the cloned palette to local state
-    setPalettes(prev => [forkedPalette, ...prev]);
-
-    // 4. Also add to user's first collection
-    setCollections(prev => {
-      if (prev.length === 0) return prev;
-      const updated = [...prev];
-      updated[0] = {
-        ...updated[0],
-        coverColors: forkedPalette.colors
-      };
-      return updated;
-    });
-
-    // 5. Load the forked palette into the Studio
-    setActivePalette(forkedPalette.colors);
-    setActiveStage('generate');
-    setCurrentTab('generator');
-
-    showToast(`Fork criado com sucesso! "${forkedPalette.title}" está carregado no Estúdio.`);
-  };
-
-  // Curated Images persistence handlers
-  const handleSaveCuratedImage = async (img: CuratedDemoImage) => {
-    await saveCuratedImage(img);
-    setCuratedImages(prev => [img, ...prev.filter(i => i.id !== img.id)]);
-  };
-
-  const handleDeleteCuratedImage = async (id: string) => {
-    await deleteCuratedImage(id);
-    setCuratedImages(prev => prev.filter(i => i.id !== id));
-  };
-
-  const handleResetCuratedImages = async () => {
-    await resetCuratedImages();
-    const reloaded = await loadCuratedImages();
-    setCuratedImages(reloaded);
-    showToast('Imagens curadas de demonstração restauradas para o padrão.');
-  };
-
-  // CMS handlers
-  const handleCreateArticle = (article: CmsArticle) => {
-    setArticles(prev => [article, ...prev]);
-    showToast('Artigo publicado no CMS com sucesso!');
-  };
-
-  const handleApproveSubmission = (id: string, asStaffPick: boolean) => {
-    const sub = submissions.find(s => s.id === id);
-    if (!sub) return;
-
-    const newPalette: Palette = {
-      id: `pal-${Date.now()}`,
-      title: sub.title,
-      author: {
-        name: sub.author,
-        handle: sub.authorHandle,
-        avatar: sub.authorAvatar,
-        pro: true
-      },
-      colors: sub.colors,
-      likes: 1,
-      forks: 0,
-      wcagLevel: 'WCAG 2.1 AAA Ready',
-      tags: sub.tags,
-      gamut: sub.suggestedGamut,
-      staffPick: asStaffPick,
-      createdAt: 'Agora',
-      description: `Submetida pela comunidade e aprovada pela Curadoria Editorial.`
-    };
-
-    setPalettes(prev => [newPalette, ...prev]);
-    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: 'Aprovado' } : s));
-    showToast(`Paleta "${sub.title}" aprovada pela Curadoria!`);
-  };
-
-  const handleRejectSubmission = (id: string) => {
-    setSubmissions(prev => prev.map(s => s.id === id ? { ...s, status: 'Rejeitado' } : s));
-  };
-
-  const handleAddTag = (name: string, category: string) => {
-    setTaxonomyTags(prev => [...prev, { name, count: 1, category }]);
-  };
-
-  const handleCreateProject = (project: ProjectWorkspace) => {
-    setProjects(prev => [project, ...prev]);
-    showToast(`Projeto "${project.name}" criado no Cofre.`);
-  };
-
-  const handleCreateCollection = (collection: CollectionBoard) => {
-    setCollections(prev => [collection, ...prev]);
-    showToast(`Coleção "${collection.title}" criada.`);
-  };
-
-  const handleDeleteFavoriteColor = (id: string) => {
-    setFavoriteColors(prev => prev.filter(c => c.id !== id));
-  };
-
-  const handleDeleteCollection = (id: string) => {
-    setCollections(prev => prev.filter(c => c.id !== id));
-  };
-
-  const handleNewSubmission = (sub: CommunitySubmission) => {
-    setSubmissions(prev => [sub, ...prev]);
-    showToast('Paleta submetida com sucesso para o Edital da Comunidade!');
-  };
-
-  // Calculate forks count
-  const forksCount = palettes.filter(p => p.isFork || (p.forks && p.forks > 0)).length;
+  if (isBootstrapping) {
+    return (
+      <div className="min-h-screen bg-[#0B0F17] text-[#DFE2EE] flex items-center justify-center font-['Geist']">
+        <div className="text-center">
+          <div className="w-10 h-10 border-2 border-[#06B6D4] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-xs font-mono text-[#94A3B8]">Conectando ao Supabase...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0B0F17] text-[#DFE2EE] flex font-['Geist'] selection:bg-[#6366F1]/40 selection:text-white">
@@ -759,7 +1482,7 @@ export function App() {
         onTabChange={setCurrentTab}
         gamut={gamut}
         onGamutChange={setGamut}
-        authUser={authUser}
+        authUser={viewer}
         onOpenAuthModal={() => setIsAuthModalOpen(true)}
         onLogout={handleLogout}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
@@ -777,311 +1500,86 @@ export function App() {
           }`}
       >
         {/* Slim Top Bar with Current Tab Context & Mobile Toggle */}
-        <header className="h-16 bg-[#0E131E]/90 backdrop-blur-md border-b border-white/[0.08] sticky top-0 z-30 px-4 sm:px-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsSidebarExpanded(!isSidebarExpanded)}
-              className="p-1.5 rounded-lg text-[#94A3B8] hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
-              title={isSidebarExpanded ? 'Retrair Menu' : 'Expandir Menu'}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <div className="h-4 w-px bg-white/10 hidden sm:block" />
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-white capitalize">
-                {currentTab === 'generator'
-                  ? STUDIO_STAGE_LABELS[activeStage]
-                  : TAB_TITLES[currentTab as Exclude<NavigationTab, 'generator'>]}
-              </span>
-              <span className="text-[10px] font-mono text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/20 px-1.5 py-0.5 rounded uppercase hidden md:inline-block">
-                {gamut}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* User Account / Auth Modal Trigger */}
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="h-8 px-2 sm:px-2.5 rounded-lg bg-[#181C24] hover:bg-[#202534] border border-white/[0.08] hover:border-white/20 text-xs flex items-center gap-2 transition-colors cursor-pointer"
-              title={`Conta: ${authUser.name} (${authUser.role === 'admin' ? 'Administrador' : 'Usuário Comum'}) - Clique para gerenciar`}
-            >
-              <img
-                src={authUser.avatar}
-                alt={authUser.name}
-                className="w-5 h-5 rounded-full object-cover border border-white/20"
-              />
-              <span className="hidden sm:inline text-white font-medium text-xs">
-                {authUser.name.split(' ')[0]}
-              </span>
-              <span className={`text-[9px] font-mono font-bold uppercase px-1.5 py-0.5 rounded border ${authUser.role === 'admin'
-                ? 'bg-purple-500/20 text-purple-300 border-purple-500/40'
-                : 'bg-[#06B6D4]/20 text-[#06B6D4] border-[#06B6D4]/40'
-                }`}>
-                {authUser.role === 'admin' ? 'ADMIN' : 'USUÁRIO'}
-              </span>
-            </button>
-
-            <button
-              onClick={() => handleOpenExport()}
-              className="h-8 px-3 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-              title="Exportar para Illustrator (.jsx / .ase), CSS, Tailwind, JSON e SVG"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Exportar Amostras & Tokens</span>
-            </button>
-          </div>
-        </header>
+        <AppHeader
+          currentTab={currentTab}
+          activeStage={activeStage}
+          gamut={gamut}
+          viewer={viewer}
+          authUser={authUser}
+          isSignedIn={isSignedIn}
+          isSidebarExpanded={isSidebarExpanded}
+          onToggleSidebar={() => setIsSidebarExpanded(!isSidebarExpanded)}
+          onOpenAuthModal={() => setIsAuthModalOpen(true)}
+          onOpenExport={() => handleOpenExport()}
+        />
 
         {/* Floating Toast Notification */}
-        {notificationToast && (
-          <output
-            className={`fixed top-20 right-6 z-50 bg-[#141A24] text-white text-xs px-4 py-3 rounded-xl shadow-2xl flex items-center gap-2.5 animate-in slide-in-from-top-4 ${notificationToast.type === 'error'
-              ? 'border border-red-500/50'
-              : 'border border-[#06B6D4]/40'
-              }`}
-          >
-            {notificationToast.type === 'error' ? (
-              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
-            ) : (
-              <Check className="w-4 h-4 text-[#06B6D4] shrink-0" />
-            )}
-            <span>{notificationToast.message}</span>
-          </output>
-        )}
+        {notificationToast && <ToastNotification toast={notificationToast} />}
 
         {/* Main Studio Views Router */}
-        <main className="flex-1 flex flex-col min-w-0">
-          {currentTab === 'generator' && (
-            <div className="flex-1 flex flex-col min-h-0">
-              {activeStage === 'generate' && (
-                <>
-                  <GenerateInputModeBar mode={generateInputMode} onChange={setGenerateInputMode} />
-                  {generateInputMode === 'procedural' ? (
-                    <GeneratorView
-                      colors={activePalette}
-                      onColorsChange={setActivePalette}
-                      onSaveToFavorites={handleSaveToFavorites}
-                      onSaveToCollection={handleSaveToCollection}
-                      onOpenExport={handleOpenExport}
-                    />
-                  ) : (
-                    <ImageExtractorView
-                      curatedImages={curatedImages}
-                      onApplyToActivePalette={setActivePalette}
-                      onProceedToRefine={() => setActiveStage('refine')}
-                      onSaveCuratedImage={handleSaveCuratedImage}
-                      onDeleteCuratedImage={handleDeleteCuratedImage}
-                      onResetCuratedImages={handleResetCuratedImages}
-                      isSupabaseConnected={isSupabaseConnected}
-                    />
-                  )}
-                </>
-              )}
-
-              {activeStage === 'refine' && (
-                <>
-                  <RefineToolTabs tool={refineTool} onChange={setRefineTool} />
-                  {refineTool === 'wheel' ? (
-                    <HarmonicWheelView colors={activePalette} onColorsChange={setActivePalette} />
-                  ) : (
-                    <ColorSpaceLabView colors={activePalette} onColorsChange={setActivePalette} />
-                  )}
-                </>
-              )}
-
-              {activeStage === 'audit' && (
-                <AccessibilityView colors={activePalette} onColorsChange={setActivePalette} />
-              )}
-
-              {activeStage === 'export' && (
-                <ExportStagePanel
-                  colors={activePalette}
-                  onSave={() => handleOpenSavePaletteModal()}
-                  onExport={() => handleOpenExport()}
-                />
-              )}
-            </div>
-          )}
-
-          {currentTab === 'explorer' && (
-            <ExplorerView
-              palettes={palettes}
-              articles={articles}
-              onOpenInGenerator={handleOpenInGenerator}
-              onSaveToCollection={handleSaveToCollection}
-              onLikePalette={handleLikePalette}
-              onForkPalette={handleForkPalette}
-              onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
-              onSendToAudit={handleSendToAudit}
-            />
-          )}
-
-          {currentTab === 'projects' && (
-            <ProjectsVaultView
-              projects={projects}
-              collections={collections}
-              favoriteColors={favoriteColors}
-              vaultPalettes={vaultPalettes}
-              onOpenInGenerator={handleOpenInGenerator}
-              onOpenExport={handleOpenExport}
-              onCreateProject={handleCreateProject}
-              onDeleteProject={(id) => {
-                setProjects(prev => prev.filter(p => p.id !== id));
-                showToast('Projeto removido.');
-              }}
-              onCreateCollection={handleCreateCollection}
-              onSavePaletteToProject={handleSavePaletteToProject}
-              onDeletePaletteFromProject={handleDeleteProjectPalette}
-              onSavePaletteToVault={handleSavePaletteToVault}
-              onDeleteVaultPalette={handleDeleteVaultPalette}
-              onDeleteFavoriteColor={handleDeleteFavoriteColor}
-              onDeleteCollection={handleDeleteCollection}
-              onSendToAudit={handleSendToAudit}
-            />
-          )}
-
-          {currentTab === 'cms' && (
-            (authUser.role === 'admin' || authUser.role === 'editor') ? (
-              <CmsAdminView
-                articles={articles}
-                submissions={submissions}
-                tags={taxonomyTags}
-                onCreateArticle={handleCreateArticle}
-                onApproveSubmission={handleApproveSubmission}
-                onRejectSubmission={handleRejectSubmission}
-                onAddTag={handleAddTag}
-                onOpenInGenerator={handleOpenInGenerator}
-              />
-            ) : (
-              <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
-                <ShieldAlert className="w-12 h-12 text-amber-400 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-white font-['Geist']">Acesso Restrito</h3>
-                <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">
-                  O painel CMS Editorial e curadoria de conteúdo é restrito a editores e administradores credenciados.
-                </p>
-                <button
-                  onClick={() => setCurrentTab('profile')}
-                  className="px-4 py-2 bg-[#6366F1] text-white font-semibold text-xs rounded-lg hover:bg-[#6366F1]/90 transition-colors cursor-pointer"
-                >
-                  Ir para Meu Perfil & Painel
-                </button>
-              </div>
-            )
-          )}
-
-          {currentTab === 'admin' && (
-            authUser.role === 'admin' ? (
-              <AdminAreaView
-                currentUser={authUser}
-                usersList={usersList}
-                onUpdateUsersList={setUsersList}
-                submissions={submissions}
-                onApproveSubmission={handleApproveSubmission}
-                onRejectSubmission={handleRejectSubmission}
-                articles={articles}
-                onCreateArticle={handleCreateArticle}
-                onDeleteArticle={(id) => setArticles(prev => prev.filter(a => a.id !== id))}
-                auditLogs={auditLogs}
-                onOpenInGenerator={handleOpenInGenerator}
-                onNavigateToUserPortal={() => setCurrentTab('profile')}
-                isSupabaseConnected={isSupabaseConnected}
-              />
-            ) : (
-              <div className="p-12 text-center max-w-md mx-auto my-16 bg-[#121622] border border-white/[0.08] rounded-2xl shadow-xl">
-                <ShieldAlert className="w-12 h-12 text-purple-400 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-white font-['Geist']">Painel Restrito a Administradores</h3>
-                <p className="text-xs text-[#94A3B8] mt-2 mb-6 leading-relaxed">
-                  Esta área contém governança de usuários, logs de auditoria e configurações de persistência na nuvem. Privilégios de administrador são obrigatórios.
-                </p>
-                <button
-                  onClick={() => setCurrentTab('profile')}
-                  className="px-4 py-2 bg-[#6366F1] text-white font-semibold text-xs rounded-lg hover:bg-[#6366F1]/90 transition-colors cursor-pointer"
-                >
-                  Ir para Meu Perfil & Painel
-                </button>
-              </div>
-            )
-          )}
-
-          {currentTab === 'user_dashboard' && (
-            <UserAnalyticsDashboard
-              palettes={palettes}
-              vaultPalettes={vaultPalettes}
-              projects={projects}
-              collections={collections}
-              favoriteColors={favoriteColors}
-              submissions={submissions}
-              onOpenInGenerator={handleOpenInGenerator}
-              onOpenExport={handleOpenExport}
-              onNavigateToProfile={() => setCurrentTab('profile')}
-            />
-          )}
-
-          {currentTab === 'profile' && (
-            <ProfileView
-              authUser={authUser}
-              userProfile={userProfile}
-              palettes={palettes}
-              projects={projects}
-              collections={collections}
-              favoriteColors={favoriteColors}
-              vaultPalettes={vaultPalettes}
-              submissions={submissions}
-              onOpenInGenerator={handleOpenInGenerator}
-              onSaveToCollection={handleSaveToCollection}
-              onOpenExport={handleOpenExport}
-              onUpdateProfile={(updated) => {
-                setUserProfile(prev => {
-                  const nextProfile = {
-                    ...prev,
-                    ...updated,
-                    exportPreferences: updated.exportPreferences
-                      ? { ...prev.exportPreferences, ...updated.exportPreferences }
-                      : prev.exportPreferences
-                  };
-                  try {
-                    localStorage.setItem('chromatica_user_profile', JSON.stringify(nextProfile));
-                    if (updated.exportPreferences) {
-                      localStorage.setItem('chromatica_token_prefs', JSON.stringify(nextProfile.exportPreferences));
-                    }
-                  } catch (e) {
-                    console.error('Erro ao salvar chromatica_user_profile:', e);
-                  }
-                  return nextProfile;
-                });
-                if (updated.name || updated.handle || updated.bio) {
-                  setAuthUser(prev => {
-                    const nextUser: AuthUser = {
-                      ...prev,
-                      name: updated.name || prev.name,
-                      handle: updated.handle || prev.handle,
-                      bio: updated.bio ?? prev.bio
-                    };
-                    setCurrentAuthUser(nextUser);
-                    setUsersList(curr => {
-                      const updatedUsers = curr.map(u => u.id === nextUser.id ? nextUser : u);
-                      saveStoredUsers(updatedUsers);
-                      return updatedUsers;
-                    });
-                    return nextUser;
-                  });
-                }
-                showToast('Perfil e preferências salvos com sucesso.');
-              }}
-              onDeleteFavoriteColor={(hex) => {
-                setFavoriteColors(prev => prev.filter(f => f.hex !== hex));
-                showToast('Amostra removida dos favoritos.');
-              }}
-              onDeleteVaultPalette={handleDeleteVaultPalette}
-              onOpenAuthModal={() => setIsAuthModalOpen(true)}
-              onOpenAvatarEditor={() => setIsAvatarEditorOpen(true)}
-              onLogout={handleLogout}
-              onOpenSubmissionModal={() => setIsSubmitModalOpen(true)}
-              isSupabaseConnected={isSupabaseConnected}
-            />
-          )}
-        </main>
+        <MainContentRouter
+          currentTab={currentTab}
+          viewer={viewer}
+          authUser={authUser}
+          isSignedIn={isSignedIn}
+          activeStage={activeStage}
+          activePalette={activePalette}
+          generateInputMode={generateInputMode}
+          refineTool={refineTool}
+          curatedImages={curatedImages}
+          palettes={palettes}
+          myPalettes={myPalettes}
+          articles={articles}
+          submissions={submissions}
+          taxonomyTags={taxonomyTags}
+          projects={projects}
+          collections={collections}
+          favoriteColors={favoriteColors}
+          vaultPalettes={vaultPalettes}
+          usersList={usersList}
+          auditLogs={auditLogs}
+          userProfile={userProfile}
+          isSupabaseConnected={isSupabaseConnected}
+          setActivePalette={setActivePalette}
+          setActiveStage={setActiveStage}
+          setGenerateInputMode={setGenerateInputMode}
+          setRefineTool={setRefineTool}
+          setCurrentTab={setCurrentTab}
+          setUsersList={setUsersList}
+          setIsAuthModalOpen={setIsAuthModalOpen}
+          setIsSubmitModalOpen={setIsSubmitModalOpen}
+          setIsAvatarEditorOpen={setIsAvatarEditorOpen}
+          requireSession={requireSession}
+          showToast={showToast}
+          handleOpenInGenerator={handleOpenInGenerator}
+          handleSendToAudit={handleSendToAudit}
+          handleOpenExport={handleOpenExport}
+          handleOpenSavePaletteModal={handleOpenSavePaletteModal}
+          handleSaveToFavorites={handleSaveToFavorites}
+          handleSaveCuratedImage={handleSaveCuratedImage}
+          handleDeleteCuratedImage={handleDeleteCuratedImage}
+          handleResetCuratedImages={handleResetCuratedImages}
+          handleLikePalette={handleLikePalette}
+          handleForkPalette={handleForkPalette}
+          handleCreateProject={handleCreateProject}
+          handleDeleteProject={handleDeleteProject}
+          handleCreateCollection={handleCreateCollection}
+          handleSavePaletteToProject={handleSavePaletteToProject}
+          handleDeleteProjectPalette={handleDeleteProjectPalette}
+          handleSavePaletteToVault={handleSavePaletteToVault}
+          handleDeleteVaultPalette={handleDeleteVaultPalette}
+          handleDeleteFavoriteColor={handleDeleteFavoriteColor}
+          handleDeleteCollection={handleDeleteCollection}
+          handleAddColorsToProject={handleAddColorsToProject}
+          handleAddColorsToCollection={handleAddColorsToCollection}
+          handleCreateArticle={handleCreateArticle}
+          handleDeleteArticle={handleDeleteArticle}
+          handleApproveSubmission={handleApproveSubmission}
+          handleRejectSubmission={handleRejectSubmission}
+          handleAddTag={handleAddTag}
+          handleUpdateProfile={handleUpdateProfile}
+          handleLogout={handleLogout}
+        />
       </div>
 
       {/* Contextual Workflow Dock (only inside the Studio) */}
@@ -1128,7 +1626,7 @@ export function App() {
         }}
         onGamutChange={setGamut}
         onOpenExport={() => handleOpenExport()}
-        authUser={authUser}
+        authUser={viewer}
       />
 
       {/* Export Tokens Modal with Illustrator & Swatches support */}
@@ -1137,6 +1635,7 @@ export function App() {
         onClose={() => setIsExportModalOpen(false)}
         colors={activePalette}
         paletteTitle={exportPaletteTitle}
+        variablePrefix={userProfile.exportPreferences.variablePrefix}
       />
 
       {/* Community Challenge Submission Modal */}
@@ -1151,17 +1650,11 @@ export function App() {
       <AuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        currentUser={authUser}
+        currentUser={viewer}
         onUserChange={(user) => {
           setAuthUser(user);
-          setUserProfile(prev => ({
-            ...prev,
-            name: user.name,
-            handle: user.handle,
-            avatar: user.avatar,
-            bio: user.bio || prev.bio
-          }));
-          showToast(`Sessão ativa como ${user.name} (${user.role === 'admin' ? 'Administrador' : 'Usuário Comum'})`);
+          showToast(`Sessão ativa como ${user.name} (${user.role})`);
+          void loadPrivateData();
         }}
         onLogout={handleLogout}
         onNavigateToAdmin={() => setCurrentTab('admin')}
@@ -1171,8 +1664,8 @@ export function App() {
       {/* Avatar Upload / Change / Remove Modal */}
       <AvatarEditorModal
         isOpen={isAvatarEditorOpen}
-        currentAvatar={authUser.avatar}
-        userName={authUser.name}
+        currentAvatar={viewer.avatar}
+        userName={viewer.name}
         onClose={() => setIsAvatarEditorOpen(false)}
         onSaveAvatar={handleSaveAvatar}
         onRemoveAvatar={handleRemoveAvatar}

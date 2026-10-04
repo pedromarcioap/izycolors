@@ -13,9 +13,11 @@ import {
   ShieldCheck,
   Palette as PaletteIcon,
   PlusCircle,
-  FileText
+  FileText,
+  FolderPlus
 } from 'lucide-react';
-import { ProjectWorkspace, ProjectPalette, CollectionBoard, FavoriteColor, VaultPalette } from '../types';
+import { ProjectWorkspace, ProjectPalette, CollectionBoard, FavoriteColor, VaultPalette, ProjectSlot } from '../types';
+import { AddFavoriteToTargetModal } from './AddFavoriteToTargetModal';
 
 type PaletteRole = 'Primária' | 'Secundária' | 'Acentos' | 'UI / Superfícies' | 'Semântica' | 'Dark Mode';
 
@@ -36,6 +38,14 @@ interface ProjectsVaultViewProps {
   onDeleteFavoriteColor: (id: string) => void;
   onDeleteCollection: (id: string) => void;
   onSendToAudit: (colors: string[]) => void;
+  onAddColorsToProject?: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => void;
+  onAddColorsToCollection?: (collectionId: string, colors: string[]) => void;
+  showToast?: (msg: string) => void;
 }
 
 export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
@@ -54,10 +64,18 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
   onCreateCollection,
   onDeleteFavoriteColor,
   onDeleteCollection,
-  onSendToAudit
+  onSendToAudit,
+  onAddColorsToProject,
+  onAddColorsToCollection,
+  showToast
 }) => {
   const [activeTab, setActiveTab] = useState<'projects' | 'collections' | 'favorites'>('projects');
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Favorite Swatches multi-select state
+  const [selectedFavIds, setSelectedFavIds] = useState<string[]>([]);
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
+  const [modalColors, setModalColors] = useState<string[]>([]);
 
   // Vault sub-filter
   const [vaultFilter, setVaultFilter] = useState<'all' | 'palettes' | 'swatches'>('all');
@@ -91,7 +109,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
   const [newVaultNotes, setNewVaultNotes] = useState('');
 
   const handleCopy = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
+    void navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 1500);
   };
@@ -864,67 +882,147 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
             {/* SEÇÃO 2: AMOSTRAS INDIVIDUAIS DO COFRE */}
             {(vaultFilter === 'all' || vaultFilter === 'swatches') && (
               <div className="space-y-4">
-                <h3 className="text-xs font-mono uppercase text-[#06B6D4] font-bold tracking-wider flex items-center gap-1.5">
-                  <Bookmark className="w-3.5 h-3.5" />
-                  Amostras Individuais Salvas ({favoriteColors.length})
-                </h3>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-[#111827] p-3 rounded-xl border border-white/[0.06]">
+                  <h3 className="text-xs font-mono uppercase text-[#06B6D4] font-bold tracking-wider flex items-center gap-1.5">
+                    <Bookmark className="w-3.5 h-3.5" />
+                    Amostras Individuais Salvas ({favoriteColors.length})
+                  </h3>
+
+                  {favoriteColors.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        onClick={() => {
+                          if (selectedFavIds.length === favoriteColors.length) {
+                            setSelectedFavIds([]);
+                          } else {
+                            setSelectedFavIds(favoriteColors.map(f => f.id));
+                          }
+                        }}
+                        className="px-2.5 py-1 rounded bg-white/[0.06] hover:bg-white/[0.1] text-xs font-mono text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+                      >
+                        {selectedFavIds.length === favoriteColors.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                      </button>
+
+                      {selectedFavIds.length > 0 && (
+                        <>
+                          <button
+                            onClick={() => {
+                              const chosenColors = favoriteColors
+                                .filter(f => selectedFavIds.includes(f.id))
+                                .map(f => f.hex);
+                              setModalColors(chosenColors);
+                              setIsTargetModalOpen(true);
+                            }}
+                            className="px-3 py-1 rounded bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                          >
+                            <FolderPlus className="w-3.5 h-3.5 text-[#06B6D4]" />
+                            <span>Adicionar ({selectedFavIds.length}) a Projeto / Coleção</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Excluir as ${selectedFavIds.length} amostras selecionadas?`)) {
+                                selectedFavIds.forEach(id => onDeleteFavoriteColor(id));
+                                setSelectedFavIds([]);
+                              }
+                            }}
+                            className="p-1.5 rounded bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-xs font-semibold transition-colors cursor-pointer"
+                            title="Excluir selecionadas"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                  {favoriteColors.map((fav) => (
-                    <div
-                      key={fav.id}
-                      className="p-4 bg-[#111827] border border-white/[0.06] rounded-xl flex items-start justify-between gap-4 group hover:border-white/20 transition-all"
-                    >
-                      <div className="flex items-start gap-3 flex-1 min-w-0">
-                        <div
-                          className="w-12 h-12 rounded-lg shrink-0 shadow-lg border border-white/10"
-                          style={{ backgroundColor: fav.hex }}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm font-bold font-mono text-white">
-                              {fav.hex}
-                            </span>
-                            <span className="text-xs text-[#94A3B8] truncate">{fav.name}</span>
-                          </div>
-                          <p className="text-xs text-[#64748B] mt-1 leading-snug line-clamp-2">
-                            {fav.note}
-                          </p>
-                          <div className="flex flex-wrap gap-1 mt-2">
-                            {fav.tags.map((t) => (
-                              <span key={`${fav.id}-tag-${t}`} className="px-1.5 py-0.2 rounded bg-white/[0.06] text-[10px] text-[#06B6D4] font-mono">
-                                {t}
+                  {favoriteColors.map((fav) => {
+                    const isSelected = selectedFavIds.includes(fav.id);
+                    return (
+                      <div
+                        key={fav.id}
+                        className={`p-4 bg-[#111827] border rounded-xl flex items-start justify-between gap-4 group transition-all relative ${
+                          isSelected
+                            ? 'border-[#6366F1] ring-1 ring-[#6366F1]/50 bg-[#161B2E]'
+                            : 'border-white/[0.06] hover:border-white/20'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 flex-1 min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedFavIds(prev => [...prev, fav.id]);
+                              } else {
+                                setSelectedFavIds(prev => prev.filter(id => id !== fav.id));
+                              }
+                            }}
+                            className="mt-1 rounded bg-[#181C24] border-white/20 text-[#6366F1] focus:ring-[#6366F1] cursor-pointer"
+                            aria-label={`Selecionar ${fav.hex}`}
+                          />
+                          <div
+                            className="w-12 h-12 rounded-lg shrink-0 shadow-lg border border-white/10"
+                            style={{ backgroundColor: fav.hex }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-sm font-bold font-mono text-white">
+                                {fav.hex}
                               </span>
-                            ))}
+                              <span className="text-xs text-[#94A3B8] truncate">{fav.name}</span>
+                            </div>
+                            <p className="text-xs text-[#64748B] mt-1 leading-snug line-clamp-2">
+                              {fav.note}
+                            </p>
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {fav.tags.map((t) => (
+                                <span key={`${fav.id}-tag-${t}`} className="px-1.5 py-0.2 rounded bg-white/[0.06] text-[10px] text-[#06B6D4] font-mono">
+                                  {t}
+                                </span>
+                              ))}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex flex-col items-end gap-2 shrink-0">
-                        <button
-                          onClick={() => onSendToAudit([fav.hex])}
-                          className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] text-[#94A3B8] hover:text-[#06B6D4] transition-colors cursor-pointer"
-                          title="Auditar Contraste & Daltonismo"
-                        >
-                          <ShieldCheck className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleCopy(fav.id, fav.hex)}
-                          className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
-                          title="Copiar Código Hex"
-                        >
-                          {copiedId === fav.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        </button>
-                        <button
-                          onClick={() => onDeleteFavoriteColor(fav.id)}
-                          className="p-1.5 text-[#64748B] hover:text-rose-400 transition-colors cursor-pointer"
-                          title="Remover do Cofre"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+                        <div className="flex flex-col items-end gap-2 shrink-0">
+                          <button
+                            onClick={() => {
+                              setModalColors([fav.hex]);
+                              setIsTargetModalOpen(true);
+                            }}
+                            className="p-1.5 rounded-md bg-[#6366F1]/20 hover:bg-[#6366F1]/40 text-[#6366F1] hover:text-white transition-colors cursor-pointer"
+                            title="Colocar em Projeto ou Coleção"
+                          >
+                            <FolderPlus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => onSendToAudit([fav.hex])}
+                            className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] text-[#94A3B8] hover:text-[#06B6D4] transition-colors cursor-pointer"
+                            title="Auditar Contraste & Daltonismo"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleCopy(fav.id, fav.hex)}
+                            className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+                            title="Copiar Código Hex"
+                          >
+                            {copiedId === fav.id ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                          </button>
+                          <button
+                            onClick={() => onDeleteFavoriteColor(fav.id)}
+                            className="p-1.5 text-[#64748B] hover:text-rose-400 transition-colors cursor-pointer"
+                            title="Remover do Cofre"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -1266,6 +1364,28 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Modal: Adicionar Amostras a Projeto ou Coleção */}
+      <AddFavoriteToTargetModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+        selectedColors={modalColors}
+        projects={projects}
+        collections={collections}
+        onAddColorsToProject={(projId, slot, colors, name) => {
+          if (onAddColorsToProject) {
+            onAddColorsToProject(projId, slot, colors, name);
+          }
+        }}
+        onAddColorsToCollection={(colId, colors) => {
+          if (onAddColorsToCollection) {
+            onAddColorsToCollection(colId, colors);
+          }
+        }}
+        onCreateProject={onCreateProject}
+        onCreateCollection={onCreateCollection}
+        showToast={showToast}
+      />
     </div>
   );
 };

@@ -14,7 +14,7 @@ import {
 import {
   AiProvider,
   AiApiConfig,
-  getAiConfig,
+  loadAiConfig,
   saveAiConfig,
   testAiConnection,
   DEFAULT_AI_CONFIG
@@ -60,8 +60,71 @@ const PROVIDER_METADATA: Record<
   }
 };
 
+const getProviderApiKey = (provider: AiProvider, config: AiApiConfig): string => {
+  switch (provider) {
+    case 'gemini':
+      return config.geminiApiKey;
+    case 'openrouter':
+      return config.openrouterApiKey;
+    case 'openai':
+      return config.openaiApiKey;
+    case 'claude':
+      return config.claudeApiKey;
+  }
+};
+
+const getProviderModel = (provider: AiProvider, config: AiApiConfig): string => {
+  switch (provider) {
+    case 'gemini':
+      return config.geminiModel || DEFAULT_AI_CONFIG.geminiModel;
+    case 'openrouter':
+      return config.openrouterModel || DEFAULT_AI_CONFIG.openrouterModel;
+    case 'openai':
+      return config.openaiModel || DEFAULT_AI_CONFIG.openaiModel;
+    case 'claude':
+      return config.claudeModel || DEFAULT_AI_CONFIG.claudeModel;
+  }
+};
+
+const getProviderFields = (provider: AiProvider): { keyField: keyof AiApiConfig; modelField: keyof AiApiConfig } => {
+  switch (provider) {
+    case 'openrouter':
+      return { keyField: 'openrouterApiKey', modelField: 'openrouterModel' };
+    case 'openai':
+      return { keyField: 'openaiApiKey', modelField: 'openaiModel' };
+    case 'claude':
+      return { keyField: 'claudeApiKey', modelField: 'claudeModel' };
+    case 'gemini':
+    default:
+      return { keyField: 'geminiApiKey', modelField: 'geminiModel' };
+  }
+};
+
+const getApiKeyPlaceholder = (provider: AiProvider): string => {
+  switch (provider) {
+    case 'gemini':
+      return 'AIzaSy...';
+    case 'openrouter':
+      return 'sk-or-v1-...';
+    case 'openai':
+      return 'sk-proj-...';
+    case 'claude':
+      return 'sk-ant-...';
+  }
+};
+
+const getTestStatusBadgeStyle = (status: 'idle' | 'testing' | 'success' | 'error'): string => {
+  if (status === 'success') {
+    return 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300';
+  }
+  if (status === 'error') {
+    return 'bg-rose-950/40 border-rose-500/30 text-rose-300';
+  }
+  return 'bg-[#181C26] border-white/10 text-[#94A3B8]';
+};
+
 export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSavedNotice }) => {
-  const [config, setConfig] = useState<AiApiConfig>(getAiConfig());
+  const [config, setConfig] = useState<AiApiConfig>(DEFAULT_AI_CONFIG);
   const [selectedProviderTab, setSelectedProviderTab] = useState<AiProvider>('gemini');
   const [showKeys, setShowKeys] = useState<Record<AiProvider, boolean>>({
     gemini: false,
@@ -82,10 +145,16 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
     claude: ''
   });
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   useEffect(() => {
-    setConfig(getAiConfig());
-  }, []);
+    if (!isAdmin) return;
+    void loadAiConfig()
+      .then(setConfig)
+      .catch((err: unknown) => {
+        console.warn('Não foi possível carregar a configuração de IA:', err);
+      });
+  }, [isAdmin]);
 
   if (!isAdmin) {
     return null;
@@ -100,34 +169,24 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
     setSavedSuccess(false);
   };
 
-  const handleSave = (e: React.SyntheticEvent) => {
+  const handleSave = async (e: React.SyntheticEvent) => {
     e.preventDefault();
-    saveAiConfig(config);
-    setSavedSuccess(true);
-    if (onSavedNotice) {
-      onSavedNotice(`Configurações de IA salvas! Provedor ativo: [${PROVIDER_METADATA[config.activeProvider].name}]`);
+    try {
+      await saveAiConfig(config);
+      setSavedSuccess(true);
+      if (onSavedNotice) {
+        onSavedNotice(`Configurações de IA salvas! Provedor ativo: [${PROVIDER_METADATA[config.activeProvider].name}]`);
+      }
+      setTimeout(() => setSavedSuccess(false), 4000);
+    } catch (err) {
+      console.error('Falha ao salvar a configuração de IA:', err);
+      setSaveError(err instanceof Error ? err.message : 'Falha ao salvar a configuração de IA.');
     }
-    setTimeout(() => setSavedSuccess(false), 4000);
   };
 
   const handleTestConnection = async (provider: AiProvider) => {
-    const apiKey =
-      provider === 'gemini'
-        ? config.geminiApiKey || (import.meta.env.VITE_GEMINI_API_KEY as string) || (import.meta.env.GEMINI_API_KEY as string) || ''
-        : provider === 'openrouter'
-        ? config.openrouterApiKey
-        : provider === 'openai'
-        ? config.openaiApiKey
-        : config.claudeApiKey;
-
-    const model =
-      provider === 'gemini'
-        ? config.geminiModel || DEFAULT_AI_CONFIG.geminiModel
-        : provider === 'openrouter'
-        ? config.openrouterModel || DEFAULT_AI_CONFIG.openrouterModel
-        : provider === 'openai'
-        ? config.openaiModel || DEFAULT_AI_CONFIG.openaiModel
-        : config.claudeModel || DEFAULT_AI_CONFIG.claudeModel;
+    const apiKey = getProviderApiKey(provider, config);
+    const model = getProviderModel(provider, config);
 
     if (!apiKey.trim()) {
       setTestStatus((prev) => ({ ...prev, [provider]: 'error' }));
@@ -140,13 +199,8 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
 
     try {
       const res = await testAiConnection(provider, apiKey.trim(), model.trim());
-      if (res.success) {
-        setTestStatus((prev) => ({ ...prev, [provider]: 'success' }));
-        setTestMessage((prev) => ({ ...prev, [provider]: res.message }));
-      } else {
-        setTestStatus((prev) => ({ ...prev, [provider]: 'error' }));
-        setTestMessage((prev) => ({ ...prev, [provider]: res.message }));
-      }
+      setTestStatus((prev) => ({ ...prev, [provider]: res.success ? 'success' : 'error' }));
+      setTestMessage((prev) => ({ ...prev, [provider]: res.message }));
     } catch (err) {
       setTestStatus((prev) => ({ ...prev, [provider]: 'error' }));
       setTestMessage((prev) => ({
@@ -155,8 +209,6 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
       }));
     }
   };
-
-  const envGeminiKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || (import.meta.env.GEMINI_API_KEY as string);
 
   return (
     <div className="bg-[#181C24] border border-[#6366F1]/30 rounded-2xl p-6 sm:p-7 shadow-2xl space-y-6 relative overflow-hidden">
@@ -196,9 +248,9 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
       <form onSubmit={handleSave} className="space-y-6">
         {/* Active Provider Selector */}
         <div>
-          <label className="text-xs font-mono uppercase text-[#94A3B8] block mb-2 font-semibold">
+          <span className="text-xs font-mono uppercase text-[#94A3B8] block mb-2 font-semibold">
             Provedor Ativo de IA para o CMS:
-          </label>
+          </span>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {(['gemini', 'openrouter', 'openai', 'claude'] as AiProvider[]).map((p) => {
               const meta = PROVIDER_METADATA[p];
@@ -208,11 +260,10 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
                   key={p}
                   type="button"
                   onClick={() => setConfig((prev) => ({ ...prev, activeProvider: p }))}
-                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${
-                    isActive
+                  className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer relative flex flex-col justify-between ${isActive
                       ? 'bg-[#1C2232] border-[#06B6D4] shadow-lg shadow-cyan-500/10 ring-1 ring-[#06B6D4]/50'
                       : 'bg-[#111827] border-white/[0.08] hover:border-white/20 text-[#94A3B8]'
-                  }`}
+                    }`}
                 >
                   <div>
                     <div className="flex items-center justify-between mb-1">
@@ -244,11 +295,10 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
                 key={p}
                 type="button"
                 onClick={() => setSelectedProviderTab(p)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
-                  selectedProviderTab === p
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${selectedProviderTab === p
                     ? 'bg-[#202534] text-white border border-white/10'
                     : 'text-[#94A3B8] hover:text-white hover:bg-white/[0.04]'
-                }`}
+                  }`}
               >
                 <span>{PROVIDER_METADATA[p].name}</span>
                 {config.activeProvider === p && (
@@ -265,20 +315,7 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
             const p = selectedProviderTab;
             const meta = PROVIDER_METADATA[p];
             const isCurrentActive = config.activeProvider === p;
-
-            let keyField: keyof AiApiConfig = 'geminiApiKey';
-            let modelField: keyof AiApiConfig = 'geminiModel';
-
-            if (p === 'openrouter') {
-              keyField = 'openrouterApiKey';
-              modelField = 'openrouterModel';
-            } else if (p === 'openai') {
-              keyField = 'openaiApiKey';
-              modelField = 'openaiModel';
-            } else if (p === 'claude') {
-              keyField = 'claudeApiKey';
-              modelField = 'claudeModel';
-            }
+            const { keyField, modelField } = getProviderFields(p);
 
             const currentKey = config[keyField] as string;
             const currentModel = (config[modelField] as string) || meta.defaultModel;
@@ -308,9 +345,9 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
                       <Key className="w-3.5 h-3.5 text-[#06B6D4]" />
                       Chave de API ({meta.name}):
                     </label>
-                    {p === 'gemini' && envGeminiKey && !currentKey && (
+                    {p === 'gemini' && currentKey && (
                       <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
-                        Chave detectada nas variáveis de ambiente ({meta.envVar})
+                        Chave armazenada no Supabase (somente administradores têm acesso)
                       </span>
                     )}
                   </div>
@@ -320,17 +357,7 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
                       type={showKeys[p] ? 'text' : 'password'}
                       value={currentKey}
                       onChange={(e) => handleFieldChange(keyField, e.target.value)}
-                      placeholder={
-                        p === 'gemini'
-                          ? envGeminiKey
-                            ? 'Usando VITE_GEMINI_API_KEY (ou digite uma chave personalizada)'
-                            : 'AIzaSy...'
-                          : p === 'openrouter'
-                          ? 'sk-or-v1-...'
-                          : p === 'openai'
-                          ? 'sk-proj-...'
-                          : 'sk-ant-...'
-                      }
+                      placeholder={getApiKeyPlaceholder(p)}
                       className="w-full bg-[#181C26] border border-white/[0.1] rounded-lg pl-3 pr-10 py-2 text-xs font-mono text-white placeholder-[#64748B] focus:outline-none focus:border-[#06B6D4]"
                     />
                     <button
@@ -382,13 +409,7 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
 
                   {testMessage[p] && (
                     <div
-                      className={`text-xs font-mono px-3 py-1.5 rounded-lg flex items-center gap-1.5 border ${
-                        testStatus[p] === 'success'
-                          ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-                          : testStatus[p] === 'error'
-                          ? 'bg-rose-950/40 border-rose-500/30 text-rose-300'
-                          : 'bg-[#181C26] border-white/10 text-[#94A3B8]'
-                      }`}
+                      className={`text-xs font-mono px-3 py-1.5 rounded-lg flex items-center gap-1.5 border ${getTestStatusBadgeStyle(testStatus[p])}`}
                     >
                       {testStatus[p] === 'success' ? (
                         <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
@@ -406,6 +427,11 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
 
         {/* Save Bar */}
         <div className="flex items-center justify-end gap-3 pt-2">
+          {saveError && (
+            <span className="text-[11px] font-mono text-rose-300 bg-rose-950/40 border border-rose-500/30 px-3 py-1.5 rounded-lg">
+              {saveError}
+            </span>
+          )}
           <button
             type="submit"
             className="h-9 px-5 rounded-lg bg-gradient-to-r from-[#6366F1] to-[#06B6D4] hover:opacity-95 text-white text-xs font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all cursor-pointer active:scale-[0.98]"
@@ -418,3 +444,4 @@ export const AdminAiSettings: React.FC<AdminAiSettingsProps> = ({ isAdmin, onSav
     </div>
   );
 };
+

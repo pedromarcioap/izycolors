@@ -63,6 +63,40 @@ npm run dev
 bun dev
 Open http://localhost:5173 in your browser.
 
+## 🗄️ Backend (Supabase)
+
+Não existe mais mock: **toda** persistência acontece no Postgres, com a RLS do
+banco decidindo o que cada sessão pode ler e escrever.
+
+- **Tabelas** (`supabase/migrations/`) — `profiles`, `palettes`, `palette_likes`,
+  `palette_forks`, `projects`, `project_palettes`, `collections`,
+  `vault_palettes`, `favorite_colors`, `user_workspace_state`, `cms_articles`,
+  `community_submissions`, `taxonomy_tags`, `curated_images`, `audit_logs`
+  e `ai_settings`. Todas com RLS habilitada.
+- **Auth & RBAC** — `auth.users` + `profiles`. O trigger `handle_new_user` cria o
+  perfil sempre com `role = 'user'`; `raw_user_meta_data` **nunca** é usado para
+  autorização porque é editável pelo cliente. Cargos só mudam via RPC
+  `admin_set_profile_role`, restrita a administradores.
+- **Storage** — bucket público `avatars` com escrita restrita à pasta
+  `<auth.uid()>/` do próprio usuário (INSERT + SELECT + UPDATE + DELETE).
+- **Edge Functions** — `ai-generate-article` (geração de artigos; as chaves dos
+  provedores ficam em `ai_settings` e nunca chegam ao navegador) e
+  `admin-create-user` (única rota com `service_role` para gravar em `auth.users`).
+
+Aplicando as migrations localmente:
+
+```bash
+supabase link --project-ref <seu-ref>
+supabase db push
+```
+
+Para promover o primeiro administrador (não existe rota segura na aplicação,
+porque qualquer auto-promoção seria explorável):
+
+```sql
+UPDATE public.profiles SET role = 'admin' WHERE email = 'seu@email.com';
+```
+
 📂 Project Structure
 
 Plaintext
@@ -71,13 +105,29 @@ src/
 
 ├── components/     # UI views, modals, and navigation controls[cite: 1]
 
-├── data/           # Default configurations and starter presets[cite: 1]
+├── services/       # Supabase client, data-access layer, auth and AI services[cite: 1]
 
-├── services/       # Supabase client and authentication services[cite: 1]
+│   ├── supabase.ts           # bootstrap do cliente (env vars)[cite: 1]
 
-├── utils/          # Mathematical color conversion and contrast algorithms[cite: 1]
+│   ├── db.ts                 # única porta de entrada para o Postgres[cite: 1]
+
+│   ├── authService.ts        # Supabase Auth + RBAC[cite: 1]
+
+│   ├── avatarService.ts      # upload de avatar no Storage[cite: 1]
+
+│   └── aiArticleService.ts   # config de IA + invocação da Edge Function[cite: 1]
+
+├── hooks/          # Reusable React hooks[cite: 1]
+
+├── utils/          # Conversão cromática, contraste e formatação de datas[cite: 1]
 
 └── types.ts        # Global TypeScript interfaces and definitions[cite: 1]
+
+supabase/
+
+├── functions/      # Edge Functions (runtime Deno)[cite: 1]
+
+└── migrations/     # Schema, RLS, triggers e seed[cite: 1]
 
 🤝 Contributing
 

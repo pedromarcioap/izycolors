@@ -29,5 +29,11 @@
   "include": [
     "src",
     "vite.config.ts"
+  ],
+  /* Edge Functions rodam no runtime Deno, não no bundle do navegador.
+     Possuem os seus próprios tipos (Deno, npm:/jsr:) e ficam fora do tsc
+     da aplicação; são validados pelo deploy no Supabase. */
+  "exclude": [
+    "supabase"
   ]
 }

@@ -74,11 +74,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     setLoading(false);
 
     if (res.success && res.user) {
-      setSuccessMsg(
-        res.viaSupabase
-          ? `Autenticado com sucesso via Supabase Cloud como ${res.user.role.toUpperCase()}!`
-          : `Sessão iniciada como ${res.user.role.toUpperCase()} (${res.user.name})`
-      );
+      setSuccessMsg(`Autenticado com sucesso via Supabase Auth como ${res.user.role.toUpperCase()}!`);
       onUserChange(res.user);
       setTimeout(() => {
         onClose();
@@ -94,20 +90,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({
       setErrorMsg('Preencha os campos obrigatórios.');
       return;
     }
-    if (supabaseCreds.isConfigured && password && password.length < 6) {
-      setErrorMsg('A senha deve conter no mínimo 6 caracteres para o Supabase Auth.');
+    if (password.trim().length < 6) {
+      setErrorMsg('A senha deve conter no mínimo 6 caracteres.');
       return;
     }
     setErrorMsg(null);
     setSuccessMsg(null);
     setLoading(true);
 
-    // O cadastro publico nunca envia cargo: o nivel e forcado como Usuario Comum
-    // no authService e no trigger do Supabase (handle_new_user).
+    // O cadastro público nunca envia cargo: o nível é fixado como 'user' pelo
+    // trigger do Supabase (handle_new_user). Enviar `role` em user_metadata
+    // não teria efeito — e nem deve, pois o cliente controla esse campo.
     const res = await registerUser({
       name: name.trim(),
       email: email.trim(),
-      password: password.trim() || undefined,
+      password: password.trim(),
       handle: handle.trim() || undefined
     });
     setLoading(false);
@@ -115,6 +112,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     if (res.success && res.user) {
       setSuccessMsg(res.message || 'Conta criada com sucesso!');
       onUserChange(res.user);
+      setTimeout(() => {
+        onClose();
+      }, 900);
+    } else if (res.success) {
+      setSuccessMsg(res.message || 'Conta criada. Confirme o e-mail para ativar o acesso.');
       setTimeout(() => {
         onClose();
       }, 900);
@@ -337,7 +339,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   <input
                     id="login-password"
                     type={showPassword ? "text" : "password"}
-                    placeholder={supabaseCreds.isConfigured ? "Sua senha do Supabase Auth" : "Qualquer senha (modo local)"}
+                    placeholder="Sua senha do Supabase Auth"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg pl-9 pr-9 py-2 text-xs text-white placeholder-[#64748B] focus:outline-none focus:border-[#6366F1]"
@@ -426,7 +428,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
               <div>
                 <label htmlFor="register-password" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1.5">
-                  Senha de Acesso {supabaseCreds.isConfigured && '(mínimo 6 caracteres)'} *
+                  Senha de Acesso (mínimo 6 caracteres) *
                 </label>
                 <div className="relative">
                   <Lock className="w-4 h-4 text-[#64748B] absolute left-3 top-1/2 -translate-y-1/2" />

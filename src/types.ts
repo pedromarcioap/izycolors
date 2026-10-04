@@ -1,5 +1,8 @@
 export type ColorGamut = 'sRGB' | 'Display P3' | 'Rec.2020';
 
+/** Target bucket type when assigning colors to a project workspace. */
+export type ProjectSlot = 'primary' | 'secondary' | 'neutral' | 'palette';
+
 /** Supported color representation formats for token export. */
 export type ColorFormat = 'OKLCH' | 'HEX' | 'RGB' | 'HSL';
 

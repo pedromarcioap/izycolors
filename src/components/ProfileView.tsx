@@ -23,7 +23,8 @@ import {
   Send,
   Eye,
   BarChart3,
-  Camera
+  Camera,
+  FolderPlus
 } from 'lucide-react';
 import {
   UserProfile,
@@ -35,11 +36,13 @@ import {
   CommunitySubmission,
   AuthUser,
   ColorFormat,
-  NamingConvention
+  NamingConvention,
+  ProjectSlot
 } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
 import { UserAnalyticsDashboard } from './UserAnalyticsDashboard';
 import { AdminAiSettings } from './AdminAiSettings';
+import { AddFavoriteToTargetModal } from './AddFavoriteToTargetModal';
 
 interface ProfileViewProps {
   authUser: AuthUser;
@@ -57,6 +60,17 @@ interface ProfileViewProps {
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   onDeleteFavoriteColor?: (hex: string) => void;
   onDeleteVaultPalette?: (id: string) => void;
+  onDeleteCollection?: (id: string) => void;
+  onAddColorsToProject?: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => void;
+  onAddColorsToCollection?: (collectionId: string, colors: string[]) => void;
+  onCreateProject?: (project: ProjectWorkspace) => void;
+  onCreateCollection?: (collection: CollectionBoard) => void;
+  showToast?: (msg: string) => void;
   onOpenAuthModal?: () => void;
   onOpenAvatarEditor?: () => void;
   onLogout?: () => void;
@@ -391,19 +405,21 @@ interface SwatchesPanelProps {
   copiedColor: string | null;
   onCopyColorHex: (hex: string) => void;
   onDeleteFavoriteColor?: (hex: string) => void;
+  onOpenTargetModal?: (hex: string) => void;
 }
 
 const SwatchesPanel: React.FC<SwatchesPanelProps> = ({
   favoriteColors,
   copiedColor,
   onCopyColorHex,
-  onDeleteFavoriteColor
+  onDeleteFavoriteColor,
+  onOpenTargetModal
 }) => (
   <div className="bg-[#141822] border border-white/[0.08] rounded-xl p-6 shadow-xl">
     <div className="flex items-center justify-between mb-4">
       <div>
         <h3 className="text-base font-semibold text-white font-['Geist']">Cores & Amostras Favoritas</h3>
-        <p className="text-xs text-[#94A3B8] mt-0.5">Clique em qualquer amostra para copiar o código hexadecimal instantaneamente.</p>
+        <p className="text-xs text-[#94A3B8] mt-0.5">Clique em qualquer amostra para copiar o código hexadecimal ou adicioná-la a projetos e coleções.</p>
       </div>
       <span className="text-xs font-mono text-[#64748B]">{favoriteColors.length} amostras</span>
     </div>
@@ -431,7 +447,7 @@ const SwatchesPanel: React.FC<SwatchesPanelProps> = ({
                 aria-label={`Copiar cor ${hexVal}`}
               >
                 <div
-                  className="w-full h-16 rounded-lg border border-white/10 shadow-inner flex items-center justify-center"
+                  className="w-full h-16 rounded-lg border border-white/10 shadow-inner flex items-center justify-center relative"
                   style={{ backgroundColor: hexVal }}
                 >
                   {copiedColor === hexVal && (
@@ -450,20 +466,37 @@ const SwatchesPanel: React.FC<SwatchesPanelProps> = ({
                 )}
               </button>
 
-              {onDeleteFavoriteColor && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteFavoriteColor(hexVal);
-                  }}
-                  className="absolute top-1.5 right-1.5 w-5 h-5 bg-black/60 hover:bg-red-500 text-white/70 hover:text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                  title="Remover dos favoritos"
-                  aria-label={`Remover ${hexVal} dos favoritos`}
-                >
-                  <Trash2 className="w-2.5 h-2.5" />
-                </button>
-              )}
+              <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {onOpenTargetModal && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onOpenTargetModal(hexVal);
+                    }}
+                    className="w-5 h-5 bg-black/60 hover:bg-[#6366F1] text-white/70 hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                    title="Adicionar a Projeto ou Coleção"
+                    aria-label={`Adicionar ${hexVal} a Projeto ou Coleção`}
+                  >
+                    <FolderPlus className="w-2.5 h-2.5" />
+                  </button>
+                )}
+
+                {onDeleteFavoriteColor && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteFavoriteColor(hexVal);
+                    }}
+                    className="w-5 h-5 bg-black/60 hover:bg-red-500 text-white/70 hover:text-white rounded-full flex items-center justify-center cursor-pointer transition-colors"
+                    title="Remover dos favoritos"
+                    aria-label={`Remover ${hexVal} dos favoritos`}
+                  >
+                    <Trash2 className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
@@ -474,23 +507,43 @@ const SwatchesPanel: React.FC<SwatchesPanelProps> = ({
 
 interface CollectionsPanelProps {
   collections: CollectionBoard[];
+  onDeleteCollection?: (id: string) => void;
 }
 
-const CollectionsPanel: React.FC<CollectionsPanelProps> = ({ collections }) => (
+const CollectionsPanel: React.FC<CollectionsPanelProps> = ({ collections, onDeleteCollection }) => (
   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
     {collections.map((col) => (
-      <div key={col.id} className="bg-[#181C24] border border-white/[0.08] rounded-xl p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-base font-bold text-white font-['Geist']">{col.title}</h3>
-          <span className="text-xs font-mono text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-2 py-0.5 rounded">
-            {(col.paletteIds || []).length} Paletas
-          </span>
+      <div key={col.id} className="bg-[#181C24] border border-white/[0.08] rounded-xl p-6 shadow-xl flex flex-col justify-between">
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-bold text-white font-['Geist']">{col.title}</h3>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-mono text-[#06B6D4] bg-[#06B6D4]/10 border border-[#06B6D4]/30 px-2 py-0.5 rounded">
+                {(col.paletteIds || []).length} Paletas
+              </span>
+              {onDeleteCollection && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm(`Tem certeza de que deseja excluir a coleção "${col.title}"?`)) {
+                      onDeleteCollection(col.id);
+                    }
+                  }}
+                  className="p-1 text-[#94A3B8] hover:text-rose-400 transition-colors cursor-pointer rounded hover:bg-rose-500/10"
+                  title="Excluir Coleção ou Board"
+                  aria-label={`Excluir coleção ${col.title}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+          <p className="text-xs text-[#94A3B8] mb-4">{col.description || 'Board temático de design system.'}</p>
         </div>
-        <p className="text-xs text-[#94A3B8] mb-4">{col.description || 'Board temático de design system.'}</p>
 
         <div className="flex items-center gap-1.5 p-3 bg-[#10141D] rounded-lg border border-white/[0.04]">
-          {(col.coverColors || ['#0E1726', '#08BBD9', '#3B82F6']).map((c) => (
-            <div key={c} className="h-6 flex-1 rounded border border-white/10" style={{ backgroundColor: c }} title={c} />
+          {(col.coverColors || ['#0E1726', '#08BBD9', '#3B82F6']).map((c, i) => (
+            <div key={`${col.id}-${c}-${i}`} className="h-6 flex-1 rounded border border-white/10" style={{ backgroundColor: c }} title={c} />
           ))}
         </div>
       </div>
@@ -927,6 +980,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   onUpdateProfile,
   onDeleteFavoriteColor,
   onDeleteVaultPalette,
+  onDeleteCollection,
+  onAddColorsToProject,
+  onAddColorsToCollection,
+  onCreateProject,
+  onCreateCollection,
+  showToast,
   onOpenAuthModal,
   onOpenAvatarEditor,
   onLogout,
@@ -936,6 +995,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<SubTab>(initialSubTab || 'analytics');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [copiedColor, setCopiedColor] = useState<string | null>(null);
+
+  // Target modal state for favorite swatches
+  const [isTargetModalOpen, setIsTargetModalOpen] = useState(false);
+  const [modalColors, setModalColors] = useState<string[]>([]);
 
   const safePalettes = toArray(palettes);
   const safeProjects = toArray(projects);
@@ -1002,30 +1065,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
     includeComments: overrides.includeComments ?? tokenIncludeComments
   });
 
+  // As preferências são persistidas no Supabase via onUpdateProfile
+  // (coluna `profiles.export_preferences`). Não há mais cache em localStorage.
   const handleSaveTokenPreferences = (e?: React.SyntheticEvent) => {
     if (e) e.preventDefault();
-    const updatedPreferences = buildPreferences();
     onUpdateProfile({
-      exportPreferences: updatedPreferences
+      exportPreferences: buildPreferences()
     });
-    try {
-      localStorage.setItem('chromatica_token_prefs', JSON.stringify(updatedPreferences));
-    } catch (err) {
-      console.error('Erro ao salvar chromatica_token_prefs:', err);
-    }
     setTokenPrefsSaved(true);
     setTimeout(() => setTokenPrefsSaved(false), 2500);
   };
 
   const handleCopyTokens = (p: Palette) => {
     const css = exportCssTokens(p.colors, p.title.toLowerCase().replace(/\s+/g, '-'));
-    navigator.clipboard.writeText(css);
+    void navigator.clipboard.writeText(css);
     setCopiedId(p.id);
     setTimeout(() => setCopiedId(null), 2000);
   };
 
   const handleCopyColorHex = (hex: string) => {
-    navigator.clipboard.writeText(hex);
+    void navigator.clipboard.writeText(hex);
     setCopiedColor(hex);
     setTimeout(() => setCopiedColor(null), 1800);
   };
@@ -1097,6 +1156,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             copiedColor={copiedColor}
             onCopyColorHex={handleCopyColorHex}
             onDeleteFavoriteColor={onDeleteFavoriteColor}
+            onOpenTargetModal={(hex) => {
+              setModalColors([hex]);
+              setIsTargetModalOpen(true);
+            }}
           />
         );
       case 'showcase':
@@ -1111,27 +1174,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
                 <div className="p-4 bg-[#10141D] rounded-lg border border-white/[0.04]">
                   <span className="text-xs font-mono text-[#94A3B8] block">Taxa de Aceite na Curadoria</span>
-                  <span className="text-2xl font-bold font-mono text-emerald-400 mt-1 block">99.2%</span>
-                  <span className="text-[11px] text-[#64748B] mt-0.5 block">Alto rigor técnico e contraste WCAG</span>
+                  <span className="text-2xl font-bold font-mono text-emerald-400 mt-1 block">
+                    {userProfile.stats.approvalRate}
+                  </span>
+                  <span className="text-[11px] text-[#64748B] mt-0.5 block">Calculada sobre as suas submissões reais</span>
                 </div>
 
                 <div className="p-4 bg-[#10141D] rounded-lg border border-white/[0.04]">
-                  <span className="text-xs font-mono text-[#94A3B8] block">Exportações Realizadas</span>
-                  <span className="text-2xl font-bold font-mono text-[#06B6D4] mt-1 block">14.8k</span>
-                  <span className="text-[11px] text-[#64748B] mt-0.5 block">Formatos Tailwind v4, CSS e Illustrator</span>
+                  <span className="text-xs font-mono text-[#94A3B8] block">Curtidas Recebidas</span>
+                  <span className="text-2xl font-bold font-mono text-[#06B6D4] mt-1 block">
+                    {userProfile.stats.likesReceived}
+                  </span>
+                  <span className="text-[11px] text-[#64748B] mt-0.5 block">Somatório das suas paletas publicadas</span>
                 </div>
 
                 <div className="p-4 bg-[#10141D] rounded-lg border border-white/[0.04]">
-                  <span className="text-xs font-mono text-[#94A3B8] block">Gamut de Preferência</span>
-                  <span className="text-2xl font-bold font-mono text-purple-400 mt-1 block">Display P3</span>
-                  <span className="text-[11px] text-[#64748B] mt-0.5 block">Calibração para telas Apple & OLED</span>
+                  <span className="text-xs font-mono text-[#94A3B8] block">Clones & Forks</span>
+                  <span className="text-2xl font-bold font-mono text-purple-400 mt-1 block">
+                    {userProfile.stats.clonesAndForks}
+                  </span>
+                  <span className="text-[11px] text-[#64748B] mt-0.5 block">Derivações criadas a partir da comunidade</span>
                 </div>
               </div>
             </div>
           </div>
         );
       case 'collections':
-        return <CollectionsPanel collections={safeCollections} />;
+        return <CollectionsPanel collections={safeCollections} onDeleteCollection={onDeleteCollection} />;
       case 'vault':
         return (
           <VaultPanel
@@ -1433,6 +1502,28 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           onClose={() => setShowEditModal(false)}
         />
       )}
+
+      {/* ADD FAVORITE TO TARGET MODAL */}
+      <AddFavoriteToTargetModal
+        isOpen={isTargetModalOpen}
+        onClose={() => setIsTargetModalOpen(false)}
+        selectedColors={modalColors}
+        projects={safeProjects}
+        collections={safeCollections}
+        onAddColorsToProject={(projId, slot, colors, name) => {
+          if (onAddColorsToProject) {
+            onAddColorsToProject(projId, slot, colors, name);
+          }
+        }}
+        onAddColorsToCollection={(colId, colors) => {
+          if (onAddColorsToCollection) {
+            onAddColorsToCollection(colId, colors);
+          }
+        }}
+        onCreateProject={onCreateProject}
+        onCreateCollection={onCreateCollection}
+        showToast={showToast}
+      />
     </div>
   );
 };

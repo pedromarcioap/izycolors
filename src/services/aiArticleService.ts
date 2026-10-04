@@ -1,13 +1,20 @@
-// - ---------------------------------------------------------------------------
-// - aiArticleService.ts
-// - Serviço de geração semiautomatizada de artigos com IA multimodal.
-// -
-// - Suporta múltiplos provedores configuráveis pelo administrador:
-// - - Google Gemini (nativo)
-// - - OpenRouter (roteador multi-modelo)
-// - - OpenAI (GPT-4o / GPT-4o-mini)
-// - - Anthropic Claude (Claude 3.5 Sonnet / Haiku)
-// - ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// aiArticleService.ts
+// ---------------------------------------------------------------------------
+// Geração semiautomatizada de artigos com IA multimodal.
+//
+// Mudança de arquitetura: a geração NÃO acontece mais no navegador.
+// Anteriormente as chaves dos provedores viviam em localStorage e eram usadas
+// em `fetch` direto do cliente — qualquer pessoa com o DevTools aberto podia
+// lê-las. Agora:
+//
+//   · a configuração fica em `ai_settings`, com RLS exclusiva de admin;
+//   · a chamada ao provedor acontece na Edge Function `ai-generate-article`,
+//     que usa a service role no servidor;
+//   · a chave nunca é lida pelo código que roda na máquina do usuário comum.
+// ---------------------------------------------------------------------------
+
+import { getSupabaseClient } from './supabase';
 
 export type ArticleTone =
   | 'Técnico & Engenharia'
@@ -52,30 +59,11 @@ export const DEFAULT_AI_CONFIG: AiApiConfig = {
   claudeModel: 'claude-3-5-sonnet-20241022'
 };
 
-const STORAGE_KEY = 'izycolors_ai_api_config';
-
-/** - Carrega as configurações de IA salvas ou retorna os padrões. */
-export function getAiConfig(): AiApiConfig {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      const parsed = JSON.parse(stored) as Partial<AiApiConfig>;
-      return { ...DEFAULT_AI_CONFIG, ...parsed };
-    }
-  } catch {
-    // - Fallback silencioso em caso de erro no parse do localStorage
-  }
-  return DEFAULT_AI_CONFIG;
-}
-
-/** - Salva as configurações de IA no localStorage. */
-export function saveAiConfig(config: AiApiConfig): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
-}
+export const AI_FUNCTION_NAME = 'ai-generate-article';
 
 export interface AiArticleReference {
   id: string;
-  /** - URL de referência ou transcrição/trecho colado pelo autor. */
+  /** URL de referência ou transcrição/trecho colado pelo autor. */
   value: string;
 }
 
@@ -83,7 +71,7 @@ export interface AiArticleImage {
   id: string;
   name: string;
   mimeType: string;
-  /** - Conteúdo da imagem codificado em Base64 (sem o prefixo "data:...;base64,"). */
+  /** Conteúdo da imagem em Base64, SEM o prefixo "data:...;base64,". */
   base64: string;
 }
 
@@ -106,536 +94,167 @@ export interface AiArticleResponse {
   content: string;
 }
 
-// - ---------------------------------------------------------------------------
-// - Configuração do modelo e orientações de tom, idioma e sintaxe
-// - ---------------------------------------------------------------------------
+const AI_SETTINGS_COLUMNS =
+  'active_provider, gemini_api_key, gemini_model, openrouter_api_key, openrouter_model, openai_api_key, openai_model, claude_api_key, claude_model';
 
-const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
+// ---------------------------------------------------------------------------
+// Configuração (somente administradores — garantido pela RLS do banco)
+// ---------------------------------------------------------------------------
 
-/** - Tabela de parâmetros mapeando cada preset para diretrizes estritas de estilo e sintaxe. */
-const TONE_GUIDANCE: Record<ArticleTone, string> = {
-  'Técnico & Engenharia':
-    'tom técnico, rigoroso e de engenharia de software, com vocabulário especializado em teoria e sintaxe de cor (oklch, hex, p3), arquitetura de design systems, performance e normas WCAG',
-  'Crítica de Design & Editorial':
-    'tom analítico, provocativo e editorial de crítica de design, discutindo escolhas estéticas, harmonia cromática, hierarquia visual e trade-offs de experiência do usuário',
-  'Didático & Passo a Passo':
-    'tom didático, estruturado e instrutivo, explicando conceitos complexos passo a passo com analogias claras, roteiros práticos e foco no aprendizado',
-  'Estudo de Caso de Produto':
-    'tom de estudo de caso corporativo e de produto, focando em resolução de problemas reais, métricas de impacto, decisões de design centradas no usuário e resultados mensuráveis',
-  'Manifesto Minimalista':
-    'tom de manifesto direto, conciso e minimalista, priorizando frases curtas, declarações de alto impacto e eliminação de redundâncias ou rodeios verbais',
-  'Personalizado':
-    'tom de voz estritamente personalizado conforme as diretrizes do autor'
-};
+/**
+ * Carrega a configuração de IA do banco.
+ * Lança quando a RLS negar o acesso, sinalizando que o usuário não é admin.
+ */
+export async function loadAiConfig(): Promise<AiApiConfig> {
+  const supabase = getSupabaseClient();
 
-const LANGUAGE_GUIDANCE: Record<ArticleLanguage, string> = {
-  'Português (Brasil)': 'português do Brasil (pt-BR)',
-  'Inglês (US)': 'inglês americano (en-US)',
-  'Espanhol': 'espanhol (es)',
-  'Francês': 'francês (fr)',
-  'Alemão': 'alemão (de)'
-};
+  const { data, error } = await supabase
+    .from('ai_settings')
+    .select(AI_SETTINGS_COLUMNS)
+    .eq('id', 1)
+    .maybeSingle();
 
-const LENGTH_GUIDANCE: Record<ArticleLength, string> = {
-  'Curto': 'artigo curto, entre 600 e 900 palavras',
-  'Médio': 'artigo de extensão média, entre 1.100 e 1.500 palavras',
-  'Longo': 'artigo longo e aprofundado, entre 1.800 e 2.600 palavras'
-};
-
-/** - Resolve a orientação de tom final, injetando instruções personalizadas caso selecionado. */
-function resolveToneGuidance(payload: AiArticlePayload): string {
-  if (payload.tone === 'Personalizado') {
-    const customText = payload.customTone?.trim();
-    if (customText) {
-      return `tom personalizado (siga rigorosamente esta instrução do autor): "${customText}"`;
-    }
-    return 'tom personalizado (redija com originalidade, clareza e tom provocativo/direto)';
+  if (error) {
+    throw new Error(
+      `Acesso negado às configurações de IA: ${error.message}`
+    );
   }
-  return TONE_GUIDANCE[payload.tone] || TONE_GUIDANCE['Técnico & Engenharia'];
-}
-
-// - ---------------------------------------------------------------------------
-// - Construção dos prompts
-// - ---------------------------------------------------------------------------
-
-function buildSystemPrompt(payload: AiArticlePayload): string {
-  const toneGuidanceText = resolveToneGuidance(payload);
-  const targetLanguageText = LANGUAGE_GUIDANCE[payload.language || 'Português (Brasil)'];
-
-  return [
-    'Você é um editor sênior de conteúdo técnico do blog IzyColors, especializado em teoria da cor, design systems, acessibilidade (WCAG) e engenharia de software.',
-    'Sua missão é transformar as diretrizes, referências e imagens fornecidas pelo autor em um artigo original, estruturado e pronto para publicação.',
-    '',
-    'REGRAS DE IDIOMA E REDAÇÃO UNIFORME:',
-    `- O artigo INTEIRO (título, slug, metaDescription, excerpt e todo o conteúdo em Markdown) DEVE ser escrito EXCLUSIVAMENTE em ${targetLanguageText}.`,
-    '- É ESTRITAMENTE PROIBIDO misturar idiomas no mesmo artigo ou gerar respostas bilíngues.',
-    '- Mantenha nomes de propriedades CSS, termos técnicos de código (como oklch, hex, WCAG, TypeScript) intactos, mas todo o texto explicativo, títulos e introduções DEVEM seguir 100% o idioma selecionado.',
-    '',
-    'REGRAS DE ANÁLISE:',
-    '- Analise profundamente todas as imagens fornecidas (capturas de tela, gráficos, diagramas, tabelas). Extraia dados visuais, valores, tendências e correlações e cite-os organicamente no texto.',
-    '- Sintetize as ideias dos links e transcrições fornecidos sem copiar trechos literais. Evite clichês corporativos vazios e jargão genérico.',
-    '- Produza conteúdo original, com argumentação própria e dados concretos.',
-    '',
-    'REGRAS DE FORMATO DA RESPOSTA:',
-    '- Responda APENAS com um JSON válido (sem markdown, sem comentários) contendo exatamente estas chaves:',
-    '  - "title": título otimizado para SEO e CTR (claro, específico, com palavra-chave).',
-    '  - "slug": URL amigável derivada do título (minúsculas, sem acentos, palavras separadas por hifens).',
-    '  - "metaDescription": descrição para mecanismos de busca com até 160 caracteres.',
-    '  - "excerpt": resumo introdutório de 2 a 3 frases para cartões e listagens.',
-    '  - "content": conteúdo completo em Markdown.',
-    '- O "content" deve:',
-    '  - Usar títulos H2 (##) e H3 (###) para estruturar as seções.',
-    '  - Incluir pelo menos uma tabela Markdown quando houver dados comparáveis.',
-    '  - Usar APENAS hifens (-) para itens de lista, nunca asteriscos ou números.',
-    '  - Respeitar 100% o idioma configurado.',
-    '',
-    'REGRAS DE ESTILO E TOM DE VOZ:',
-    `- Tom de voz: ${toneGuidanceText}.`,
-    `- Extensão: ${LENGTH_GUIDANCE[payload.length]}.`,
-    '- Título, slug, metaDescription, excerpt e content devem ser totalmente coerentes entre si.'
-  ].join('\n');
-}
-
-function buildUserPrompt(payload: AiArticlePayload): string {
-  const referencesBlock = payload.references.length > 0
-    ? payload.references.map((ref, index) => `${index + 1}. ${ref.value}`).join('\n')
-    : 'Nenhuma referência fornecida.';
-
-  const imageNote = payload.images.length > 0
-    ? `Foram anexadas ${payload.images.length} imagem(ns). Analise os dados visuais presentes e incorpore-os naturalmente ao artigo.`
-    : 'Nenhuma imagem anexada.';
-
-  const customToneBlock = payload.tone === 'Personalizado' && payload.customTone?.trim()
-    ? `\nDIRETRIZ DE TOM CUSTOMIZADO DO AUTOR:\n"${payload.customTone.trim()}"`
-    : '';
-
-  return [
-    'DIRETRIZES DO AUTOR',
-    `Tema central: ${payload.theme || 'Não informado'}`,
-    `Tese e ideias principais: ${payload.thesis || 'Não informado'}`,
-    `Idioma de saída obrigatório: ${payload.language || 'Português (Brasil)'}`,
-    `Preset de Tom de Voz: ${payload.tone}`,
-    customToneBlock,
-    '',
-    'REFERÊNCIAS FORNECIDAS',
-    referencesBlock,
-    '',
-    'OBSERVAÇÕES',
-    imageNote
-  ].filter(Boolean).join('\n');
-}
-
-// - ---------------------------------------------------------------------------
-// - Extração e validação da resposta JSON
-// - ---------------------------------------------------------------------------
-
-const FENCED_JSON_PATTERN = /```(?:json)?([\s\S]*?)```/i;
-
-function extractJsonFromText(rawText: string): unknown {
-  const trimmed = rawText.trim();
-  const fenced = FENCED_JSON_PATTERN.exec(trimmed);
-  const candidate = fenced ? fenced[1].trim() : trimmed;
-
-  const start = candidate.indexOf('{');
-  const end = candidate.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('A IA retornou uma resposta sem JSON estruturado.');
+  if (!data) {
+    return { ...DEFAULT_AI_CONFIG };
   }
 
-  return JSON.parse(candidate.slice(start, end + 1));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function asString(value: unknown, fallback: string): string {
-  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : fallback;
-}
-
-function normalizeResponse(value: unknown): AiArticleResponse {
-  if (!isRecord(value)) {
-    throw new Error('A resposta da IA não está no formato esperado.');
-  }
-
-  const content = asString(value.content, '');
-  const fallbackTitle = asString(value.title, 'Artigo gerado por IA');
-
+  const row = data as Record<string, string>;
   return {
-    title: fallbackTitle,
-    slug: asString(value.slug, ''),
-    metaDescription: asString(value.metaDescription, '').slice(0, 160),
-    excerpt: asString(value.excerpt, ''),
-    content
+    activeProvider: (row.active_provider as AiProvider) ?? 'gemini',
+    geminiApiKey: row.gemini_api_key ?? '',
+    geminiModel: row.gemini_model ?? DEFAULT_AI_CONFIG.geminiModel,
+    openrouterApiKey: row.openrouter_api_key ?? '',
+    openrouterModel: row.openrouter_model ?? DEFAULT_AI_CONFIG.openrouterModel,
+    openaiApiKey: row.openai_api_key ?? '',
+    openaiModel: row.openai_model ?? DEFAULT_AI_CONFIG.openaiModel,
+    claudeApiKey: row.claude_api_key ?? '',
+    claudeModel: row.claude_model ?? DEFAULT_AI_CONFIG.claudeModel
   };
 }
 
-// - ---------------------------------------------------------------------------
-// - Chamadas aos Provedores de IA
-// - ---------------------------------------------------------------------------
+/**
+ * Persiste a configuração de IA.
+ *
+ * Chaves em branco não sobrescrevem o valor existente: o campo vazio significa
+ * "não altere", evitando apagar acidentalmente uma credencial já configurada.
+ */
+export async function saveAiConfig(config: AiApiConfig): Promise<void> {
+  const supabase = getSupabaseClient();
 
-interface GeminiPart {
-  text?: string;
-  inlineData?: { mimeType: string; data: string };
-}
-
-interface GeminiResponseBody {
-  candidates?: { content?: { parts?: { text?: string }[] } }[];
-  error?: { message?: string };
-}
-
-async function callGeminiApi(payload: AiArticlePayload, apiKey: string, model: string): Promise<AiArticleResponse> {
-  const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const parts: GeminiPart[] = [{ text: buildUserPrompt(payload) }];
-  for (const image of payload.images) {
-    parts.push({
-      inlineData: {
-        mimeType: image.mimeType,
-        data: image.base64
-      }
-    });
-  }
-
-  const body = {
-    systemInstruction: { parts: [{ text: buildSystemPrompt(payload) }] },
-    contents: [{ role: 'user', parts }],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 8192,
-      responseMimeType: 'application/json'
-    }
+  const payload: Record<string, string> = {
+    active_provider: config.activeProvider
   };
 
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body)
-  });
+  const optional: Array<[keyof AiApiConfig, string]> = [
+    ['geminiApiKey', 'gemini_api_key'],
+    ['geminiModel', 'gemini_model'],
+    ['openrouterApiKey', 'openrouter_api_key'],
+    ['openrouterModel', 'openrouter_model'],
+    ['openaiApiKey', 'openai_api_key'],
+    ['openaiModel', 'openai_model'],
+    ['claudeApiKey', 'claude_api_key'],
+    ['claudeModel', 'claude_model']
+  ];
 
-  if (!response.ok) {
-    let apiMessage = `HTTP ${response.status}`;
-    try {
-      const errorBody = (await response.json()) as GeminiResponseBody;
-      if (errorBody.error?.message) {
-        apiMessage = errorBody.error.message;
-      }
-    } catch {
-      // - Ignora falha no parse do corpo de erro
+  for (const [field, column] of optional) {
+    const value = (config[field] ?? '').toString();
+    if (field.endsWith('ApiKey')) {
+      if (value.trim()) payload[column] = value.trim();
+    } else if (value.trim()) {
+      payload[column] = value.trim();
     }
-    throw new Error(`Erro na API Gemini (${apiMessage}).`);
   }
 
-  const data = (await response.json()) as GeminiResponseBody;
-  const generatedText = data.candidates?.[0]?.content?.parts?.map(p => p.text || '').join('') || '';
-
-  if (!generatedText.trim()) {
-    throw new Error('A API Gemini não retornou conteúdo.');
-  }
-
-  const parsed = extractJsonFromText(generatedText);
-  return normalizeResponse(parsed);
-}
-
-async function callOpenRouterApi(payload: AiArticlePayload, apiKey: string, model: string): Promise<AiArticleResponse> {
-  const url = 'https://openrouter.ai/api/v1/chat/completions';
-
-  const userContent: unknown[] = [{ type: 'text', text: buildUserPrompt(payload) }];
-  for (const image of payload.images) {
-    userContent.push({
-      type: 'image_url',
-      image_url: { url: `data:${image.mimeType};base64,${image.base64}` }
-    });
-  }
-
-  const body = {
-    model: model || 'google/gemini-2.0-flash-001',
-    messages: [
-      { role: 'system', content: buildSystemPrompt(payload) },
-      { role: 'user', content: userContent }
-    ],
-    response_format: { type: 'json_object' }
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-      'HTTP-Referer': 'https://izycolors.com',
-      'X-Title': 'IzyColors Studio'
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    let msg = `HTTP ${response.status}`;
-    try {
-      const err = await response.json();
-      if (err.error?.message) msg = err.error.message;
-    } catch {
-      // - Ignora falha de parse
-    }
-    throw new Error(`Erro na API OpenRouter (${msg}).`);
-  }
-
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || '';
-  if (!text.trim()) {
-    throw new Error('OpenRouter não retornou conteúdo.');
-  }
-
-  const parsed = extractJsonFromText(text);
-  return normalizeResponse(parsed);
-}
-
-async function callOpenAiApi(payload: AiArticlePayload, apiKey: string, model: string): Promise<AiArticleResponse> {
-  const url = 'https://api.openai.com/v1/chat/completions';
-
-  const userContent: unknown[] = [{ type: 'text', text: buildUserPrompt(payload) }];
-  for (const image of payload.images) {
-    userContent.push({
-      type: 'image_url',
-      image_url: { url: `data:${image.mimeType};base64,${image.base64}` }
-    });
-  }
-
-  const body = {
-    model: model || 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: buildSystemPrompt(payload) },
-      { role: 'user', content: userContent }
-    ],
-    response_format: { type: 'json_object' }
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    let msg = `HTTP ${response.status}`;
-    try {
-      const err = await response.json();
-      if (err.error?.message) msg = err.error.message;
-    } catch {
-      // - Ignora falha de parse
-    }
-    throw new Error(`Erro na API OpenAI (${msg}).`);
-  }
-
-  const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || '';
-  if (!text.trim()) {
-    throw new Error('OpenAI não retornou conteúdo.');
-  }
-
-  const parsed = extractJsonFromText(text);
-  return normalizeResponse(parsed);
-}
-
-async function callClaudeApi(payload: AiArticlePayload, apiKey: string, model: string): Promise<AiArticleResponse> {
-  const url = 'https://api.anthropic.com/v1/messages';
-
-  const userContent: unknown[] = [{ type: 'text', text: buildUserPrompt(payload) }];
-  for (const image of payload.images) {
-    userContent.push({
-      type: 'image',
-      source: {
-        type: 'base64',
-        media_type: image.mimeType,
-        data: image.base64
-      }
-    });
-  }
-
-  const body = {
-    model: model || 'claude-3-5-sonnet-20241022',
-    max_tokens: 8192,
-    system: buildSystemPrompt(payload),
-    messages: [{ role: 'user', content: userContent }]
-  };
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!response.ok) {
-    let msg = `HTTP ${response.status}`;
-    try {
-      const err = await response.json();
-      if (err.error?.message) msg = err.error.message;
-    } catch {
-      // - Ignora falha de parse
-    }
-    throw new Error(`Erro na API Anthropic Claude (${msg}).`);
-  }
-
-  const data = await response.json();
-  const text = data.content?.[0]?.text || '';
-  if (!text.trim()) {
-    throw new Error('Claude não retornou conteúdo.');
-  }
-
-  const parsed = extractJsonFromText(text);
-  return normalizeResponse(parsed);
-}
-
-// - ---------------------------------------------------------------------------
-// - Teste de Conexão com os Provedores
-// - ---------------------------------------------------------------------------
-
-export async function testAiConnection(
-  provider: AiProvider,
-  apiKey: string,
-  model: string
-): Promise<{ success: boolean; message: string }> {
-  try {
-    if (provider === 'gemini') {
-      const url = `${GEMINI_ENDPOINT}/${model}:generateContent?key=${encodeURIComponent(apiKey)}`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: 'Responda exatamente: CONEXAO_OK' }] }]
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      return { success: true, message: `Conexão bem-sucedida com Gemini (${model})` };
-    }
-
-    if (provider === 'openrouter') {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: 'Responda OK' }],
-          max_tokens: 10
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      return { success: true, message: `Conexão bem-sucedida com OpenRouter (${model})` };
-    }
-
-    if (provider === 'openai') {
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: 'user', content: 'Responda OK' }],
-          max_tokens: 10
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      return { success: true, message: `Conexão bem-sucedida com OpenAI (${model})` };
-    }
-
-    if (provider === 'claude') {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-dangerous-direct-browser-access': 'true'
-        },
-        body: JSON.stringify({
-          model,
-          max_tokens: 10,
-          messages: [{ role: 'user', content: 'Responda OK' }]
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      return { success: true, message: `Conexão bem-sucedida com Claude (${model})` };
-    }
-
-    return { success: false, message: 'Provedor desconhecido.' };
-  } catch (err) {
-    return {
-      success: false,
-      message: `Falha na conexão: ${err instanceof Error ? err.message : 'Erro de rede.'}`
-    };
+  const { error } = await supabase.from('ai_settings').update(payload).eq('id', 1);
+  if (error) {
+    throw new Error(`Falha ao salvar a configuração de IA: ${error.message}`);
   }
 }
 
-// - ---------------------------------------------------------------------------
-// - API pública de geração
-// - ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Invocação da Edge Function
+// ---------------------------------------------------------------------------
 
+function readFunctionError(payload: unknown, fallback: string): string {
+  if (payload && typeof payload === 'object' && 'error' in payload) {
+    const value = (payload as { error?: unknown }).error;
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return fallback;
+}
+
+/**
+ * Gera o artigo no servidor.
+ * O provedor ativo e a chave são resolvidos pela Edge Function a partir de
+ * `ai_settings` — o cliente não envia credenciais.
+ */
 export async function generateAiArticle(payload: AiArticlePayload): Promise<AiArticleResponse> {
   if (!payload.theme.trim() && !payload.thesis.trim() && payload.references.length === 0) {
     throw new Error('Forneça ao menos um tema, uma tese ou uma referência antes de gerar.');
   }
 
-  const config = getAiConfig();
-  const provider = config.activeProvider;
+  const { data, error } = await getSupabaseClient().functions.invoke(AI_FUNCTION_NAME, {
+    body: { mode: 'generate', payload }
+  });
 
-  if (provider === 'openrouter') {
-    const key = config.openrouterApiKey.trim();
-    if (!key) {
-      throw new Error('Chave de API OpenRouter não configurada. Configure em Perfil -> Configurações (Admin).');
-    }
-    return callOpenRouterApi(payload, key, config.openrouterModel.trim());
+  if (error) {
+    throw new Error(`Falha ao acionar a Edge Function: ${error.message}`);
   }
 
-  if (provider === 'openai') {
-    const key = config.openaiApiKey.trim();
-    if (!key) {
-      throw new Error('Chave de API OpenAI não configurada. Configure em Perfil -> Configurações (Admin).');
-    }
-    return callOpenAiApi(payload, key, config.openaiModel.trim());
+  const result = data as AiArticleResponse | { error?: string };
+  if (!result || typeof result !== 'object') {
+    throw new Error('A Edge Function não retornou conteúdo válido.');
+  }
+  if ('error' in result && result.error) {
+    throw new Error(readFunctionError(result, 'Erro na geração do artigo.'));
+  }
+  if (!('content' in result)) {
+    throw new Error('A Edge Function não retornou conteúdo válido.');
   }
 
-  if (provider === 'claude') {
-    const key = config.claudeApiKey.trim();
-    if (!key) {
-      throw new Error('Chave de API Claude (Anthropic) não configurada. Configure em Perfil -> Configurações (Admin).');
-    }
-    return callClaudeApi(payload, key, config.claudeModel.trim());
-  }
-
-  // - Padrão: Gemini
-  const envKey = (import.meta.env.VITE_GEMINI_API_KEY as string) || (import.meta.env.GEMINI_API_KEY as string) || '';
-  const key = (config.geminiApiKey || envKey).trim();
-  if (!key) {
-    throw new Error(
-      'Chave de API Gemini não configurada. Defina VITE_GEMINI_API_KEY no ambiente ou configure em Perfil -> Configurações (Admin).'
-    );
-  }
-
-  const model = (config.geminiModel || DEFAULT_AI_CONFIG.geminiModel).trim();
-  return callGeminiApi(payload, key, model);
+  return result as AiArticleResponse;
 }
 
-/** - Converte um título em slug amigável (minúsculas, sem acentos, hifens). */
+/**
+ * Testa a conectividade com um provedor.
+ * A chave é enviada apenas para o servidor; ela nunca é persistida aqui.
+ */
+export async function testAiConnection(
+  provider: AiProvider,
+  apiKey: string,
+  model: string
+): Promise<{ success: boolean; message: string }> {
+  const { data, error } = await getSupabaseClient().functions.invoke(AI_FUNCTION_NAME, {
+    body: { mode: 'test', provider, apiKey: apiKey.trim(), model: model.trim() }
+  });
+
+  if (error) {
+    return { success: false, message: `Falha ao acionar a Edge Function: ${error.message}` };
+  }
+
+  const result = data as { success?: boolean; message?: string; error?: string };
+  if (!result || typeof result !== 'object') {
+    return { success: false, message: 'Resposta inválida da Edge Function.' };
+  }
+  if (result.error) {
+    return { success: false, message: result.error };
+  }
+  return {
+    success: Boolean(result.success),
+    message: result.message || (result.success ? 'Conexão bem-sucedida.' : 'Falha na conexão.')
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Utilidades
+// ---------------------------------------------------------------------------
+
+/** Converte um título em slug amigável (minúsculas, sem acentos, hifens). */
 export function slugifyArticle(value: string): string {
   const slug = value
     .normalize('NFD')

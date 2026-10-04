@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Check, Copy, Download, Code, Palette as PaletteIcon, Sparkles } from 'lucide-react';
 import {
   exportCssTokens,
@@ -16,25 +16,25 @@ interface ExportModalProps {
   onClose: () => void;
   colors: string[];
   paletteTitle?: string;
+  /** Prefixo das variáveis, vindo das preferências salvas no perfil (Supabase). */
+  variablePrefix?: string;
 }
 
 export const ExportModal: React.FC<ExportModalProps> = ({
   isOpen,
   onClose,
   colors,
-  paletteTitle = 'Izy Colors System Palette'
+  paletteTitle = 'Izy Colors System Palette',
+  variablePrefix = 'sys-color'
 }) => {
   const [format, setFormat] = useState<ExportFormat>('illustrator');
   const [copied, setCopied] = useState(false);
-  const [prefix, setPrefix] = useState(() => {
-    try {
-      const prefs = localStorage.getItem('chromatica_token_prefs');
-      if (prefs) return JSON.parse(prefs).variablePrefix || 'color';
-      const user = localStorage.getItem('chromatica_user_profile');
-      if (user) return JSON.parse(user).exportPreferences?.variablePrefix || 'color';
-    } catch { }
-    return 'color';
-  });
+  const [prefix, setPrefix] = useState(variablePrefix);
+
+  // Mantém o campo sincronizado com a preferência persistida no Supabase.
+  useEffect(() => {
+    setPrefix(variablePrefix);
+  }, [variablePrefix]);
 
   if (!isOpen) return null;
 
@@ -84,14 +84,18 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
       break;
   }
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (format === 'ase') {
       handleDownload();
       return;
     }
-    navigator.clipboard.writeText(exportContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(exportContent);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore or fallback
+    }
   };
 
   const handleDownload = () => {
@@ -116,11 +120,12 @@ ${colors.map((c, i) => `// [Amostra ${i + 1}] ${paletteTitle} ${i + 1}: ${c}`).j
     URL.revokeObjectURL(url);
   };
 
-  const downloadLabel = format === 'ase'
-    ? 'Baixar Amostras .ASE'
-    : format === 'illustrator'
-      ? 'Baixar Script .JSX'
-      : `Baixar (${format.toUpperCase()})`;
+  let downloadLabel = `Baixar (${format.toUpperCase()})`;
+  if (format === 'ase') {
+    downloadLabel = 'Baixar Amostras .ASE';
+  } else if (format === 'illustrator') {
+    downloadLabel = 'Baixar Script .JSX';
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">

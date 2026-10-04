@@ -70,6 +70,7 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserHandle, setNewUserHandle] = useState('');
   const [newUserBio, setNewUserBio] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<UserRole>('user');
 
   // Article creation modal inside admin
@@ -150,51 +151,65 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
   const regularCount = usersList.filter(u => u.role === 'user').length;
 
   // Somente Administradores podem alterar cargos, status e criar usuários.
-  const handleRoleChange = (userId: string, nextRole: UserRole) => {
+  // A autorização real acontece na RPC do banco; estas funções apenas
+  // escondem a UI e traduzem o erro para o painel.
+  const handleRoleChange = async (userId: string, nextRole: UserRole) => {
     if (!canManageUserRoles(currentUser)) {
       showFeedback('Operação negada: apenas Administradores podem alterar cargos de usuários.');
       return;
     }
-    const updated = updateUserRole(userId, nextRole, currentUser);
-    onUpdateUsersList(updated);
-    showFeedback(`Cargo atualizado para [${nextRole.toUpperCase()}].`);
+    try {
+      const updated = await updateUserRole(usersList, userId, nextRole, currentUser);
+      onUpdateUsersList(updated);
+      showFeedback(`Cargo atualizado para [${nextRole.toUpperCase()}].`);
+    } catch (err) {
+      showFeedback(err instanceof Error ? err.message : 'Falha ao atualizar o cargo.');
+    }
   };
 
-  const handleToggleStatus = (userId: string) => {
+  const handleToggleStatus = async (userId: string) => {
     if (!canManageUserRoles(currentUser)) {
       showFeedback('Operação negada: apenas Administradores podem alterar o status de contas.');
       return;
     }
-    const updated = toggleUserStatus(userId, currentUser);
-    onUpdateUsersList(updated);
-    showFeedback('Status do usuário atualizado.');
+    try {
+      const updated = await toggleUserStatus(usersList, userId, currentUser);
+      onUpdateUsersList(updated);
+      showFeedback('Status do usuário atualizado.');
+    } catch (err) {
+      showFeedback(err instanceof Error ? err.message : 'Falha ao atualizar o status.');
+    }
   };
 
-  const handleCreateUserSubmit = (e: React.SyntheticEvent) => {
+  const handleCreateUserSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault();
     if (!newUserName.trim() || !newUserEmail.trim()) return;
 
-    const { users, newUser } = createNewUserFromAdmin({
-      name: newUserName.trim(),
-      email: newUserEmail.trim(),
-      handle: newUserHandle.trim() || `@${newUserEmail.split('@')[0]}`,
-      role: newUserRole,
-      bio: newUserBio.trim()
-    }, currentUser);
+    try {
+      const { user } = await createNewUserFromAdmin(
+        {
+          name: newUserName.trim(),
+          email: newUserEmail.trim(),
+          handle: newUserHandle.trim() || `@${newUserEmail.split('@')[0]}`,
+          role: newUserRole,
+          bio: newUserBio.trim(),
+          password: newUserPassword.trim()
+        },
+        currentUser
+      );
 
-    if (!newUser) {
-      showFeedback('Operação negada: apenas Administradores podem criar usuários.');
-      return;
+      onUpdateUsersList([user, ...usersList]);
+      setShowAddUserModal(false);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserHandle('');
+      setNewUserBio('');
+      setNewUserPassword('');
+      setNewUserRole('user');
+      showFeedback(`Usuário ${user.name} cadastrado com sucesso.`);
+    } catch (err) {
+      showFeedback(err instanceof Error ? err.message : 'Não foi possível criar o usuário.');
     }
-
-    onUpdateUsersList(users);
-    setShowAddUserModal(false);
-    setNewUserName('');
-    setNewUserEmail('');
-    setNewUserHandle('');
-    setNewUserBio('');
-    setNewUserRole('user');
-    showFeedback(`Usuário ${newUser.name} cadastrado com sucesso.`);
   };
 
   const handleCreateArticleSubmit = (e: React.SyntheticEvent) => {
@@ -969,6 +984,23 @@ export const AdminAreaView: React.FC<AdminAreaViewProps> = ({
                   onChange={(e) => setNewUserHandle(e.target.value)}
                   className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
                 />
+              </div>
+
+              <div>
+                <label htmlFor="admin-new-user-password" className="block text-xs font-mono uppercase text-[#94A3B8] mb-1">Senha Provisória</label>
+                <input
+                  id="admin-new-user-password"
+                  type="text"
+                  required
+                  minLength={6}
+                  placeholder="Mínimo 6 caracteres"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                  className="w-full bg-[#10141D] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                />
+                <p className="text-[10px] text-[#64748B] mt-1.5 leading-relaxed">
+                  A conta é criada pela Edge Function <code>admin-create-user</code>, que é a única rota com permissão para gravar em <code>auth.users</code>.
+                </p>
               </div>
 
               <div>
