@@ -42,8 +42,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   colors: activePalette,
   onColorsChange
 }) => {
-  // Harmonic parameters — seeded from the first color of the active palette so the
-  // wheel continues (consumes) the centralized WIP instead of starting from scratch.
+  const [hasInteracted, setHasInteracted] = useState(false);
   const seedHex = activePalette.length > 0 ? activePalette[0] : '#08BBD9';
   const seedDetails = getColorDetails(seedHex);
   const [baseHue, setBaseHue] = useState<number>(seedDetails.hsl.h);
@@ -70,17 +69,39 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
     { id: 'tetradic', label: 'Tétrade (Quadrado)', desc: 'Dois pares de cores complementares em 90° e 180°' },
   ];
 
+  // Sync seed from active palette when it changes
+  useEffect(() => {
+    if (activePalette.length > 0) {
+      const details = getColorDetails(activePalette[0]);
+      setBaseHue(details.hsl.h);
+      setBaseLightness(details.hsl.l);
+      setBaseSaturation(details.hsl.s);
+    }
+  }, [activePalette]);
+
   // Generate the 5 harmonic colors with live saturation & lightness
   const generatedColors = useMemo(() => {
     return generateHarmonies(baseHue, 5, harmonyRule, baseSaturation, baseLightness);
   }, [baseHue, harmonyRule, baseSaturation, baseLightness]);
 
-  // Refine tool behavior: keep the centralized active palette in sync with the wheel.
+  // Refine tool behavior: only sync generated colors if user explicitly interacts or applies
   useEffect(() => {
-    if (generatedColors.length > 0) {
+    if (hasInteracted && generatedColors.length > 0) {
       onColorsChange(generatedColors);
     }
-  }, [generatedColors, onColorsChange]);
+  }, [hasInteracted, generatedColors, onColorsChange]);
+
+  const handleSelectActiveBaseColor = (hex: string) => {
+    const details = getColorDetails(hex);
+    setBaseHue(details.hsl.h);
+    setBaseLightness(details.hsl.l);
+    setBaseSaturation(details.hsl.s);
+  };
+
+  const handleApplyHarmoniesToPalette = () => {
+    setHasInteracted(true);
+    onColorsChange(generatedColors);
+  };
 
   // Relative offsets for current harmony rule
   const offsets = useMemo(() => {
@@ -161,6 +182,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>, nodeIndex: number | null = null) => {
     e.preventDefault();
     e.stopPropagation();
+    setHasInteracted(true);
     setIsDragging(true);
     const targetNode = nodeIndex ?? 0;
     setActiveDragNode(targetNode);
@@ -224,10 +246,12 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
 
   // Quick rotation step handlers
   const rotateWheel = (deltaDegrees: number) => {
+    setHasInteracted(true);
     setBaseHue((prev) => (prev + deltaDegrees + 3600) % 360);
   };
 
   const randomizeWheel = () => {
+    setHasInteracted(true);
     const array = new Uint32Array(2);
     window.crypto.getRandomValues(array);
     setBaseHue(Math.floor((array[0] / 4294967296) * 360));
@@ -260,22 +284,68 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   }, [wheelRadius]);
 
   return (
-    <div className="flex-1 bg-[#0B0F17] text-[#DFE2EE] p-4 sm:p-8 max-w-[1500px] mx-auto w-full pb-20 select-none">
+    <div className="flex-1 bg-[#0B0F17] text-[#DFE2EE] p-4 sm:p-8 max-w-[1500px] mx-auto w-full pb-20 select-none font-['Geist']">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-white/[0.08] pb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 border-b border-white/[0.08] pb-6">
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4] animate-pulse" /> Motor de Harmonia & Munsell
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-['Geist'] mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
             Roda Cromática Harmônica
           </h1>
           <p className="text-xs sm:text-sm text-[#94A3B8] mt-1">
             Interaja diretamente com o mouse na roda para girar matizes, arrastar nós e esculpir harmonias proporcionais.
           </p>
         </div>
-
       </div>
+
+      {/* Active Palette Strip (Incoming Colors from Image Extractor / Generator) */}
+      {activePalette && activePalette.length > 0 && (
+        <div className="mb-8 p-4 rounded-xl bg-[#181C24] border border-white/[0.08] flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div>
+            <span className="text-xs font-mono text-[#94A3B8] font-semibold block">
+              Amostras da Paleta Ativa em Edição ({activePalette.length} cores):
+            </span>
+            <span className="text-[11px] font-mono text-[#64748B]">
+              Clique em qualquer cor para defini-la como o nó base âncora #1 da roda harmônica:
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {activePalette.map((hex, i) => {
+              const d = getColorDetails(hex);
+              const isBase = baseHue === d.hsl.h;
+              return (
+                <button
+                  key={`${hex}-${i}`}
+                  type="button"
+                  onClick={() => handleSelectActiveBaseColor(hex)}
+                  className={`px-2.5 py-1.5 rounded-lg border text-xs font-mono flex items-center gap-2 transition-all cursor-pointer ${isBase
+                    ? 'border-[#06B6D4] bg-[#262A33] text-white ring-1 ring-[#06B6D4]'
+                    : 'border-white/[0.08] bg-[#111827] text-[#94A3B8] hover:border-white/20 hover:text-white'
+                    }`}
+                  title={`Definir ${hex} como nó base #1`}
+                >
+                  <span className="w-3.5 h-3.5 rounded-full border border-white/20" style={{ backgroundColor: hex }} />
+                  <span>{hex}</span>
+                  {isBase && <span className="text-[9px] text-[#06B6D4] font-bold">BASE</span>}
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={handleApplyHarmoniesToPalette}
+              className="h-8 px-3 ml-auto bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+              title="Substituir a paleta ativa pelas 5 cores harmônicas calculadas pela roda"
+            >
+              <Check className="w-3.5 h-3.5" />
+              <span>Aplicar Harmonia na Paleta</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main Studio Layout: Controls + Interactive Wheel + Swatches */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -295,7 +365,10 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
             {rules.map((rule) => (
               <button
                 key={rule.id}
-                onClick={() => setHarmonyRule(rule.id)}
+                onClick={() => {
+                  setHasInteracted(true);
+                  setHarmonyRule(rule.id);
+                }}
                 className={`w-full text-left p-3 rounded-lg border transition-all cursor-pointer ${harmonyRule === rule.id
                   ? 'bg-[#262A33] border-[#6366F1] text-white shadow-md'
                   : 'bg-[#111827] border-white/[0.04] text-[#94A3B8] hover:text-white hover:border-white/[0.1]'

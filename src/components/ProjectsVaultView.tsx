@@ -14,7 +14,10 @@ import {
   Palette as PaletteIcon,
   PlusCircle,
   FileText,
-  FolderPlus
+  FolderPlus,
+  Gavel,
+  Sliders,
+  X
 } from 'lucide-react';
 import { ProjectWorkspace, ProjectPalette, CollectionBoard, FavoriteColor, VaultPalette, ProjectSlot } from '../types';
 import { AddFavoriteToTargetModal } from './AddFavoriteToTargetModal';
@@ -45,6 +48,7 @@ interface ProjectsVaultViewProps {
     paletteName?: string
   ) => void;
   onAddColorsToCollection?: (collectionId: string, colors: string[]) => void;
+  onSubmitToCuration?: (submission: { title: string; colors: string[]; tags: string[]; gamut: string; type: 'collection' | 'board'; sourceId: string }) => void;
   showToast?: (msg: string) => void;
 }
 
@@ -67,6 +71,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
   onSendToAudit,
   onAddColorsToProject,
   onAddColorsToCollection,
+  onSubmitToCuration,
   showToast
 }) => {
   const [activeTab, setActiveTab] = useState<'projects' | 'collections' | 'favorites'>('projects');
@@ -107,6 +112,56 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
   const [newVaultColorsInput, setNewVaultColorsInput] = useState('#0B0F17, #181C24, #08BBD9, #6366F1, #EC4899');
   const [newVaultTags, setNewVaultTags] = useState('Oklch, Dark Mode, Vault');
   const [newVaultNotes, setNewVaultNotes] = useState('');
+
+  // Submit to Curation Modal State
+  const [showSubmitToCurationModal, setShowSubmitToCurationModal] = useState(false);
+  const [submissionColors, setSubmissionColors] = useState<string[]>([]);
+  const [submissionTitle, setSubmissionTitle] = useState('');
+  const [submissionType, setSubmissionType] = useState<'collection' | 'board'>('collection');
+  const [submissionSourceId, setSubmissionSourceId] = useState<string>('');
+
+  // Handler functions for new features
+  const handleSendColorsToGenerator = (colors: string[]) => {
+    if (colors && colors.length > 0) {
+      onOpenInGenerator(colors);
+      showToast?.(`${colors.length} cor(es) enviada(s) para o Gerador de Cores`);
+    }
+  };
+
+  const handleSendColorsToEditor = (colors: string[]) => {
+    if (colors && colors.length > 0) {
+      onOpenInGenerator(colors);
+      showToast?.(`${colors.length} cor(es) enviada(s) para o Editor de Cores`);
+    }
+  };
+
+  const handleOpenSubmitToCuration = (colors: string[], type: 'collection' | 'board', sourceId: string, defaultTitle: string) => {
+    setSubmissionColors(colors);
+    setSubmissionType(type);
+    setSubmissionSourceId(sourceId);
+    setSubmissionTitle(defaultTitle);
+    setShowSubmitToCurationModal(true);
+  };
+
+  const handleSubmitToCuration = (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!submissionTitle.trim() || submissionColors.length === 0) return;
+
+    if (onSubmitToCuration) {
+      onSubmitToCuration({
+        title: submissionTitle,
+        colors: submissionColors,
+        tags: ['curadoria', submissionType],
+        gamut: 'Display P3',
+        type: submissionType,
+        sourceId: submissionSourceId
+      });
+      showToast?.(`${submissionType === 'collection' ? 'Coleção' : 'Board'} "${submissionTitle}" enviada para aprovação da curadoria!`);
+    }
+    setShowSubmitToCurationModal(false);
+    setSubmissionTitle('');
+    setSubmissionColors([]);
+  };
 
   const handleCopy = (id: string, text: string) => {
     void navigator.clipboard.writeText(text);
@@ -643,10 +698,20 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
 
                   <div className="flex items-center gap-1.5">
                     <button
-                      onClick={() => onOpenInGenerator(col.coverColors)}
-                      className="h-7 px-2.5 rounded bg-[#6366F1] hover:bg-[#5254E0] text-white text-[11px] font-medium transition-colors cursor-pointer"
+                      onClick={() => handleSendColorsToGenerator(col.coverColors)}
+                      className="h-7 px-2.5 rounded bg-[#6366F1] hover:bg-[#5254E0] text-white text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                      title="Enviar cores para o Gerador"
                     >
-                      Carregar no Estúdio
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Gerador</span>
+                    </button>
+                    <button
+                      onClick={() => handleSendColorsToEditor(col.coverColors)}
+                      className="h-7 px-2.5 rounded bg-[#06B6D4] hover:bg-[#08BBD9] text-black text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                      title="Enviar cores para o Editor"
+                    >
+                      <Sliders className="w-3.5 h-3.5" />
+                      <span>Editor</span>
                     </button>
                     <button
                       onClick={() => onSendToAudit(col.coverColors)}
@@ -655,6 +720,14 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                     >
                       <ShieldCheck className="w-3.5 h-3.5" />
                       <span>Auditar</span>
+                    </button>
+                    <button
+                      onClick={() => handleOpenSubmitToCuration(col.coverColors, 'collection', col.id, col.title)}
+                      className="h-7 px-2.5 rounded bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                      title="Enviar para aprovação da Curadoria"
+                    >
+                      <Gavel className="w-3.5 h-3.5" />
+                      <span>Curadoria</span>
                     </button>
                     <button
                       onClick={() => onDeleteCollection(col.id)}
@@ -865,6 +938,30 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                               <span>Auditar</span>
                             </button>
                             <button
+                              onClick={() => handleSendColorsToGenerator(pal.colors)}
+                              className="px-2 py-1 rounded bg-[#6366F1] hover:bg-[#5254E0] text-white text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                              title="Enviar cores para o Gerador"
+                            >
+                              <Sparkles className="w-3.5 h-3.5" />
+                              <span>Gerador</span>
+                            </button>
+                            <button
+                              onClick={() => handleSendColorsToEditor(pal.colors)}
+                              className="px-2 py-1 rounded bg-[#06B6D4] hover:bg-[#08BBD9] text-black text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                              title="Enviar cores para o Editor"
+                            >
+                              <Sliders className="w-3.5 h-3.5" />
+                              <span>Editor</span>
+                            </button>
+                            <button
+                              onClick={() => handleOpenSubmitToCuration(pal.colors, 'board', pal.id, pal.title)}
+                              className="px-2 py-1 rounded bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 border border-amber-400/40 text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
+                              title="Enviar para aprovação da Curadoria"
+                            >
+                              <Gavel className="w-3.5 h-3.5" />
+                              <span>Curadoria</span>
+                            </button>
+                            <button
                               onClick={() => onOpenInGenerator(pal.colors)}
                               className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-black text-[11px] font-bold transition-colors cursor-pointer"
                             >
@@ -943,11 +1040,10 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                     return (
                       <div
                         key={fav.id}
-                        className={`p-4 bg-[#111827] border rounded-xl flex items-start justify-between gap-4 group transition-all relative ${
-                          isSelected
-                            ? 'border-[#6366F1] ring-1 ring-[#6366F1]/50 bg-[#161B2E]'
-                            : 'border-white/[0.06] hover:border-white/20'
-                        }`}
+                        className={`p-4 bg-[#111827] border rounded-xl flex items-start justify-between gap-4 group transition-all relative ${isSelected
+                          ? 'border-[#6366F1] ring-1 ring-[#6366F1]/50 bg-[#161B2E]'
+                          : 'border-white/[0.06] hover:border-white/20'
+                          }`}
                       >
                         <div className="flex items-start gap-3 flex-1 min-w-0">
                           <input
@@ -997,6 +1093,27 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                             title="Colocar em Projeto ou Coleção"
                           >
                             <FolderPlus className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleSendColorsToGenerator([fav.hex])}
+                            className="p-1.5 rounded-md bg-[#6366F1]/20 hover:bg-[#6366F1]/40 text-[#6366F1] hover:text-white transition-colors cursor-pointer"
+                            title="Enviar para o Gerador"
+                          >
+                            <Sparkles className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleSendColorsToEditor([fav.hex])}
+                            className="p-1.5 rounded-md bg-[#06B6D4]/20 hover:bg-[#06B6D4]/40 text-[#06B6D4] hover:text-white transition-colors cursor-pointer"
+                            title="Enviar para o Editor"
+                          >
+                            <Sliders className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleOpenSubmitToCuration([fav.hex], 'board', fav.id, fav.name)}
+                            className="p-1.5 rounded-md bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 hover:text-white transition-colors cursor-pointer"
+                            title="Enviar para aprovação da Curadoria"
+                          >
+                            <Gavel className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => onSendToAudit([fav.hex])}
@@ -1386,6 +1503,84 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
         onCreateCollection={onCreateCollection}
         showToast={showToast}
       />
+
+      {/* Modal: Enviar para Curadoria */}
+      {showSubmitToCurationModal && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-[#181C24] border border-white/[0.12] rounded-2xl p-6 shadow-2xl space-y-4 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between border-b border-white/[0.08] pb-4">
+              <div>
+                <h3 className="text-base font-bold text-white font-['Geist'] flex items-center gap-2">
+                  <Gavel className="w-4 h-4 text-amber-400" />
+                  Enviar para Aprovação da Curadoria
+                </h3>
+                <p className="text-xs text-[#94A3B8] mt-0.5">
+                  {submissionType === 'collection' ? 'Coleção' : 'Board'} será revisada pela equipe editorial
+                </p>
+              </div>
+              <button
+                onClick={() => setShowSubmitToCurationModal(false)}
+                className="p-1 rounded-lg text-[#94A3B8] hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitToCuration} className="space-y-4">
+              <div>
+                <label htmlFor="submission-title" className="text-xs font-mono text-[#94A3B8] block mb-1">Título:</label>
+                <input
+                  id="submission-title"
+                  type="text"
+                  required
+                  placeholder="Ex: Minha Coleção de Cores Outonais"
+                  value={submissionTitle}
+                  onChange={(e) => setSubmissionTitle(e.target.value)}
+                  className="w-full bg-[#111827] border border-white/[0.1] rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-[#6366F1]"
+                />
+              </div>
+
+              <div>
+                <span className="text-xs font-mono text-[#94A3B8] block mb-1">Cores a serem enviadas ({submissionColors.length}):</span>
+                <div className="h-10 rounded-lg overflow-hidden flex shadow-inner border border-white/10 mb-2">
+                  {submissionColors.map((c, i) => (
+                    <div key={`${c}-${i}`} className="flex-1 h-full" style={{ backgroundColor: c }} />
+                  ))}
+                </div>
+                <div className="grid grid-cols-5 gap-1.5">
+                  {submissionColors.map((c, i) => (
+                    <input
+                      key={`${c}-${i}`}
+                      type="text"
+                      aria-label={`Cor ${i + 1}`}
+                      value={c}
+                      readOnly
+                      className="bg-[#111827] border border-white/[0.1] rounded px-1.5 py-1 text-[11px] font-mono text-center text-white"
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-white/[0.06]">
+                <button
+                  type="button"
+                  onClick={() => setShowSubmitToCurationModal(false)}
+                  className="px-3 py-1.5 rounded-lg text-xs text-[#94A3B8] hover:text-white"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold shadow-md cursor-pointer flex items-center gap-1.5"
+                >
+                  <Gavel className="w-3.5 h-3.5" />
+                  <span>Enviar para Curadoria</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

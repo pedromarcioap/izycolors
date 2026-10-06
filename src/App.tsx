@@ -342,10 +342,22 @@ const GenerateStageContent: React.FC<{
   setActiveStage: (stage: StudioStage) => void;
   curatedImages: CuratedDemoImage[];
   isSupabaseConnected: boolean;
+  projects?: ProjectWorkspace[];
+  collections?: CollectionBoard[];
+  favoriteColors?: FavoriteColor[];
   handleSaveToFavorites: (hex: string, name: string) => void;
   handleSaveCuratedImage: (img: CuratedDemoImage) => void;
   handleDeleteCuratedImage: (id: string) => void;
   handleResetCuratedImages: () => void;
+  handleAddColorsToProject?: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => void;
+  handleAddColorsToCollection?: (collectionId: string, colors: string[]) => void;
+  handleCreateProject?: (project: ProjectWorkspace) => void;
+  handleCreateCollection?: (collection: CollectionBoard) => void;
   handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
   handleOpenExport: (colors?: string[], title?: string) => void;
 }> = ({
@@ -356,10 +368,17 @@ const GenerateStageContent: React.FC<{
   setActiveStage,
   curatedImages,
   isSupabaseConnected,
+  projects = [],
+  collections = [],
+  favoriteColors = [],
   handleSaveToFavorites,
   handleSaveCuratedImage,
   handleDeleteCuratedImage,
   handleResetCuratedImages,
+  handleAddColorsToProject,
+  handleAddColorsToCollection,
+  handleCreateProject,
+  handleCreateCollection,
   handleOpenSavePaletteModal,
   handleOpenExport
 }) => (
@@ -382,6 +401,16 @@ const GenerateStageContent: React.FC<{
           onDeleteCuratedImage={handleDeleteCuratedImage}
           onResetCuratedImages={handleResetCuratedImages}
           isSupabaseConnected={isSupabaseConnected}
+          projects={projects}
+          collections={collections}
+          favoriteColors={favoriteColors}
+          onSaveToFavorites={handleSaveToFavorites}
+          onAddColorsToProject={handleAddColorsToProject}
+          onAddColorsToCollection={handleAddColorsToCollection}
+          onCreateProject={handleCreateProject}
+          onCreateCollection={handleCreateCollection}
+          onOpenSavePaletteModal={handleOpenSavePaletteModal}
+          onOpenExport={handleOpenExport}
         />
       )}
     </>
@@ -412,6 +441,9 @@ const StudioContent: React.FC<{
   refineTool: RefineTool;
   curatedImages: CuratedDemoImage[];
   isSupabaseConnected: boolean;
+  projects?: ProjectWorkspace[];
+  collections?: CollectionBoard[];
+  favoriteColors?: FavoriteColor[];
   setActivePalette: (colors: string[]) => void;
   setActiveStage: (stage: StudioStage) => void;
   setGenerateInputMode: (mode: GenerateInputMode) => void;
@@ -420,6 +452,15 @@ const StudioContent: React.FC<{
   handleSaveCuratedImage: (img: CuratedDemoImage) => void;
   handleDeleteCuratedImage: (id: string) => void;
   handleResetCuratedImages: () => void;
+  handleAddColorsToProject?: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => void;
+  handleAddColorsToCollection?: (collectionId: string, colors: string[]) => void;
+  handleCreateProject?: (project: ProjectWorkspace) => void;
+  handleCreateCollection?: (collection: CollectionBoard) => void;
   handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
   handleOpenExport: (colors?: string[], title?: string) => void;
   openSavePaletteModal: () => void;
@@ -431,6 +472,9 @@ const StudioContent: React.FC<{
   refineTool,
   curatedImages,
   isSupabaseConnected,
+  projects = [],
+  collections = [],
+  favoriteColors = [],
   setActivePalette,
   setActiveStage,
   setGenerateInputMode,
@@ -439,6 +483,10 @@ const StudioContent: React.FC<{
   handleSaveCuratedImage,
   handleDeleteCuratedImage,
   handleResetCuratedImages,
+  handleAddColorsToProject,
+  handleAddColorsToCollection,
+  handleCreateProject,
+  handleCreateCollection,
   handleOpenSavePaletteModal,
   handleOpenExport,
   openSavePaletteModal,
@@ -454,10 +502,17 @@ const StudioContent: React.FC<{
           setActiveStage={setActiveStage}
           curatedImages={curatedImages}
           isSupabaseConnected={isSupabaseConnected}
+          projects={projects}
+          collections={collections}
+          favoriteColors={favoriteColors}
           handleSaveToFavorites={handleSaveToFavorites}
           handleSaveCuratedImage={handleSaveCuratedImage}
           handleDeleteCuratedImage={handleDeleteCuratedImage}
           handleResetCuratedImages={handleResetCuratedImages}
+          handleAddColorsToProject={handleAddColorsToProject}
+          handleAddColorsToCollection={handleAddColorsToCollection}
+          handleCreateProject={handleCreateProject}
+          handleCreateCollection={handleCreateCollection}
           handleOpenSavePaletteModal={handleOpenSavePaletteModal}
           handleOpenExport={handleOpenExport}
         />
@@ -546,6 +601,7 @@ const ProjectsTab: React.FC<{
     paletteName?: string
   ) => void;
   handleAddColorsToCollection: (collectionId: string, colors: string[]) => void;
+  handleSubmitToCuration: (submission: { title: string; colors: string[]; tags: string[]; gamut: string; type: 'collection' | 'board'; sourceId: string }) => void;
 }> = ({
   isSignedIn,
   openAuth,
@@ -567,7 +623,8 @@ const ProjectsTab: React.FC<{
   handleDeleteCollection,
   handleSendToAudit,
   handleAddColorsToProject,
-  handleAddColorsToCollection
+  handleAddColorsToCollection,
+  handleSubmitToCuration
 }) => {
     if (!isSignedIn) {
       return (
@@ -598,6 +655,7 @@ const ProjectsTab: React.FC<{
         onSendToAudit={handleSendToAudit}
         onAddColorsToProject={handleAddColorsToProject}
         onAddColorsToCollection={handleAddColorsToCollection}
+        onSubmitToCuration={handleSubmitToCuration}
         showToast={showToast}
       />
     );
@@ -941,6 +999,7 @@ interface MainContentRouterProps {
   handleApproveSubmission: (id: string, asStaffPick: boolean) => Promise<void>;
   handleRejectSubmission: (id: string) => Promise<void>;
   handleAddTag: (name: string, category: string) => Promise<void>;
+  handleSubmitToCuration: (submission: { title: string; colors: string[]; tags: string[]; gamut: string; type: 'collection' | 'board'; sourceId: string }) => Promise<void>;
   handleUpdateProfile: (updated: Partial<UserProfile>) => Promise<void>;
   handleLogout: () => Promise<void>;
 }
@@ -1006,6 +1065,7 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
     handleApproveSubmission,
     handleRejectSubmission,
     handleAddTag,
+    handleSubmitToCuration,
     handleUpdateProfile,
     handleLogout
   } = props;
@@ -1026,6 +1086,9 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           refineTool={refineTool}
           curatedImages={curatedImages}
           isSupabaseConnected={isSupabaseConnected}
+          projects={projects}
+          collections={collections}
+          favoriteColors={favoriteColors}
           setActivePalette={setActivePalette}
           setActiveStage={setActiveStage}
           setGenerateInputMode={setGenerateInputMode}
@@ -1034,6 +1097,10 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           handleSaveCuratedImage={handleSaveCuratedImage}
           handleDeleteCuratedImage={handleDeleteCuratedImage}
           handleResetCuratedImages={handleResetCuratedImages}
+          handleAddColorsToProject={handleAddColorsToProject}
+          handleAddColorsToCollection={handleAddColorsToCollection}
+          handleCreateProject={handleCreateProject}
+          handleCreateCollection={handleCreateCollection}
           handleOpenSavePaletteModal={handleOpenSavePaletteModal}
           handleOpenExport={handleOpenExport}
           openSavePaletteModal={openSavePaletteModal}
@@ -1079,6 +1146,7 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           handleSendToAudit={handleSendToAudit}
           handleAddColorsToProject={handleAddColorsToProject}
           handleAddColorsToCollection={handleAddColorsToCollection}
+          handleSubmitToCuration={handleSubmitToCuration}
         />
       )}
 
@@ -1429,6 +1497,7 @@ export function App() {
     handleApproveSubmission,
     handleRejectSubmission,
     handleAddTag,
+    handleSubmitToCuration,
     handleSaveCuratedImage,
     handleDeleteCuratedImage,
     handleResetCuratedImages,
@@ -1581,6 +1650,7 @@ export function App() {
           handleApproveSubmission={handleApproveSubmission}
           handleRejectSubmission={handleRejectSubmission}
           handleAddTag={handleAddTag}
+          handleSubmitToCuration={handleSubmitToCuration}
           handleUpdateProfile={handleUpdateProfile}
           handleLogout={handleLogout}
         />

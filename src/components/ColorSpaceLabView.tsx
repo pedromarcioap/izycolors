@@ -19,12 +19,24 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
 
   const details = getColorDetails(activeHex);
 
+  // Sync with active palette if colors change (e.g. from extractor)
+  useEffect(() => {
+    if (activePalette.length > 0) {
+      if (!activePalette.includes(activeHex)) {
+        setActiveHex(activePalette[0]);
+      }
+      if (activePalette.length > 1 && !activePalette.includes(gradientEndHex)) {
+        setGradientEndHex(activePalette[1]);
+      }
+    }
+  }, [activePalette]);
+
   // Refine tool behavior: write the two inspected colors back into the active
   // palette while preserving any remaining swatches from the WIP.
   useEffect(() => {
     const next = activePalette.length > 0 ? [...activePalette] : [activeHex, gradientEndHex];
-    if (next.length > 0) next[0] = activeHex;
-    if (next.length > 1) next[1] = gradientEndHex;
+    if (next.length > 0 && next[0] !== activeHex) next[0] = activeHex;
+    if (next.length > 1 && next[1] !== gradientEndHex) next[1] = gradientEndHex;
     onColorsChange(next);
   }, [activeHex, gradientEndHex]);
 
@@ -56,7 +68,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
   ];
 
   return (
-    <div className="flex-1 bg-[#0B0F17] text-[#DFE2EE] p-4 sm:p-8 max-w-[1500px] mx-auto w-full pb-24">
+    <div className="flex-1 bg-[#0B0F17] text-[#DFE2EE] p-4 sm:p-8 max-w-[1500px] mx-auto w-full pb-24 font-['Geist']">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 border-b border-white/[0.08] pb-6">
         <div>
@@ -64,7 +76,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
             CIE-Lab & ColorSpace Laboratory
           </div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight font-['Geist'] mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
             Color Space Lab & Gradientes
           </h1>
           <p className="text-xs sm:text-sm text-[#94A3B8] mt-1">
@@ -122,18 +134,28 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
             </div>
           </div>
 
-          {/* Quick Palette Swatches presets */}
+          {/* Active Palette Swatches selector */}
           <div className="mt-6 pt-4 border-t border-white/[0.06]">
-            <span className="text-xs text-[#94A3B8] font-mono block mb-2">Alternar rapidamente:</span>
-            <div className="flex items-center gap-2">
-              {['#08BBD9', '#6366F1', '#EC4899', '#10B981', '#F59E0B', '#EF4444'].map(c => (
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs text-[#94A3B8] font-mono block">Amostras da Paleta Ativa ({activePalette.length}):</span>
+              <span className="text-[10px] text-[#06B6D4] font-mono">Clique para inspecionar</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {(activePalette.length > 0 ? activePalette : ['#08BBD9', '#6366F1', '#EC4899', '#10B981', '#F59E0B', '#EF4444']).map((c, i) => (
                 <button
-                  key={c}
+                  key={`${c}-${i}`}
                   onClick={() => setActiveHex(c)}
-                  className="w-7 h-7 rounded-full border border-white/20 hover:scale-110 transition-transform"
+                  className={`w-8 h-8 rounded-lg border transition-all cursor-pointer relative group ${activeHex === c ? 'border-[#06B6D4] ring-2 ring-[#06B6D4] scale-105' : 'border-white/20 hover:scale-110'
+                    }`}
                   style={{ backgroundColor: c }}
-                  title={c}
-                />
+                  title={`Cor #${i + 1}: ${c}`}
+                >
+                  {activeHex === c && (
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-white bg-black/30 rounded-lg">
+                      ✓
+                    </span>
+                  )}
+                </button>
               ))}
             </div>
           </div>

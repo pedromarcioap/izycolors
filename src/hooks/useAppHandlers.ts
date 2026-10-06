@@ -32,6 +32,7 @@ import {
     deleteProject,
     deleteProjectPalette,
     deleteVaultPalette,
+    fetchCurrentProfile,
     forkPalette,
     listArticles,
     listCollections,
@@ -51,6 +52,7 @@ import {
     updateSubmissionStatus,
     deleteCuratedImage as removeCuratedImage
 } from '../services/db';
+import { getSupabaseClient } from '../services/supabase';
 import {
     uploadUserAvatar,
     removeUserAvatar,
@@ -494,6 +496,32 @@ export function useAppHandlers(params: UseAppHandlersParams) {
         if (ok) setTaxonomyTags(await listTaxonomyTags());
     }, [runMutation, setTaxonomyTags]);
 
+    const handleSubmitToCuration = useCallback(async (submission: { title: string; colors: string[]; tags: string[]; gamut: string; type: 'collection' | 'board'; sourceId: string }) => {
+        if (!requireSession()) return;
+        const ok = await runMutation(
+            async () => {
+                const { data: { user } } = await getSupabaseClient().auth.getUser();
+                if (!user) throw new Error('Usuário não autenticado');
+
+                const profile = await fetchCurrentProfile();
+                if (!profile) throw new Error('Perfil não encontrado');
+
+                return createSubmission({
+                    title: submission.title,
+                    author: profile.name,
+                    authorHandle: profile.handle,
+                    authorAvatar: profile.avatar,
+                    colors: submission.colors,
+                    tags: submission.tags,
+                    suggestedGamut: submission.gamut,
+                    contrastScore: 'WCAG AAA (Ready)'
+                });
+            },
+            `${submission.type === 'collection' ? 'Coleção' : 'Board'} "${submission.title}" enviada para aprovação da curadoria!`
+        );
+        if (ok) setSubmissions(await listSubmissions());
+    }, [requireSession, runMutation, setSubmissions]);
+
     // -------------------------------------------------------------------------
     // Handlers — Curadoria de imagens e perfil
     // -------------------------------------------------------------------------
@@ -615,6 +643,7 @@ export function useAppHandlers(params: UseAppHandlersParams) {
         handleApproveSubmission,
         handleRejectSubmission,
         handleAddTag,
+        handleSubmitToCuration,
         handleSaveCuratedImage,
         handleDeleteCuratedImage,
         handleResetCuratedImages,

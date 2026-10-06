@@ -7,10 +7,15 @@ import {
   Trash2,
   Database,
   Check,
-  RefreshCw
+  RefreshCw,
+  Copy,
+  FolderPlus,
+  Download,
+  Edit3
 } from 'lucide-react';
-import { extractPaletteFromImage, getColorDetails } from '../utils/colorUtils';
-import { CuratedDemoImage } from '../types';
+import { extractPaletteFromImage, getColorDetails, toValidColorInputValue } from '../utils/colorUtils';
+import { CuratedDemoImage, ProjectWorkspace, CollectionBoard, FavoriteColor, ProjectSlot } from '../types';
+import { AddFavoriteToTargetModal } from './AddFavoriteToTargetModal';
 
 interface ImageExtractorViewProps {
   curatedImages: CuratedDemoImage[];
@@ -20,6 +25,21 @@ interface ImageExtractorViewProps {
   onDeleteCuratedImage: (id: string) => void;
   onResetCuratedImages: () => void;
   isSupabaseConnected: boolean;
+  projects?: ProjectWorkspace[];
+  collections?: CollectionBoard[];
+  favoriteColors?: FavoriteColor[];
+  onSaveToFavorites?: (hex: string, name: string) => void;
+  onAddColorsToProject?: (
+    projectId: string,
+    targetType: ProjectSlot,
+    colors: string[],
+    paletteName?: string
+  ) => void;
+  onAddColorsToCollection?: (collectionId: string, colors: string[]) => void;
+  onCreateProject?: (project: ProjectWorkspace) => void;
+  onCreateCollection?: (collection: CollectionBoard) => void;
+  onOpenSavePaletteModal?: (colors?: string[], title?: string) => void;
+  onOpenExport?: (colors?: string[], title?: string) => void;
 }
 
 export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
@@ -29,7 +49,16 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
   onSaveCuratedImage,
   onDeleteCuratedImage,
   onResetCuratedImages,
-  isSupabaseConnected
+  isSupabaseConnected,
+  projects = [],
+  collections = [],
+  onSaveToFavorites,
+  onAddColorsToProject,
+  onAddColorsToCollection,
+  onCreateProject,
+  onCreateCollection,
+  onOpenSavePaletteModal,
+  onOpenExport
 }) => {
   const [selectedImage, setSelectedImage] = useState<string>(
     curatedImages[0]?.url || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1200&auto=format&fit=crop&q=80'
@@ -43,6 +72,11 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
   const [curatedName, setCuratedName] = useState('');
   const [curatedTag, setCuratedTag] = useState('Arte & Estudo');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [copiedHex, setCopiedHex] = useState<string | null>(null);
+
+  // Target modal (Save single or multiple colors into Projects / Collections)
+  const [targetModalOpen, setTargetModalOpen] = useState(false);
+  const [targetSelectedColors, setTargetSelectedColors] = useState<string[]>([]);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -53,22 +87,36 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
   };
 
   // Input mode behavior: every extraction is immediately synced into the
-  // centralized active palette (no redundant save/audit actions here).
+  // centralized active palette.
   useEffect(() => {
     if (extractedColors.length > 0) {
       onApplyToActivePalette(extractedColors);
     }
   }, [extractedColors, onApplyToActivePalette]);
 
-  const processImage = (imgElement: HTMLImageElement) => {
+  /**
+   * Process image with explicit count to avoid React state closure delays.
+   * Fixes the requirement where quantity buttons (4, 5, 6, 7) required two clicks.
+   */
+  const processImage = (imgElement: HTMLImageElement, count: number = colorsCount) => {
     setIsProcessing(true);
     try {
-      const colors = extractPaletteFromImage(imgElement, colorsCount);
-      setExtractedColors(colors);
+      const colors = extractPaletteFromImage(imgElement, count);
+      if (colors && colors.length > 0) {
+        setExtractedColors(colors);
+        onApplyToActivePalette(colors);
+      }
     } catch (e) {
       console.error('Image extraction error', e);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleSetColorCount = (count: number) => {
+    setColorsCount(count);
+    if (imgRef.current) {
+      processImage(imgRef.current, count);
     }
   };
 
@@ -80,8 +128,8 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
         if (event.target?.result) {
           const dataUrl = event.target.result as string;
           setSelectedImage(dataUrl);
-          setCuratedName(file.name.replace(/\.[^/.]+$/, ""));
-          showToast('Imagem carregada! Pronto para extrair e salvar como demonstração curada.');
+          setCuratedName(file.name.replace(/\.[^/.]+$/, ''));
+          showToast('Imagem carregada! Extraindo paleta perceptual...');
         }
       };
       reader.readAsDataURL(file);
@@ -104,7 +152,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
     onSaveCuratedImage(newCurated);
     setShowSaveModal(false);
     setCuratedName('');
-    showToast(`Imagem "${name}" salva com sucesso nas Imagens Curadas (Sincronizada no Supabase / Armazenamento Persistente)!`);
+    showToast(`Imagem "${name}" salva nas Imagens Curadas de Demonstração!`);
   };
 
   const handleDeleteCurated = (e: React.MouseEvent, id: string, name: string) => {
@@ -116,6 +164,75 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
         setSelectedImage(curatedImages[0].url);
       }
     }
+  };
+
+  // Color Editing
+  const handleEditColor = (index: number, newHex: string) => {
+    const updated = [...extractedColors];
+    updated[index] = newHex.toUpperCase();
+    setExtractedColors(updated);
+    onApplyToActivePalette(updated);
+  };
+
+  // Color Deletion (Minimum 1 color maintained)
+  const handleDeleteColor = (index: number) => {
+    if (extractedColors.length <= 1) {
+      showToast('A paleta deve conter no mínimo 1 cor dominante.');
+      return;
+    }
+    const colorToRemove = extractedColors[index];
+    const updated = extractedColors.filter((_, idx) => idx !== index);
+    setExtractedColors(updated);
+    onApplyToActivePalette(updated);
+    showToast(`Amostra ${colorToRemove} removida.`);
+  };
+
+  // Add a new color swatch manually
+  const handleAddColor = () => {
+    if (extractedColors.length >= 10) {
+      showToast('Limite máximo de 10 cores na extração.');
+      return;
+    }
+    const lastColor = extractedColors[extractedColors.length - 1] || '#08BBD9';
+    const details = getColorDetails(lastColor);
+    // Generate a complementary or offset color
+    const nextHue = (details.hsl.h + 45) % 360;
+    const detailsNew = getColorDetails(`hsl(${nextHue}, 70%, 50%)`);
+    const newHex = detailsNew.hex.toUpperCase();
+    const updated = [...extractedColors, newHex];
+    setExtractedColors(updated);
+    onApplyToActivePalette(updated);
+    showToast(`Nova amostra ${newHex} adicionada.`);
+  };
+
+  // Copy Color Hex
+  const handleCopyColor = (hex: string) => {
+    navigator.clipboard.writeText(hex);
+    setCopiedHex(hex);
+    showToast(`Código ${hex} copiado para a área de transferência!`);
+    setTimeout(() => setCopiedHex(null), 2000);
+  };
+
+  // Save single color to favorites
+  const handleFavoriteSingleColor = (hex: string) => {
+    if (onSaveToFavorites) {
+      onSaveToFavorites(hex, `Amostra Extraída ${hex}`);
+      showToast(`Cor ${hex} favoritada e salva no Cofre de Cores!`);
+    } else {
+      showToast(`Cor ${hex} salva!`);
+    }
+  };
+
+  // Open modal to save color(s) to project or collection
+  const handleOpenTargetModal = (colors: string[]) => {
+    setTargetSelectedColors(colors);
+    setTargetModalOpen(true);
+  };
+
+  // Apply & Proceed to Refine conveyor
+  const handleProceedToRefine = () => {
+    onApplyToActivePalette(extractedColors);
+    onProceedToRefine();
   };
 
   return (
@@ -151,7 +268,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
             Extrator Cromático de Imagens
           </h1>
           <p className="text-xs sm:text-sm text-[#94A3B8] mt-1 max-w-2xl leading-relaxed">
-            Quantize paletas a partir de fotografias, ilustrações ou referências de arte. As imagens de demonstração ficam salvas de forma permanente com sincronização no <strong>Supabase</strong>.
+            Quantize paletas a partir de fotografias, ilustrações ou referências visuais. Salve cores individualmente em projetos, edite amostras e continue o fluxo de design na esteira de refino.
           </p>
         </div>
 
@@ -168,7 +285,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
             className="h-9 px-3.5 bg-[#181C24] hover:bg-[#262A33] border border-white/[0.08] rounded-lg text-xs text-white flex items-center gap-2 transition-colors cursor-pointer"
           >
             <Upload className="w-3.5 h-3.5 text-[#06B6D4]" />
-            <span>Enviar Nova Foto</span>
+            <span>Enviar Foto</span>
           </button>
 
           <button
@@ -180,12 +297,13 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
             title="Salvar a foto atual no acervo de demonstração permanente"
           >
             <Bookmark className="w-3.5 h-3.5" />
-            <span>Salvar como Imagem Curada</span>
+            <span>Salvar Foto Curada</span>
           </button>
 
           <button
-            onClick={onProceedToRefine}
+            onClick={handleProceedToRefine}
             className="h-9 px-4 bg-[#6366F1] hover:bg-[#5254E0] text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-lg shadow-indigo-600/30 transition-colors cursor-pointer"
+            title="Levar as cores extraídas para a esteira de Refino Harmônico / Color Space Lab"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Continuar para Refinar</span>
@@ -225,6 +343,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
                   setSelectedImage(preset.url);
                   if (preset.colors && preset.colors.length > 0) {
                     setExtractedColors(preset.colors);
+                    onApplyToActivePalette(preset.colors);
                   }
                 }}
                 className={`p-2 rounded-xl border text-left transition-all overflow-hidden group relative cursor-pointer ${isSelected
@@ -289,14 +408,14 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
       {/* Image Stage + Extracted Palette Output */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left: Image Canvas */}
-        <div className="lg:col-span-8 bg-[#181C24] border border-white/[0.08] rounded-xl overflow-hidden p-4 sm:p-6 flex flex-col items-center justify-center relative min-h-[420px]">
+        <div className="lg:col-span-7 bg-[#181C24] border border-white/[0.08] rounded-xl overflow-hidden p-4 sm:p-6 flex flex-col items-center justify-center relative min-h-[420px]">
           <div className="relative max-w-full max-h-[520px] rounded-lg overflow-hidden shadow-2xl border border-white/10 bg-black/40">
             <img
               ref={imgRef}
               src={selectedImage}
               alt="Análise Visual"
               crossOrigin="anonymous"
-              onLoad={(e) => processImage(e.currentTarget)}
+              onLoad={(e) => processImage(e.currentTarget, colorsCount)}
               className="max-h-[500px] w-auto object-contain rounded-lg"
             />
             {isProcessing && (
@@ -316,77 +435,194 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
           </div>
         </div>
 
-        {/* Right: Extracted Swatches & Color Science */}
-        <div className="lg:col-span-4 bg-[#181C24] border border-white/[0.08] rounded-xl p-5 flex flex-col justify-between">
+        {/* Right: Extracted Swatches & Individual Color Actions */}
+        <div className="lg:col-span-5 bg-[#181C24] border border-white/[0.08] rounded-xl p-5 flex flex-col justify-between">
           <div>
-            <div className="flex items-center justify-between mb-4 pb-3 border-b border-white/[0.06]">
+            {/* Header with Quantity Switcher & Add Button */}
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-4 pb-3 border-b border-white/[0.06]">
               <div>
-                <h3 className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] font-semibold">
-                  Cores Dominantes Extraídas ({extractedColors.length})
+                <h3 className="text-xs font-mono uppercase tracking-wider text-[#94A3B8] font-semibold flex items-center gap-2">
+                  <span>Cores Dominantes Extraídas ({extractedColors.length})</span>
                 </h3>
                 <span className="text-[10px] font-mono text-[#64748B]">
-                  Ordenado por Luminância Perceptual
+                  Mínimo de 1 cor • Salve individualmente ou em paleta
                 </span>
               </div>
 
-              <div className="flex items-center gap-1 text-xs">
-                <span className="text-[#64748B] font-mono text-[11px]">Qtd:</span>
-                {[4, 5, 6, 7].map(n => (
-                  <button
-                    key={n}
-                    onClick={() => {
-                      setColorsCount(n);
-                      if (imgRef.current) processImage(imgRef.current);
-                    }}
-                    className={`w-6 h-6 rounded text-[11px] font-mono cursor-pointer transition-colors ${colorsCount === n
-                      ? 'bg-[#6366F1] text-white font-bold shadow-sm'
-                      : 'bg-[#111827] text-[#94A3B8] hover:text-white'
-                      }`}
-                  >
-                    {n}
-                  </button>
-                ))}
+              <div className="flex items-center gap-2">
+                {/* Quantity selector (4, 5, 6, 7) - 1-click execution */}
+                <div className="flex items-center gap-1 text-xs bg-[#111827] p-1 rounded-lg border border-white/[0.08]">
+                  <span className="text-[#64748B] font-mono text-[10px] px-1">Qtd:</span>
+                  {[4, 5, 6, 7].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      onClick={() => handleSetColorCount(n)}
+                      className={`w-5 h-5 rounded text-[10px] font-mono cursor-pointer transition-colors ${colorsCount === n && extractedColors.length === n
+                        ? 'bg-[#6366F1] text-white font-bold shadow-sm'
+                        : 'bg-[#181C24] text-[#94A3B8] hover:text-white'
+                        }`}
+                      title={`Extrair ${n} cores dominantes`}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Add Manual Color */}
+                <button
+                  type="button"
+                  onClick={handleAddColor}
+                  className="h-7 px-2 bg-[#111827] hover:bg-[#262A33] border border-white/[0.08] rounded-lg text-[11px] font-mono text-[#06B6D4] flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Adicionar uma cor personalizada à paleta extraída"
+                >
+                  <Plus className="w-3 h-3" />
+                  <span>Adicionar</span>
+                </button>
               </div>
             </div>
 
-            {/* Extracted Swatches List */}
-            <div className="space-y-2.5">
-              {extractedColors.map((hex) => {
+            {/* Extracted Swatches List with Inline Edit, Delete, and Individual Save Actions */}
+            <div className="space-y-2.5 max-h-[460px] overflow-y-auto pr-1">
+              {extractedColors.map((hex, idx) => {
                 const details = getColorDetails(hex);
+                const isCopied = copiedHex === hex;
+                const canDelete = extractedColors.length > 1;
+
                 return (
                   <div
-                    key={hex}
+                    key={`${hex}-${idx}`}
                     className="p-2.5 rounded-lg border border-white/[0.06] bg-[#111827] flex items-center justify-between group hover:border-white/20 transition-all"
                   >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-lg shadow-inner border border-white/10 shrink-0"
+                    {/* Left: Swatch Picker + Info */}
+                    <div className="flex items-center gap-3 min-w-0">
+                      {/* Color Picker trigger */}
+                      <label
+                        className="w-10 h-10 rounded-lg shadow-inner border border-white/10 shrink-0 cursor-pointer relative overflow-hidden group/swatch block"
                         style={{ backgroundColor: hex }}
-                      />
-                      <div>
-                        <span className="text-sm font-bold font-mono text-white block">
-                          {hex}
-                        </span>
-                        <span className="text-[11px] font-mono text-[#64748B]">
-                          Luma: {Math.round(details.luminance * 100)}% • H: {details.hsl.h}° • S: {details.hsl.s}%
+                        title="Clique para editar com o seletor de cores nativo"
+                      >
+                        <input
+                          type="color"
+                          value={toValidColorInputValue(hex)}
+                          onChange={(e) => handleEditColor(idx, e.target.value)}
+                          className="opacity-0 absolute inset-0 w-full h-full cursor-pointer"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/swatch:opacity-100 flex items-center justify-center transition-opacity pointer-events-none">
+                          <Edit3 className="w-3.5 h-3.5 text-white" />
+                        </div>
+                      </label>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={hex}
+                            onChange={(e) => handleEditColor(idx, e.target.value)}
+                            className="text-xs font-bold font-mono text-white bg-transparent border-b border-transparent hover:border-white/30 focus:border-[#06B6D4] focus:outline-none w-20 uppercase"
+                            title="Editar código HEX diretamente"
+                          />
+                          <span className="text-[10px] font-mono text-[#64748B]">#{idx + 1}</span>
+                        </div>
+                        <span className="text-[10px] font-mono text-[#64748B] block truncate">
+                          L: {Math.round(details.luminance * 100)}% • H: {details.hsl.h}° • S: {details.hsl.s}%
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-right font-mono text-[10px] space-y-1">
-                      <span className="px-1.5 py-0.5 rounded bg-white/[0.06] text-[#06B6D4] block">
-                        WCAG {details.luminance > 0.4 ? '14:1' : '11:1'}
-                      </span>
+                    {/* Right: Individual Actions (Copy, Favorite, Add to Project/Collection, Delete) */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      {/* Copy Hex */}
+                      <button
+                        type="button"
+                        onClick={() => handleCopyColor(hex)}
+                        className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] border border-white/[0.06] text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
+                        title={`Copiar código ${hex}`}
+                      >
+                        {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+
+                      {/* Favorite single color */}
+                      <button
+                        type="button"
+                        onClick={() => handleFavoriteSingleColor(hex)}
+                        className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] border border-white/[0.06] text-[#94A3B8] hover:text-amber-400 transition-colors cursor-pointer"
+                        title="Favoritar / Salvar esta cor no Cofre de Cores"
+                      >
+                        <Bookmark className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Save single color to Project or Collection */}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenTargetModal([hex])}
+                        className="p-1.5 rounded-md bg-[#181C24] hover:bg-[#262A33] border border-white/[0.06] text-[#94A3B8] hover:text-[#06B6D4] transition-colors cursor-pointer"
+                        title="Salvar esta cor individualmente em Projeto ou Coleção"
+                      >
+                        <FolderPlus className="w-3.5 h-3.5" />
+                      </button>
+
+                      {/* Delete swatch (minimum 1 color allowed) */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteColor(idx)}
+                        disabled={!canDelete}
+                        className={`p-1.5 rounded-md border transition-colors cursor-pointer ${canDelete
+                          ? 'bg-[#181C24] hover:bg-rose-950/60 border-white/[0.06] hover:border-rose-500/40 text-[#94A3B8] hover:text-rose-400'
+                          : 'bg-[#181C24]/50 border-white/[0.04] text-white/20 cursor-not-allowed'
+                          }`}
+                        title={canDelete ? 'Remover esta cor dominante' : 'Mínimo de 1 cor mantido (não é possível deletar a última cor)'}
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
               })}
             </div>
+
+            {/* Quick Bulk Save Buttons */}
+            <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => handleOpenTargetModal(extractedColors)}
+                className="flex-1 h-8 px-2.5 rounded-lg bg-[#111827] hover:bg-[#262A33] border border-white/[0.08] text-[11px] font-mono text-[#94A3B8] hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                title="Salvar todas as cores extraídas em um Projeto ou Coleção"
+              >
+                <FolderPlus className="w-3.5 h-3.5 text-[#06B6D4]" />
+                <span>Adicionar ao Projeto/Coleção</span>
+              </button>
+
+              {onOpenSavePaletteModal && (
+                <button
+                  type="button"
+                  onClick={() => onOpenSavePaletteModal(extractedColors, curatedName || 'Paleta Extraída da Imagem')}
+                  className="h-8 px-2.5 rounded-lg bg-[#111827] hover:bg-[#262A33] border border-white/[0.08] text-[11px] font-mono text-emerald-400 hover:text-emerald-300 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="Salvar como paleta completa no Cofre Privado"
+                >
+                  <Bookmark className="w-3.5 h-3.5" />
+                  <span>Salvar Paleta</span>
+                </button>
+              )}
+
+              {onOpenExport && (
+                <button
+                  type="button"
+                  onClick={() => onOpenExport(extractedColors, curatedName || 'Paleta Extraída')}
+                  className="h-8 px-2.5 rounded-lg bg-[#111827] hover:bg-[#262A33] border border-white/[0.08] text-[11px] font-mono text-[#94A3B8] hover:text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  title="Exportar paleta extraída em CSS, JSON, ASE ou SVG"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Exportar</span>
+                </button>
+              )}
+            </div>
           </div>
 
+          {/* Bottom Workflow Action */}
           <div className="mt-6 pt-4 border-t border-white/[0.06] space-y-2">
             <button
-              onClick={onProceedToRefine}
+              onClick={handleProceedToRefine}
               className="w-full h-10 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-semibold flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 transition-colors cursor-pointer"
             >
               <Sparkles className="w-3.5 h-3.5" />
@@ -399,7 +635,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
         </div>
       </div>
 
-      {/* Modal: Salvar Imagem Curada */}
+      {/* Modal: Salvar Imagem Curada de Demonstração */}
       {showSaveModal && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-[#111827] border border-white/[0.12] rounded-xl shadow-2xl p-5 animate-in fade-in zoom-in-95">
@@ -464,6 +700,28 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Target Modal: Save Individual Color or Selection to Projects / Collections */}
+      <AddFavoriteToTargetModal
+        isOpen={targetModalOpen}
+        onClose={() => setTargetModalOpen(false)}
+        selectedColors={targetSelectedColors}
+        projects={projects}
+        collections={collections}
+        onAddColorsToProject={(projId, slot, colors, name) => {
+          if (onAddColorsToProject) {
+            onAddColorsToProject(projId, slot, colors, name);
+          }
+        }}
+        onAddColorsToCollection={(colId, colors) => {
+          if (onAddColorsToCollection) {
+            onAddColorsToCollection(colId, colors);
+          }
+        }}
+        onCreateProject={onCreateProject}
+        onCreateCollection={onCreateCollection}
+        showToast={showToast}
+      />
     </div>
   );
 };
