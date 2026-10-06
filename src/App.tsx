@@ -344,7 +344,6 @@ const GenerateStageContent: React.FC<{
   isSupabaseConnected: boolean;
   projects?: ProjectWorkspace[];
   collections?: CollectionBoard[];
-  favoriteColors?: FavoriteColor[];
   handleSaveToFavorites: (hex: string, name: string) => void;
   handleSaveCuratedImage: (img: CuratedDemoImage) => void;
   handleDeleteCuratedImage: (id: string) => void;
@@ -370,7 +369,6 @@ const GenerateStageContent: React.FC<{
   isSupabaseConnected,
   projects = [],
   collections = [],
-  favoriteColors = [],
   handleSaveToFavorites,
   handleSaveCuratedImage,
   handleDeleteCuratedImage,
@@ -403,7 +401,6 @@ const GenerateStageContent: React.FC<{
           isSupabaseConnected={isSupabaseConnected}
           projects={projects}
           collections={collections}
-          favoriteColors={favoriteColors}
           onSaveToFavorites={handleSaveToFavorites}
           onAddColorsToProject={handleAddColorsToProject}
           onAddColorsToCollection={handleAddColorsToCollection}
@@ -443,7 +440,6 @@ const StudioContent: React.FC<{
   isSupabaseConnected: boolean;
   projects?: ProjectWorkspace[];
   collections?: CollectionBoard[];
-  favoriteColors?: FavoriteColor[];
   setActivePalette: (colors: string[]) => void;
   setActiveStage: (stage: StudioStage) => void;
   setGenerateInputMode: (mode: GenerateInputMode) => void;
@@ -474,7 +470,6 @@ const StudioContent: React.FC<{
   isSupabaseConnected,
   projects = [],
   collections = [],
-  favoriteColors = [],
   setActivePalette,
   setActiveStage,
   setGenerateInputMode,
@@ -504,7 +499,6 @@ const StudioContent: React.FC<{
           isSupabaseConnected={isSupabaseConnected}
           projects={projects}
           collections={collections}
-          favoriteColors={favoriteColors}
           handleSaveToFavorites={handleSaveToFavorites}
           handleSaveCuratedImage={handleSaveCuratedImage}
           handleDeleteCuratedImage={handleDeleteCuratedImage}
@@ -1088,7 +1082,6 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           isSupabaseConnected={isSupabaseConnected}
           projects={projects}
           collections={collections}
-          favoriteColors={favoriteColors}
           setActivePalette={setActivePalette}
           setActiveStage={setActiveStage}
           setGenerateInputMode={setGenerateInputMode}

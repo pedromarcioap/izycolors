@@ -259,7 +259,7 @@ export const HarmonicWheelView: React.FC<HarmonicWheelViewProps> = ({
   };
 
   const handleCopy = (hex: string) => {
-    navigator.clipboard.writeText(hex);
+    void navigator.clipboard.writeText(hex);
     setCopiedHex(hex);
     setTimeout(() => setCopiedHex(null), 2000);
   };

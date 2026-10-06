@@ -41,7 +41,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
   }, [activeHex, gradientEndHex]);
 
   const copyText = (key: string, val: string) => {
-    navigator.clipboard.writeText(val);
+    void navigator.clipboard.writeText(val);
     setCopiedKey(key);
     setTimeout(() => setCopiedKey(null), 1500);
   };
@@ -74,7 +74,7 @@ export const ColorSpaceLabView: React.FC<ColorSpaceLabViewProps> = ({
         <div>
           <div className="text-[11px] font-mono uppercase tracking-wider text-[#06B6D4] flex items-center gap-1.5 font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#06B6D4]" />
-            CIE-Lab & ColorSpace Laboratory
+            <span>CIE-Lab & ColorSpace Laboratory</span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight mt-1">
             Color Space Lab & Gradientes

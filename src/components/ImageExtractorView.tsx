@@ -14,7 +14,7 @@ import {
   Edit3
 } from 'lucide-react';
 import { extractPaletteFromImage, getColorDetails, toValidColorInputValue } from '../utils/colorUtils';
-import { CuratedDemoImage, ProjectWorkspace, CollectionBoard, FavoriteColor, ProjectSlot } from '../types';
+import { CuratedDemoImage, ProjectWorkspace, CollectionBoard, ProjectSlot } from '../types';
 import { AddFavoriteToTargetModal } from './AddFavoriteToTargetModal';
 
 interface ImageExtractorViewProps {
@@ -27,7 +27,6 @@ interface ImageExtractorViewProps {
   isSupabaseConnected: boolean;
   projects?: ProjectWorkspace[];
   collections?: CollectionBoard[];
-  favoriteColors?: FavoriteColor[];
   onSaveToFavorites?: (hex: string, name: string) => void;
   onAddColorsToProject?: (
     projectId: string,
@@ -193,7 +192,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
       showToast('Limite máximo de 10 cores na extração.');
       return;
     }
-    const lastColor = extractedColors[extractedColors.length - 1] || '#08BBD9';
+    const lastColor = extractedColors.at(-1) || '#08BBD9';
     const details = getColorDetails(lastColor);
     // Generate a complementary or offset color
     const nextHue = (details.hsl.h + 45) % 360;
@@ -207,7 +206,7 @@ export const ImageExtractorView: React.FC<ImageExtractorViewProps> = ({
 
   // Copy Color Hex
   const handleCopyColor = (hex: string) => {
-    navigator.clipboard.writeText(hex);
+    void navigator.clipboard.writeText(hex);
     setCopiedHex(hex);
     showToast(`Código ${hex} copiado para a área de transferência!`);
     setTimeout(() => setCopiedHex(null), 2000);
