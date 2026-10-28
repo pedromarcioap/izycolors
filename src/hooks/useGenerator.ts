@@ -18,10 +18,11 @@ const getRandomNumber = (): number => {
 
 export interface UseGeneratorOptions {
   initialColors?: string[];
+  initialEditingIndex?: number | null;
 }
 
 export function useGenerator(options: UseGeneratorOptions = {}) {
-  const { initialColors } = options;
+  const { initialColors, initialEditingIndex } = options;
 
   const [colors, setColors] = useState<ColorItem[]>(() => {
     const seed = initialColors && initialColors.length > 0
@@ -38,7 +39,13 @@ export function useGenerator(options: UseGeneratorOptions = {}) {
   const [moodKeyword, setMoodKeyword] = useState<string>('');
   const [harmonyMode, setHarmonyMode] = useState<string>('smart');
   const [activeFormat, setActiveFormat] = useState<'HEX' | 'RGB' | 'HSL' | 'OKLCH'>('HEX');
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editingIndex, setEditingIndex] = useState<number | null>(initialEditingIndex ?? null);
+
+  useEffect(() => {
+    if (initialEditingIndex !== undefined) {
+      setEditingIndex(initialEditingIndex);
+    }
+  }, [initialEditingIndex]);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isFocusMode, setIsFocusMode] = useState(false);
@@ -220,6 +227,68 @@ export function useGenerator(options: UseGeneratorOptions = {}) {
     }
   }, [history, historyIndex]);
 
+  // Direct overlay / append colors to palette
+  const overlayColors = useCallback((newHexes: string[], strategy: 'append' | 'replace-unlocked' | 'blend' = 'append') => {
+    setColors(prev => {
+      setHistory(h => [...h.slice(0, historyIndex + 1), prev]);
+      setHistoryIndex(i => i + 1);
+
+      if (strategy === 'append') {
+        const remainingSlots = Math.max(0, 8 - prev.length);
+        const toAdd = newHexes.slice(0, remainingSlots);
+        if (toAdd.length === 0) {
+          showToast('Limite de 8 colunas atingido.');
+          return prev;
+        }
+        const appended = toAdd.map((hex, i) => ({
+          id: `col-${Date.now()}-${i}-${getRandomNumber()}`,
+          hex: hex.toUpperCase(),
+          name: `Color ${prev.length + i + 1}`,
+          locked: false
+        }));
+        showToast(`${toAdd.length} cor(es) sobreposta(s) com sucesso!`);
+        return [...prev, ...appended];
+      }
+
+      if (strategy === 'replace-unlocked') {
+        let newIdx = 0;
+        const updated = prev.map((item) => {
+          if (item.locked) return item;
+          if (newIdx < newHexes.length) {
+            const nextHex = newHexes[newIdx++].toUpperCase();
+            return { ...item, hex: nextHex };
+          }
+          return item;
+        });
+        showToast(`${newIdx} cor(es) sobreposta(s) nas posições desbloqueadas!`);
+        return updated;
+      }
+
+      const combined = [...prev.map(c => c.hex), ...newHexes];
+      const unique = Array.from(new Set(combined)).slice(0, 8);
+      showToast(`${unique.length} cores mescladas no gerador!`);
+      return unique.map((hex, i) => ({
+        id: `col-${Date.now()}-${i}`,
+        hex: hex.toUpperCase(),
+        name: `Color ${i + 1}`,
+        locked: false
+      }));
+    });
+  }, [historyIndex, showToast]);
+
+  const loadNewPalette = useCallback((newHexes: string[], startEditing: boolean = false) => {
+    const valid = newHexes.slice(0, 8);
+    setColors(valid.map((hex, i) => ({
+      id: `col-${Date.now()}-${i}`,
+      hex: hex.toUpperCase(),
+      name: `Color ${i + 1}`,
+      locked: false
+    })));
+    if (startEditing) {
+      setEditingIndex(0);
+    }
+  }, []);
+
   return {
     colors,
     setColors,
@@ -251,6 +320,8 @@ export function useGenerator(options: UseGeneratorOptions = {}) {
     handleColorUpdate,
     copyColor,
     handleUndo,
-    handleRedo
+    handleRedo,
+    overlayColors,
+    loadNewPalette
   };
 }

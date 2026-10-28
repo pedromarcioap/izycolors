@@ -2,18 +2,17 @@ import React, { useState } from 'react';
 import {
   Palette as PaletteIcon,
   Award,
-  Sliders,
   Download,
   Check,
   Copy,
   Sparkles,
   Settings,
-  ChevronRight,
   Plus,
   Bookmark
 } from 'lucide-react';
-import { AuthUser, Palette, CommunitySubmission, CollectionBoard, NavigationTab } from '../types';
+import { AuthUser, Palette, CommunitySubmission, CollectionBoard, NavigationTab, GeneratorOpenMode, SendToGeneratorPayload } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
+import { SendToGeneratorQuickMenu } from './SendToGeneratorQuickMenu';
 
 interface UserPortalViewProps {
   currentUser: AuthUser;
@@ -21,7 +20,8 @@ interface UserPortalViewProps {
   submissions?: CommunitySubmission[];
   collections?: CollectionBoard[];
   favoriteColors?: string[];
-  onOpenInGenerator: (colors: string[]) => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onOpenExport: (colors: string[], title?: string) => void;
   onOpenSubmissionModal: () => void;
   onUpdateCurrentUser: (updated: Partial<AuthUser>) => void;
@@ -35,6 +35,7 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
   collections = [],
   favoriteColors = [],
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onOpenExport,
   onOpenSubmissionModal,
   onUpdateCurrentUser,
@@ -245,13 +246,18 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
 
                 {/* Action Buttons */}
                 <div className="flex items-center gap-2 pt-4 mt-4 border-t border-white/[0.06]">
-                  <button
-                    onClick={() => onOpenInGenerator(p.colors)}
-                    className="flex-1 py-1.5 bg-[#181C26] hover:bg-[#222838] border border-white/[0.1] rounded text-xs text-white font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                  >
-                    <Sliders className="w-3 h-3" />
-                    <span>Gerador</span>
-                  </button>
+                  <SendToGeneratorQuickMenu
+                    colors={p.colors}
+                    title={p.title}
+                    sourceLabel={`Minha Paleta: ${p.title}`}
+                    sourceType="palette"
+                    onOpenInGenerator={onOpenInGenerator}
+                    onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                    size="sm"
+                    variant="primary"
+                    label="Gerador"
+                    className="flex-1"
+                  />
 
                   <button
                     onClick={() => handleCopyTokens(p)}
@@ -339,13 +345,17 @@ export const UserPortalView: React.FC<UserPortalViewProps> = ({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onOpenInGenerator(sub.colors)}
-                        className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-                      >
-                        <span>Abrir no Gerador</span>
-                        <ChevronRight className="w-3 h-3" />
-                      </button>
+                      <SendToGeneratorQuickMenu
+                        colors={sub.colors}
+                        title={sub.title}
+                        sourceLabel={`Submissão: ${sub.title}`}
+                        sourceType="curation"
+                        onOpenInGenerator={onOpenInGenerator}
+                        onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                        size="sm"
+                        variant="secondary"
+                        label="Gerador"
+                      />
                     </div>
                   </div>
                 );

@@ -20,7 +20,6 @@ import {
   BarChart3,
   PieChart as PieIcon,
   TrendingUp,
-  Sparkles,
   Layers,
   Palette as PaletteIcon,
   Calendar,
@@ -36,13 +35,16 @@ import {
 } from 'lucide-react';
 import {
   Palette,
+  VaultPalette,
   ProjectWorkspace,
   CollectionBoard,
   FavoriteColor,
-  VaultPalette,
-  CommunitySubmission
+  CommunitySubmission,
+  GeneratorOpenMode,
+  SendToGeneratorPayload
 } from '../types';
 import { hexToRgb, rgbToHsl } from '../utils/colorUtils';
+import { SendToGeneratorQuickMenu } from './SendToGeneratorQuickMenu';
 
 interface UserAnalyticsDashboardProps {
   palettes?: Palette[];
@@ -51,7 +53,8 @@ interface UserAnalyticsDashboardProps {
   collections?: CollectionBoard[];
   favoriteColors?: FavoriteColor[];
   submissions?: CommunitySubmission[];
-  onOpenInGenerator?: (colors: string[]) => void;
+  onOpenInGenerator?: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onOpenExport?: (colors: string[], title?: string) => void;
   onNavigateToProfile?: () => void;
 }
@@ -213,6 +216,7 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
   favoriteColors = [],
   submissions = [],
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onOpenExport,
   onNavigateToProfile
 }) => {
@@ -479,13 +483,17 @@ export const UserAnalyticsDashboard: React.FC<UserAnalyticsDashboardProps> = ({
           )}
 
           {colorAnalytics.topSwatchHexes.length > 0 && onOpenInGenerator && (
-            <button
-              onClick={() => onOpenInGenerator(colorAnalytics.topSwatchHexes.slice(0, 5))}
-              className="px-4 py-2 rounded-lg bg-gradient-to-r from-[#6366F1] to-[#06B6D4] hover:opacity-95 text-white text-xs font-semibold flex items-center gap-2 shadow-lg shadow-indigo-500/20 transition-all cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Gerar com Cores Mais Usadas</span>
-            </button>
+            <SendToGeneratorQuickMenu
+              colors={colorAnalytics.topSwatchHexes.slice(0, 5)}
+              title="Top 5 Cores Mais Utilizadas"
+              sourceLabel="Analytics: Cores Mais Usadas"
+              sourceType="swatch"
+              onOpenInGenerator={onOpenInGenerator}
+              onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+              size="md"
+              variant="primary"
+              label="Gerar com Cores Mais Usadas"
+            />
           )}
         </div>
       </div>

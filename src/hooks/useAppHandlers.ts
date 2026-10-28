@@ -13,7 +13,10 @@ import {
     AuthUser,
     ProjectSlot,
     StudioStage,
-    NavigationTab
+    NavigationTab,
+    GeneratorOpenMode,
+    OverlayStrategy,
+    SendToGeneratorPayload
 } from '../types';
 import {
     CreatorProfile,
@@ -68,9 +71,10 @@ interface UseAppHandlersParams {
     requireSession: () => boolean;
     runMutation: RunMutation;
     showToast: ShowToast;
-    setActivePalette: (colors: string[]) => void;
+    setActivePalette: React.Dispatch<React.SetStateAction<string[]>>;
     setActiveStage: (stage: StudioStage) => void;
     setCurrentTab: (tab: NavigationTab) => void;
+    setGeneratorEditingIndex?: (index: number | null) => void;
     setExportPaletteTitle: (title: string) => void;
     setIsExportModalOpen: (open: boolean) => void;
     setSavePaletteModalTitle: (title: string) => void;
@@ -128,18 +132,89 @@ export function useAppHandlers(params: UseAppHandlersParams) {
         collections,
         projects,
         favoriteColors,
-        submissions
+        submissions,
+        setGeneratorEditingIndex
     } = params;
 
     // -------------------------------------------------------------------------
     // Handlers — Estúdio
     // -------------------------------------------------------------------------
 
-    const handleOpenInGenerator = useCallback((colors: string[]) => {
-        if (colors && colors.length > 0) setActivePalette(colors);
+    const handleOpenInGenerator = useCallback((
+        colorsOrPayload: string[] | SendToGeneratorPayload,
+        mode: GeneratorOpenMode = 'new',
+        options?: {
+            startEditingIndex?: number;
+            strategy?: OverlayStrategy;
+            sourceLabel?: string;
+        }
+    ) => {
+        let colors: string[] = [];
+        let effectiveMode: GeneratorOpenMode = mode;
+        let editIdx = options?.startEditingIndex;
+        let strategy: OverlayStrategy = options?.strategy ?? 'append';
+
+        if (Array.isArray(colorsOrPayload)) {
+            colors = colorsOrPayload;
+        } else if (colorsOrPayload && typeof colorsOrPayload === 'object') {
+            colors = colorsOrPayload.colors || [];
+            effectiveMode = colorsOrPayload.defaultMode || mode;
+            if (colorsOrPayload.initialEditIndex !== undefined) {
+                editIdx = colorsOrPayload.initialEditIndex;
+            }
+        }
+
+        if (!colors || colors.length === 0) {
+            setActiveStage('generate');
+            setCurrentTab('generator');
+            return;
+        }
+
+        if (effectiveMode === 'overlay') {
+            setActivePalette(prev => {
+                const current = (prev && prev.length > 0) ? prev : ['#0E1726', '#08BBD9', '#3B82F6', '#9354F5', '#FF2A85'];
+                let merged: string[] = [];
+                if (strategy === 'append') {
+                    const remainingSlots = Math.max(0, 8 - current.length);
+                    merged = [...current, ...colors.slice(0, remainingSlots)];
+                } else if (strategy === 'blend') {
+                    merged = [];
+                    const maxLen = Math.max(current.length, colors.length);
+                    for (let i = 0; i < maxLen; i++) {
+                        if (i < current.length) merged.push(current[i]);
+                        if (i < colors.length && !merged.includes(colors[i])) merged.push(colors[i]);
+                    }
+                } else if (strategy === 'replace-unlocked') {
+                    merged = [...current];
+                    for (let i = 0; i < colors.length && i < merged.length; i++) {
+                        merged[merged.length - 1 - i] = colors[i];
+                    }
+                } else {
+                    merged = [...current, ...colors];
+                }
+                return merged.slice(0, 8);
+            });
+            showToast(`${colors.length} cor(es) sobreposta(s) com sucesso à paleta do Gerador!`);
+        } else {
+            // 'new' or 'edit'
+            setActivePalette(colors.slice(0, 8));
+            if (effectiveMode === 'edit') {
+                showToast('Paleta carregada no Gerador pronta para edição!');
+                if (editIdx === undefined) editIdx = 0;
+            } else {
+                showToast('Nova paleta carregada no Gerador com sucesso!');
+            }
+        }
+
+        if (editIdx !== undefined && editIdx !== null) {
+            setGeneratorEditingIndex?.(editIdx);
+        } else {
+            setGeneratorEditingIndex?.(null);
+        }
+
         setActiveStage('generate');
         setCurrentTab('generator');
-    }, [setActivePalette, setActiveStage, setCurrentTab]);
+    }, [setActivePalette, setActiveStage, setCurrentTab, showToast, setGeneratorEditingIndex]);
 
     const handleSendToAudit = useCallback((colors: string[]) => {
         if (colors && colors.length > 0) setActivePalette(colors);

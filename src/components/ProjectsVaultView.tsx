@@ -19,8 +19,9 @@ import {
   Sliders,
   X
 } from 'lucide-react';
-import { ProjectWorkspace, ProjectPalette, CollectionBoard, FavoriteColor, VaultPalette, ProjectSlot } from '../types';
+import { ProjectWorkspace, ProjectPalette, CollectionBoard, FavoriteColor, VaultPalette, ProjectSlot, GeneratorOpenMode, SendToGeneratorPayload } from '../types';
 import { AddFavoriteToTargetModal } from './AddFavoriteToTargetModal';
+import { SendToGeneratorQuickMenu } from './SendToGeneratorQuickMenu';
 
 type PaletteRole = 'Primária' | 'Secundária' | 'Acentos' | 'UI / Superfícies' | 'Semântica' | 'Dark Mode';
 
@@ -29,7 +30,8 @@ interface ProjectsVaultViewProps {
   collections: CollectionBoard[];
   favoriteColors: FavoriteColor[];
   vaultPalettes: VaultPalette[];
-  onOpenInGenerator: (colors: string[]) => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onOpenExport: (colors: string[], title?: string) => void;
   onCreateProject: (project: ProjectWorkspace) => void;
   onDeleteProject?: (projectId: string) => void;
@@ -58,6 +60,7 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
   favoriteColors,
   vaultPalettes,
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onOpenExport,
   onCreateProject,
   onDeleteProject,
@@ -512,13 +515,16 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                             </div>
 
                             <div className="flex items-center gap-1">
-                              <button
-                                onClick={() => onOpenInGenerator(pal.colors)}
-                                className="px-2 py-1 rounded bg-[#6366F1]/20 hover:bg-[#6366F1]/40 text-[#6366F1] text-[11px] font-semibold transition-colors cursor-pointer"
-                                title="Carregar no Estúdio"
-                              >
-                                Carregar no Estúdio
-                              </button>
+                              <SendToGeneratorQuickMenu
+                                colors={pal.colors}
+                                title={`${proj.name} - ${pal.name}`}
+                                sourceLabel={`Projeto: ${proj.name} (${pal.name})`}
+                                sourceType="project"
+                                onOpenInGenerator={onOpenInGenerator}
+                                onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                                size="sm"
+                                label="Estúdio"
+                              />
                               <button
                                 onClick={() => onOpenExport(pal.colors, `${proj.name} - ${pal.name}`)}
                                 className="p-1 text-[#94A3B8] hover:text-white transition-colors cursor-pointer"
@@ -647,10 +653,22 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
               {/* Color Stripes Header */}
               <button
                 type="button"
-                onClick={() => onOpenInGenerator(col.coverColors)}
+                onClick={() => {
+                  if (onOpenSendToGeneratorModal) {
+                    onOpenSendToGeneratorModal({
+                      colors: col.coverColors,
+                      title: col.title,
+                      sourceLabel: `Coleção: ${col.title}`,
+                      sourceType: 'collection',
+                      defaultMode: 'overlay'
+                    });
+                  } else {
+                    onOpenInGenerator(col.coverColors, 'overlay');
+                  }
+                }}
                 className="h-32 w-full flex cursor-pointer border-0 p-0 bg-transparent focus:outline-none focus-visible:ring-2 focus-visible:ring-[#06B6D4] focus-visible:ring-inset"
-                title="Clique para carregar no Estúdio"
-                aria-label={`Carregar a coleção ${col.title} no Estúdio`}
+                title="Clique para levar ao Gerador (Criação, Edição ou Sobreposição)"
+                aria-label={`Levar a coleção ${col.title} ao Gerador`}
               >
                 {col.coverColors.map((c, i) => (
                   <div key={`${col.id}-cover-${c}-${i}`} className="flex-1 h-full transition-transform hover:scale-105" style={{ backgroundColor: c }} />
@@ -697,22 +715,16 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                   <span className="text-[#64748B] font-mono">Criado em {col.createdAt}</span>
 
                   <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => handleSendColorsToGenerator(col.coverColors)}
-                      className="h-7 px-2.5 rounded bg-[#6366F1] hover:bg-[#5254E0] text-white text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
-                      title="Enviar cores para o Gerador"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Gerador</span>
-                    </button>
-                    <button
-                      onClick={() => handleSendColorsToEditor(col.coverColors)}
-                      className="h-7 px-2.5 rounded bg-[#06B6D4] hover:bg-[#08BBD9] text-black text-[11px] font-medium transition-colors cursor-pointer flex items-center gap-1"
-                      title="Enviar cores para o Editor"
-                    >
-                      <Sliders className="w-3.5 h-3.5" />
-                      <span>Editor</span>
-                    </button>
+                    <SendToGeneratorQuickMenu
+                      colors={col.coverColors}
+                      title={col.title}
+                      sourceLabel={`Coleção: ${col.title}`}
+                      sourceType="collection"
+                      onOpenInGenerator={onOpenInGenerator}
+                      onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                      size="sm"
+                      label="Gerador"
+                    />
                     <button
                       onClick={() => onSendToAudit(col.coverColors)}
                       className="h-7 px-2.5 rounded bg-[#181C24] hover:bg-[#262A33] text-[#06B6D4] hover:text-white text-[11px] font-medium transition-colors border border-[#06B6D4]/30 flex items-center gap-1 cursor-pointer"
@@ -772,19 +784,20 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                   <Plus className="w-3.5 h-3.5" />
                   <span>Salvar Nova Paleta no Cofre</span>
                 </button>
-                <button
-                  onClick={() => {
-                    const allVaultColors = [
-                      ...vaultPalettes.flatMap(p => p.colors),
-                      ...favoriteColors.map(c => c.hex)
-                    ];
-                    onOpenInGenerator(allVaultColors.slice(0, 5));
-                  }}
-                  className="h-8 px-3 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Gerar Paleta com o Cofre</span>
-                </button>
+                <SendToGeneratorQuickMenu
+                  colors={[
+                    ...vaultPalettes.flatMap(p => p.colors),
+                    ...favoriteColors.map(c => c.hex)
+                  ].slice(0, 8)}
+                  title="Cofre Geral de Cores"
+                  sourceLabel="Cofre de Cores"
+                  sourceType="vault"
+                  onOpenInGenerator={onOpenInGenerator}
+                  onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                  size="md"
+                  variant="primary"
+                  label="Gerar com o Cofre"
+                />
               </div>
             </div>
 
@@ -961,12 +974,17 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                               <Gavel className="w-3.5 h-3.5" />
                               <span>Curadoria</span>
                             </button>
-                            <button
-                              onClick={() => onOpenInGenerator(pal.colors)}
-                              className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-black text-[11px] font-bold transition-colors cursor-pointer"
-                            >
-                              Carregar no Estúdio
-                            </button>
+                            <SendToGeneratorQuickMenu
+                              colors={pal.colors}
+                              title={pal.title}
+                              sourceLabel={`Cofre: ${pal.title}`}
+                              sourceType="vault"
+                              onOpenInGenerator={onOpenInGenerator}
+                              onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                              size="sm"
+                              variant="amber"
+                              label="Gerador"
+                            />
                           </div>
                         </div>
                       </div>
@@ -1015,6 +1033,18 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                             <FolderPlus className="w-3.5 h-3.5 text-[#06B6D4]" />
                             <span>Adicionar ({selectedFavIds.length}) a Projeto / Coleção</span>
                           </button>
+
+                          <SendToGeneratorQuickMenu
+                            colors={favoriteColors.filter(f => selectedFavIds.includes(f.id)).map(f => f.hex)}
+                            title={`${selectedFavIds.length} Amostras Favoritas Selecionadas`}
+                            sourceLabel="Cofre: Amostras Favoritas"
+                            sourceType="swatch"
+                            onOpenInGenerator={onOpenInGenerator}
+                            onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                            size="sm"
+                            variant="amber"
+                            label={`Levar (${selectedFavIds.length}) ao Gerador`}
+                          />
 
                           <button
                             onClick={() => {
@@ -1094,20 +1124,17 @@ export const ProjectsVaultView: React.FC<ProjectsVaultViewProps> = ({
                           >
                             <FolderPlus className="w-3.5 h-3.5" />
                           </button>
-                          <button
-                            onClick={() => handleSendColorsToGenerator([fav.hex])}
-                            className="p-1.5 rounded-md bg-[#6366F1]/20 hover:bg-[#6366F1]/40 text-[#6366F1] hover:text-white transition-colors cursor-pointer"
-                            title="Enviar para o Gerador"
-                          >
-                            <Sparkles className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            onClick={() => handleSendColorsToEditor([fav.hex])}
-                            className="p-1.5 rounded-md bg-[#06B6D4]/20 hover:bg-[#06B6D4]/40 text-[#06B6D4] hover:text-white transition-colors cursor-pointer"
-                            title="Enviar para o Editor"
-                          >
-                            <Sliders className="w-3.5 h-3.5" />
-                          </button>
+                          <SendToGeneratorQuickMenu
+                            colors={[fav.hex]}
+                            title={fav.name}
+                            sourceLabel={`Amostra: ${fav.name} (${fav.hex})`}
+                            sourceType="swatch"
+                            onOpenInGenerator={onOpenInGenerator}
+                            onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                            size="sm"
+                            variant="secondary"
+                            label="Gerador"
+                          />
                           <button
                             onClick={() => handleOpenSubmitToCuration([fav.hex], 'board', fav.id, fav.name)}
                             className="p-1.5 rounded-md bg-amber-400/20 hover:bg-amber-400/40 text-amber-300 hover:text-white transition-colors cursor-pointer"

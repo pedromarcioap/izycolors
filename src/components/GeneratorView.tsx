@@ -19,9 +19,10 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
-  Wand2
+  Wand2,
+  Layers
 } from 'lucide-react';
-import { ColorItem } from '../types';
+import { ColorItem, SendToGeneratorPayload } from '../types';
 import {
   getColorDetails,
   getContrastRatio,
@@ -39,6 +40,8 @@ interface GeneratorViewProps {
   onSaveToFavorites: (hex: string, name: string) => void;
   onSaveToCollection: (colors: string[]) => void;
   onOpenExport: (colors: string[]) => void;
+  initialEditingIndex?: number | null;
+  onOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
 }
 
 // Helper function to evaluate WCAG badge labels without nested ternaries
@@ -398,7 +401,9 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
   onColorsChange,
   onSaveToFavorites,
   onSaveToCollection,
-  onOpenExport
+  onOpenExport,
+  initialEditingIndex,
+  onOpenSendToGeneratorModal
 }) => {
   const {
     colors,
@@ -429,7 +434,18 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
     copyColor,
     handleUndo,
     handleRedo
-  } = useGenerator({ initialColors: activePalette });
+  } = useGenerator({
+    initialColors: activePalette,
+    initialEditingIndex
+  });
+
+  // Sync colors to parent activePalette
+  useEffect(() => {
+    if (onColorsChange && colors.length > 0) {
+      const hexList = colors.map(c => c.hex);
+      onColorsChange(hexList);
+    }
+  }, [colors, onColorsChange]);
 
   const [isSmartInputOpen, setIsSmartInputOpen] = useState(false);
   const [hoveredSwatch, setHoveredSwatch] = useState<{
@@ -601,6 +617,25 @@ export const GeneratorView: React.FC<GeneratorViewProps> = ({
               <Wand2 className="w-3.5 h-3.5 text-[#06B6D4]" />
               <span className="hidden sm:inline">Gerar por Mood</span>
               <span className="text-[9px] bg-white/10 px-1 rounded font-mono">⌘K</span>
+            </button>
+
+            {/* Importar & Sobrepor do Cofre / Coleções */}
+            <button
+              onClick={() => {
+                if (onOpenSendToGeneratorModal) {
+                  onOpenSendToGeneratorModal({
+                    colors: colors.map(c => c.hex),
+                    title: 'Sobrepor na Paleta Atual',
+                    sourceLabel: 'Biblioteca / Cofre',
+                    defaultMode: 'overlay'
+                  });
+                }
+              }}
+              className="h-8 px-2.5 rounded text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer bg-[#181C24] hover:bg-[#262A33] text-amber-300 border border-amber-400/30 hover:border-amber-400/60 shadow-sm"
+              title="Importar e sobrepor cores do Cofre, Coleções e Paletas salvas"
+            >
+              <Layers className="w-3.5 h-3.5 text-amber-300" />
+              <span className="hidden md:inline">Importar / Sobrepor</span>
             </button>
 
             {/* Seed Colors Active Badge */}

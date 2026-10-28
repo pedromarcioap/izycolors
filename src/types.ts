@@ -24,6 +24,21 @@ export type NavigationTab =
 
 export type StudioStage = 'generate' | 'refine' | 'audit' | 'export';
 
+/** Modes for opening colors in the generator */
+export type GeneratorOpenMode = 'new' | 'edit' | 'overlay';
+
+/** Strategies when overlaying/merging colors into current generator palette */
+export type OverlayStrategy = 'append' | 'replace-unlocked' | 'blend' | 'custom';
+
+export interface SendToGeneratorPayload {
+  colors: string[];
+  title?: string;
+  sourceLabel?: string;
+  sourceType?: 'collection' | 'vault' | 'palette' | 'project' | 'swatch' | 'image' | 'curation' | 'custom';
+  defaultMode?: GeneratorOpenMode;
+  initialEditIndex?: number;
+}
+
 export interface AuthUser {
   id: string;
   email: string;

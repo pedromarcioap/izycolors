@@ -6,7 +6,6 @@ import {
   Bookmark,
   Lock,
   Globe,
-  Sliders,
   Check,
   Copy,
   Download,
@@ -14,7 +13,6 @@ import {
   Sparkles,
   CheckCircle2,
   Settings,
-  ChevronRight,
   Plus,
   Palette as PaletteIcon,
   Trash2,
@@ -37,8 +35,11 @@ import {
   AuthUser,
   ColorFormat,
   NamingConvention,
-  ProjectSlot
+  ProjectSlot,
+  GeneratorOpenMode,
+  SendToGeneratorPayload
 } from '../types';
+import { SendToGeneratorQuickMenu } from './SendToGeneratorQuickMenu';
 import { exportCssTokens } from '../utils/colorUtils';
 import { UserAnalyticsDashboard } from './UserAnalyticsDashboard';
 import { AdminAiSettings } from './AdminAiSettings';
@@ -54,7 +55,8 @@ interface ProfileViewProps {
   vaultPalettes?: VaultPalette[];
   submissions?: CommunitySubmission[];
   initialSubTab?: 'analytics' | 'palettes' | 'submissions' | 'swatches' | 'showcase' | 'collections' | 'vault' | 'settings';
-  onOpenInGenerator: (colors: string[]) => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onSaveToCollection?: (colors: string[]) => void;
   onOpenExport: (colors: string[], title?: string) => void;
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
@@ -183,7 +185,8 @@ const EmptyState: React.FC<EmptyStateProps> = ({ icon, title, hint }) => (
 interface PalettesPanelProps {
   palettes: Palette[];
   copiedId: string | null;
-  onOpenInGenerator: (colors: string[]) => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onSaveToCollection?: (colors: string[]) => void;
   onOpenExport: (colors: string[], title?: string) => void;
   onOpenSubmissionModal?: () => void;
@@ -194,6 +197,7 @@ const PalettesPanel: React.FC<PalettesPanelProps> = ({
   palettes,
   copiedId,
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onSaveToCollection,
   onOpenExport,
   onOpenSubmissionModal,
@@ -281,13 +285,18 @@ const PalettesPanel: React.FC<PalettesPanelProps> = ({
 
               {/* Actions footer */}
               <div className="flex items-center gap-2 pt-4 border-t border-white/[0.06]">
-                <button
-                  onClick={() => onOpenInGenerator(p.colors)}
-                  className="flex-1 h-8 bg-[#202532] hover:bg-[#2C3345] text-white rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-                >
-                  <Sliders className="w-3 h-3" />
-                  <span>Gerador</span>
-                </button>
+                <SendToGeneratorQuickMenu
+                  colors={p.colors}
+                  title={p.title}
+                  sourceLabel={`Minha Paleta: ${p.title}`}
+                  sourceType="palette"
+                  onOpenInGenerator={onOpenInGenerator}
+                  onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                  size="sm"
+                  variant="primary"
+                  label="Gerador"
+                  className="flex-1"
+                />
 
                 <button
                   onClick={() => onSaveToCollection?.(p.colors)}
@@ -323,11 +332,12 @@ const PalettesPanel: React.FC<PalettesPanelProps> = ({
 
 interface SubmissionsPanelProps {
   submissions: CommunitySubmission[];
-  onOpenInGenerator: (colors: string[]) => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onOpenSubmissionModal?: () => void;
 }
 
-const SubmissionsPanel: React.FC<SubmissionsPanelProps> = ({ submissions, onOpenInGenerator, onOpenSubmissionModal }) => (
+const SubmissionsPanel: React.FC<SubmissionsPanelProps> = ({ submissions, onOpenInGenerator, onOpenSendToGeneratorModal, onOpenSubmissionModal }) => (
   <div className="bg-[#141822] border border-white/[0.08] rounded-xl p-6 shadow-xl space-y-4">
     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.06]">
       <div>
@@ -387,13 +397,17 @@ const SubmissionsPanel: React.FC<SubmissionsPanelProps> = ({ submissions, onOpen
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => onOpenInGenerator(sub.colors)}
-                className="h-8 px-3 bg-[#10141D] hover:bg-[#202534] border border-white/[0.1] rounded text-xs text-[#94A3B8] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <span>Abrir no Gerador</span>
-                <ChevronRight className="w-3 h-3" />
-              </button>
+              <SendToGeneratorQuickMenu
+                colors={sub.colors}
+                title={sub.title}
+                sourceLabel={`Submissão: ${sub.title}`}
+                sourceType="curation"
+                onOpenInGenerator={onOpenInGenerator}
+                onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                size="sm"
+                variant="secondary"
+                label="Gerador"
+              />
             </div>
           </div>
         ))}
@@ -556,7 +570,8 @@ const CollectionsPanel: React.FC<CollectionsPanelProps> = ({ collections, onDele
 interface VaultPanelProps {
   vaultPalettes: VaultPalette[];
   copiedColor: string | null;
-  onOpenInGenerator: (colors: string[]) => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onOpenExport: (colors: string[], title?: string) => void;
   onDeleteVaultPalette?: (id: string) => void;
   onCopyColorHex: (hex: string) => void;
@@ -566,6 +581,7 @@ const VaultPanel: React.FC<VaultPanelProps> = ({
   vaultPalettes,
   copiedColor,
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onOpenExport,
   onDeleteVaultPalette,
   onCopyColorHex
@@ -690,12 +706,17 @@ const VaultPanel: React.FC<VaultPanelProps> = ({
                     >
                       Exportar
                     </button>
-                    <button
-                      onClick={() => onOpenInGenerator(pal.colors)}
-                      className="px-3 py-1 rounded bg-amber-400 hover:bg-amber-300 text-black text-[11px] font-bold transition-colors cursor-pointer"
-                    >
-                      Abrir no Gerador
-                    </button>
+                    <SendToGeneratorQuickMenu
+                      colors={pal.colors}
+                      title={pal.title}
+                      sourceLabel={`Cofre: ${pal.title}`}
+                      sourceType="vault"
+                      onOpenInGenerator={onOpenInGenerator}
+                      onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+                      size="sm"
+                      variant="amber"
+                      label="Gerador"
+                    />
                   </div>
                 </div>
               </div>
@@ -979,6 +1000,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   submissions = [],
   initialSubTab,
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onSaveToCollection,
   onOpenExport,
   onUpdateProfile,
@@ -1139,6 +1161,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             palettes={safePalettes}
             copiedId={copiedId}
             onOpenInGenerator={onOpenInGenerator}
+            onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
             onSaveToCollection={onSaveToCollection}
             onOpenExport={onOpenExport}
             onOpenSubmissionModal={onOpenSubmissionModal}
@@ -1150,6 +1173,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           <SubmissionsPanel
             submissions={visibleSubmissions}
             onOpenInGenerator={onOpenInGenerator}
+            onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
             onOpenSubmissionModal={onOpenSubmissionModal}
           />
         );
@@ -1211,6 +1235,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             vaultPalettes={safeVaultPalettes}
             copiedColor={copiedColor}
             onOpenInGenerator={onOpenInGenerator}
+            onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
             onOpenExport={onOpenExport}
             onDeleteVaultPalette={onDeleteVaultPalette}
             onCopyColorHex={handleCopyColorHex}

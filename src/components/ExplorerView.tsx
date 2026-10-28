@@ -3,7 +3,6 @@ import {
   Heart,
   Bookmark,
   Code,
-  Sliders,
   Sparkles,
   Trophy,
   Filter,
@@ -22,14 +21,16 @@ import {
   X,
   Search
 } from 'lucide-react';
-import { Palette, CmsArticle } from '../types';
+import { Palette, CmsArticle, GeneratorOpenMode, SendToGeneratorPayload } from '../types';
 import { exportCssTokens } from '../utils/colorUtils';
 import { MarkdownRenderer } from './MarkdownRenderer';
+import { SendToGeneratorQuickMenu } from './SendToGeneratorQuickMenu';
 
 interface ExplorerViewProps {
   palettes: Palette[];
   articles?: CmsArticle[];
-  onOpenInGenerator: (colors: string[]) => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onSaveToCollection: (colors: string[]) => void;
   onLikePalette: (paletteId: string) => void;
   onForkPalette?: (palette: Palette) => void;
@@ -41,6 +42,7 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
   palettes,
   articles = [],
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onSaveToCollection,
   onLikePalette,
   onForkPalette,
@@ -410,7 +412,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                   copiedTokensId={copiedTokensId}
                   onLike={() => handleLike(palette.id)}
                   onFork={() => handleFork(palette)}
-                  onOpenInGenerator={() => onOpenInGenerator(palette.colors)}
+                  onOpenInGenerator={onOpenInGenerator}
+                  onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
                   onSaveToCollection={() => onSaveToCollection(palette.colors)}
                   onCopyTokens={() => handleCopyTokens(palette)}
                   onSendToAudit={onSendToAudit}
@@ -508,7 +511,8 @@ export const ExplorerView: React.FC<ExplorerViewProps> = ({
                   copiedTokensId={copiedTokensId}
                   onLike={() => handleLike(palette.id)}
                   onFork={() => handleFork(palette)}
-                  onOpenInGenerator={() => onOpenInGenerator(palette.colors)}
+                  onOpenInGenerator={onOpenInGenerator}
+                  onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
                   onSaveToCollection={() => onSaveToCollection(palette.colors)}
                   onCopyTokens={() => handleCopyTokens(palette)}
                   onSendToAudit={onSendToAudit}
@@ -703,7 +707,8 @@ interface PaletteCardProps {
   copiedTokensId: string | null;
   onLike: () => void;
   onFork: () => void;
-  onOpenInGenerator: () => void;
+  onOpenInGenerator: (colors: string[], mode?: GeneratorOpenMode) => void;
+  onOpenSendToGeneratorModal?: (payload: SendToGeneratorPayload) => void;
   onSaveToCollection: () => void;
   onCopyTokens: () => void;
   onSendToAudit: (colors: string[]) => void;
@@ -716,6 +721,7 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
   onLike,
   onFork,
   onOpenInGenerator,
+  onOpenSendToGeneratorModal,
   onSaveToCollection,
   onCopyTokens,
   onSendToAudit
@@ -735,8 +741,16 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
               if (e.shiftKey) {
                 e.stopPropagation();
                 onSendToAudit([c]);
+              } else if (onOpenSendToGeneratorModal) {
+                onOpenSendToGeneratorModal({
+                  colors: palette.colors,
+                  title: palette.title,
+                  sourceLabel: `Comunidade: ${palette.title}`,
+                  sourceType: 'palette',
+                  defaultMode: 'overlay'
+                });
               } else {
-                onOpenInGenerator();
+                onOpenInGenerator(palette.colors, 'overlay');
               }
             }}
             onKeyDown={(e) => {
@@ -745,8 +759,16 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
                 if (e.shiftKey) {
                   e.stopPropagation();
                   onSendToAudit([c]);
+                } else if (onOpenSendToGeneratorModal) {
+                  onOpenSendToGeneratorModal({
+                    colors: palette.colors,
+                    title: palette.title,
+                    sourceLabel: `Comunidade: ${palette.title}`,
+                    sourceType: 'palette',
+                    defaultMode: 'overlay'
+                  });
                 } else {
-                  onOpenInGenerator();
+                  onOpenInGenerator(palette.colors, 'overlay');
                 }
               }
             }}
@@ -779,7 +801,19 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
             <h3 className="font-['Geist']">
               <button
                 type="button"
-                onClick={onOpenInGenerator}
+                onClick={() => {
+                  if (onOpenSendToGeneratorModal) {
+                    onOpenSendToGeneratorModal({
+                      colors: palette.colors,
+                      title: palette.title,
+                      sourceLabel: `Comunidade: ${palette.title}`,
+                      sourceType: 'palette',
+                      defaultMode: 'overlay'
+                    });
+                  } else {
+                    onOpenInGenerator(palette.colors, 'overlay');
+                  }
+                }}
                 className="text-base font-semibold text-white tracking-tight cursor-pointer hover:text-[#06B6D4] transition-colors font-['Geist'] text-left"
               >
                 {palette.title}
@@ -838,17 +872,21 @@ const PaletteCard: React.FC<PaletteCardProps> = ({
         {/* Card Action Buttons */}
         <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <button
-              onClick={onOpenInGenerator}
-              className="h-8 px-3 rounded-lg bg-[#6366F1] hover:bg-[#5254E0] text-white text-xs font-medium flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
-            >
-              <Sliders className="w-3.5 h-3.5" />
-              <span>Editar</span>
-            </button>
+            <SendToGeneratorQuickMenu
+              colors={palette.colors}
+              title={palette.title}
+              sourceLabel={`Comunidade: ${palette.title}`}
+              sourceType="palette"
+              onOpenInGenerator={onOpenInGenerator}
+              onOpenSendToGeneratorModal={onOpenSendToGeneratorModal}
+              size="sm"
+              variant="primary"
+              label="Gerador"
+            />
 
             <button
               onClick={onFork}
-              className="h-8 px-2.5 rounded-lg bg-[#181C24] hover:bg-[#262A33] text-[#06B6D4] hover:text-white text-xs font-medium flex items-center gap-1 transition-colors border border-[#06B6D4]/30 hover:border-[#06B6D4] cursor-pointer"
+              className="h-7 px-2.5 rounded-lg bg-[#181C24] hover:bg-[#262A33] text-[#06B6D4] hover:text-white text-xs font-medium flex items-center gap-1 transition-colors border border-[#06B6D4]/30 hover:border-[#06B6D4] cursor-pointer"
               title="Criar Fork / Clone desta paleta"
             >
               <GitFork className="w-3.5 h-3.5" />

@@ -18,6 +18,7 @@ import { SubmitPaletteModal } from './components/SubmitPaletteModal';
 import { SavePaletteModal } from './components/SavePaletteModal';
 import { WorkflowDock } from './components/WorkflowDock';
 import { AvatarEditorModal } from './components/AvatarEditorModal';
+import { SendToGeneratorModal } from './components/SendToGeneratorModal';
 import { useAppHandlers } from './hooks/useAppHandlers';
 import { useAppData } from './hooks/useAppData';
 
@@ -40,7 +41,9 @@ import {
   AuditLogItem,
   ColorFormat,
   NamingConvention,
-  ProjectSlot
+  ProjectSlot,
+  GeneratorOpenMode,
+  SendToGeneratorPayload
 } from './types';
 
 import { isSupabaseConfigured } from './services/supabase';
@@ -359,6 +362,8 @@ const GenerateStageContent: React.FC<{
   handleCreateCollection?: (collection: CollectionBoard) => void;
   handleOpenSavePaletteModal: (colors?: string[], title?: string) => void;
   handleOpenExport: (colors?: string[], title?: string) => void;
+  generatorEditingIndex?: number | null;
+  handleOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
 }> = ({
   generateInputMode,
   setGenerateInputMode,
@@ -378,7 +383,9 @@ const GenerateStageContent: React.FC<{
   handleCreateProject,
   handleCreateCollection,
   handleOpenSavePaletteModal,
-  handleOpenExport
+  handleOpenExport,
+  generatorEditingIndex,
+  handleOpenSendToGeneratorModal
 }) => (
     <>
       <GenerateInputModeBar mode={generateInputMode} onChange={setGenerateInputMode} />
@@ -389,6 +396,8 @@ const GenerateStageContent: React.FC<{
           onSaveToFavorites={handleSaveToFavorites}
           onSaveToCollection={handleOpenSavePaletteModal}
           onOpenExport={handleOpenExport}
+          initialEditingIndex={generatorEditingIndex}
+          onOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
         />
       ) : (
         <ImageExtractorView
@@ -461,6 +470,8 @@ const StudioContent: React.FC<{
   handleOpenExport: (colors?: string[], title?: string) => void;
   openSavePaletteModal: () => void;
   openExportModal: () => void;
+  generatorEditingIndex?: number | null;
+  handleOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
 }> = ({
   activeStage,
   activePalette,
@@ -485,7 +496,9 @@ const StudioContent: React.FC<{
   handleOpenSavePaletteModal,
   handleOpenExport,
   openSavePaletteModal,
-  openExportModal
+  openExportModal,
+  generatorEditingIndex,
+  handleOpenSendToGeneratorModal
 }) => (
     <div className="flex-1 flex flex-col min-h-0">
       {activeStage === 'generate' && (
@@ -509,6 +522,8 @@ const StudioContent: React.FC<{
           handleCreateCollection={handleCreateCollection}
           handleOpenSavePaletteModal={handleOpenSavePaletteModal}
           handleOpenExport={handleOpenExport}
+          generatorEditingIndex={generatorEditingIndex}
+          handleOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
         />
       )}
 
@@ -543,6 +558,7 @@ const ExplorerTab: React.FC<{
   handleLikePalette: (paletteId: string) => void;
   handleForkPalette: (palette: Palette) => void;
   handleSendToAudit: (colors: string[]) => void;
+  handleOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
 }> = ({
   palettes,
   articles,
@@ -553,12 +569,14 @@ const ExplorerTab: React.FC<{
   handleOpenSavePaletteModal,
   handleLikePalette,
   handleForkPalette,
-  handleSendToAudit
+  handleSendToAudit,
+  handleOpenSendToGeneratorModal
 }) => (
     <ExplorerView
       palettes={palettes}
       articles={articles}
       onOpenInGenerator={handleOpenInGenerator}
+      onOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
       onSaveToCollection={handleOpenSavePaletteModal}
       onLikePalette={handleLikePalette}
       onForkPalette={handleForkPalette}
@@ -596,6 +614,7 @@ const ProjectsTab: React.FC<{
   ) => void;
   handleAddColorsToCollection: (collectionId: string, colors: string[]) => void;
   handleSubmitToCuration: (submission: { title: string; colors: string[]; tags: string[]; gamut: string; type: 'collection' | 'board'; sourceId: string }) => void;
+  handleOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
 }> = ({
   isSignedIn,
   openAuth,
@@ -618,7 +637,8 @@ const ProjectsTab: React.FC<{
   handleSendToAudit,
   handleAddColorsToProject,
   handleAddColorsToCollection,
-  handleSubmitToCuration
+  handleSubmitToCuration,
+  handleOpenSendToGeneratorModal
 }) => {
     if (!isSignedIn) {
       return (
@@ -650,6 +670,7 @@ const ProjectsTab: React.FC<{
         onAddColorsToProject={handleAddColorsToProject}
         onAddColorsToCollection={handleAddColorsToCollection}
         onSubmitToCuration={handleSubmitToCuration}
+        onOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
         showToast={showToast}
       />
     );
@@ -791,6 +812,7 @@ const UserDashboardTab: React.FC<{
   submissions: CommunitySubmission[];
   handleOpenInGenerator: (colors: string[]) => void;
   handleOpenExport: (colors?: string[], title?: string) => void;
+  handleOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
 }> = ({
   authUser,
   isSignedIn,
@@ -803,7 +825,8 @@ const UserDashboardTab: React.FC<{
   favoriteColors,
   submissions,
   handleOpenInGenerator,
-  handleOpenExport
+  handleOpenExport,
+  handleOpenSendToGeneratorModal
 }) => {
     if (!isSignedIn || !authUser) {
       return (
@@ -823,6 +846,7 @@ const UserDashboardTab: React.FC<{
         favoriteColors={favoriteColors}
         submissions={submissions}
         onOpenInGenerator={handleOpenInGenerator}
+        onOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
         onOpenExport={handleOpenExport}
         onNavigateToProfile={onNavigateToProfile}
       />
@@ -861,6 +885,7 @@ const ProfileTab: React.FC<{
   handleCreateProject: (project: ProjectWorkspace) => void;
   handleCreateCollection: (collection: CollectionBoard) => void;
   handleLogout: () => void;
+  handleOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
 }> = ({
   authUser,
   openAuth,
@@ -886,7 +911,8 @@ const ProfileTab: React.FC<{
   handleAddColorsToCollection,
   handleCreateProject,
   handleCreateCollection,
-  handleLogout
+  handleLogout,
+  handleOpenSendToGeneratorModal
 }) => {
     if (!authUser) {
       return (
@@ -908,6 +934,7 @@ const ProfileTab: React.FC<{
         vaultPalettes={vaultPalettes}
         submissions={submissions}
         onOpenInGenerator={handleOpenInGenerator}
+        onOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
         onSaveToCollection={handleOpenSavePaletteModal}
         onOpenExport={handleOpenExport}
         onUpdateProfile={handleUpdateProfile}
@@ -996,6 +1023,8 @@ interface MainContentRouterProps {
   handleSubmitToCuration: (submission: { title: string; colors: string[]; tags: string[]; gamut: string; type: 'collection' | 'board'; sourceId: string }) => Promise<void>;
   handleUpdateProfile: (updated: Partial<UserProfile>) => Promise<void>;
   handleLogout: () => Promise<void>;
+  handleOpenSendToGeneratorModal?: (payload?: SendToGeneratorPayload) => void;
+  generatorEditingIndex?: number | null;
 }
 
 const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
@@ -1061,7 +1090,9 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
     handleAddTag,
     handleSubmitToCuration,
     handleUpdateProfile,
-    handleLogout
+    handleLogout,
+    handleOpenSendToGeneratorModal,
+    generatorEditingIndex
   } = props;
 
   const openAuth = () => setIsAuthModalOpen(true);
@@ -1098,6 +1129,8 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           handleOpenExport={handleOpenExport}
           openSavePaletteModal={openSavePaletteModal}
           openExportModal={openExportModal}
+          generatorEditingIndex={generatorEditingIndex}
+          handleOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
         />
       )}
 
@@ -1126,6 +1159,7 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           vaultPalettes={vaultPalettes}
           showToast={showToast}
           handleOpenInGenerator={handleOpenInGenerator}
+          handleOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
           handleOpenExport={handleOpenExport}
           handleCreateProject={handleCreateProject}
           handleDeleteProject={handleDeleteProject}
@@ -1194,6 +1228,7 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           favoriteColors={favoriteColors}
           submissions={submissions}
           handleOpenInGenerator={handleOpenInGenerator}
+          handleOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
           handleOpenExport={handleOpenExport}
         />
       )}
@@ -1214,6 +1249,7 @@ const MainContentRouter: React.FC<MainContentRouterProps> = (props) => {
           setIsAvatarEditorOpen={setIsAvatarEditorOpen}
           setIsSubmitModalOpen={setIsSubmitModalOpen}
           handleOpenInGenerator={handleOpenInGenerator}
+          handleOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
           handleOpenSavePaletteModal={handleOpenSavePaletteModal}
           handleOpenExport={handleOpenExport}
           handleUpdateProfile={handleUpdateProfile}
@@ -1386,6 +1422,34 @@ export function App() {
   const [savePaletteModalTitle, setSavePaletteModalTitle] = useState<string>('Nova Paleta Harmônica');
   const [notificationToast, setNotificationToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
+  // Send to Generator state & initial editing index
+  const [sendToGeneratorModal, setSendToGeneratorModal] = useState<{
+    isOpen: boolean;
+    incomingColors?: string[];
+    title?: string;
+    sourceLabel?: string;
+    sourceType?: 'collection' | 'vault' | 'palette' | 'project' | 'swatch' | 'image' | 'curation' | 'custom';
+    defaultMode?: GeneratorOpenMode;
+  }>({
+    isOpen: false
+  });
+  const [generatorEditingIndex, setGeneratorEditingIndex] = useState<number | null>(null);
+
+  const handleOpenSendToGeneratorModal = useCallback((payload?: SendToGeneratorPayload) => {
+    setSendToGeneratorModal({
+      isOpen: true,
+      incomingColors: payload?.colors,
+      title: payload?.title,
+      sourceLabel: payload?.sourceLabel,
+      sourceType: payload?.sourceType,
+      defaultMode: payload?.defaultMode ?? 'overlay'
+    });
+  }, []);
+
+  const handleCloseSendToGeneratorModal = useCallback(() => {
+    setSendToGeneratorModal(prev => ({ ...prev, isOpen: false }));
+  }, []);
+
   const viewer: AuthUser = authUser ?? ANONYMOUS_VIEWER;
   const isSignedIn = authUser !== null;
 
@@ -1521,6 +1585,7 @@ export function App() {
     setCuratedImages,
     setCreatorProfile,
     setAuthUser,
+    setGeneratorEditingIndex,
     collections,
     projects,
     favoriteColors,
@@ -1646,6 +1711,8 @@ export function App() {
           handleSubmitToCuration={handleSubmitToCuration}
           handleUpdateProfile={handleUpdateProfile}
           handleLogout={handleLogout}
+          handleOpenSendToGeneratorModal={handleOpenSendToGeneratorModal}
+          generatorEditingIndex={generatorEditingIndex}
         />
       </div>
 
@@ -1697,6 +1764,27 @@ export function App() {
       />
 
       {/* Export Tokens Modal with Illustrator & Swatches support */}
+      {/* Modal: Levar ao Gerador (Criação Nova, Edição, Sobreposição) */}
+      <SendToGeneratorModal
+        isOpen={sendToGeneratorModal.isOpen}
+        onClose={handleCloseSendToGeneratorModal}
+        incomingColors={sendToGeneratorModal.incomingColors}
+        title={sendToGeneratorModal.title}
+        sourceLabel={sendToGeneratorModal.sourceLabel}
+        sourceType={sendToGeneratorModal.sourceType}
+        defaultMode={sendToGeneratorModal.defaultMode}
+        currentGeneratorColors={activePalette}
+        onConfirm={(mode, finalColors, options) => {
+          handleOpenInGenerator(finalColors, mode, {
+            startEditingIndex: options?.startEditingIndex,
+            strategy: options?.strategy
+          });
+          handleCloseSendToGeneratorModal();
+        }}
+        collections={collections}
+        vaultPalettes={vaultPalettes}
+      />
+
       <ExportModal
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
